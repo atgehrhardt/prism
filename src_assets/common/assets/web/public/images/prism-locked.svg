@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="prismBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="beamIn" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <!-- incoming light beam -->
+  <rect x="8" y="122" width="78" height="12" rx="6" fill="url(#beamIn)" transform="rotate(14 86 128)"/>
+  <!-- prism -->
+  <path d="M128 36 L208 196 L48 196 Z" fill="url(#prismBody)" stroke="#e2e8f0" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M128 36 L208 196 L48 196 Z" fill="none" stroke="#0f172a" stroke-opacity="0.25" stroke-width="2" stroke-linejoin="round"/>
+  <!-- inner refraction hint -->
+  <path d="M118 128 L138 128 L150 172 L106 172 Z" fill="#ffffff" fill-opacity="0.35"/>
+  <!-- spectrum fan -->
+  <g stroke-linecap="round">
+    <path d="M150 118 L242 78"  stroke="#ef4444" stroke-width="9"/>
+    <path d="M152 128 L246 106" stroke="#f97316" stroke-width="9"/>
+    <path d="M153 138 L248 134" stroke="#eab308" stroke-width="9"/>
+    <path d="M152 148 L246 162" stroke="#22c55e" stroke-width="9"/>
+    <path d="M150 158 L242 190" stroke="#3b82f6" stroke-width="9"/>
+    <path d="M148 168 L236 216" stroke="#8b5cf6" stroke-width="9"/>
+  </g>
+  <circle cx="202" cy="202" r="34" fill="#64748b" stroke="#0f172a" stroke-opacity="0.3" stroke-width="2"/>
+  <rect x="186" y="200" width="32" height="26" rx="4" fill="#ffffff"/>
+  <path d="M192 200 v-8 a10 10 0 0 1 20 0 v8" fill="none" stroke="#ffffff" stroke-width="6"/>
+</svg>
