@@ -37,10 +37,17 @@ fi
 
 # --- 3. Build ----------------------------------------------------------------
 log "Building Prism (this takes a while)"
+# Enable CUDA (NVIDIA DMA-BUF/nvenc path) only when a CUDA toolkit is present;
+# on AMD/Intel systems Sunshine simply builds without it.
+CUDA_FLAG="OFF"
+if command -v nvcc >/dev/null || [ -x /usr/local/cuda/bin/nvcc ]; then
+  CUDA_FLAG="ON"
+fi
 cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
-  -DSUNSHINE_ENABLE_CUDA=OFF \
+  -DSUNSHINE_ENABLE_CUDA="$CUDA_FLAG" \
+  -DCUDA_FAIL_ON_MISSING=OFF \
   -DBUILD_DOCS=OFF -DBUILD_TESTS=OFF
 cmake --build "$SRC_DIR/cmake-build-prism" --parallel "$BUILD_JOBS"
 
