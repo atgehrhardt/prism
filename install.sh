@@ -80,6 +80,10 @@ install -Dm644 "$SRC_DIR/contrib/virtual-session/sunshine-labwc.service" \
 install -Dm644 "$SRC_DIR/contrib/virtual-session/sunshine.service" \
   "$HOME/.config/systemd/user/sunshine.service"
 
+# Build and install the uinput -> labwc virtual-input bridge (also installs
+# prism-input-bridge.service and runs systemctl --user daemon-reload).
+"$SRC_DIR/contrib/virtual-session/build-input-bridge.sh"
+
 # --- 6. apps.json (idempotent merge, with backup) ------------------------------
 APPS="$HOME/.config/sunshine/apps.json"
 mkdir -p "$HOME/.config/sunshine"
