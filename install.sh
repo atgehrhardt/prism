@@ -99,9 +99,17 @@ except Exception:
     data = {"env": {"PATH": "$(PATH):$(HOME)/.local/bin"}, "apps": []}
 data.setdefault("env", {"PATH": "$(PATH):$(HOME)/.local/bin"})
 data.setdefault("apps", [])
+# Remove stock example apps and any previous Prism entries; keep other custom apps.
 data["apps"] = [a for a in data["apps"]
-                if a.get("name") not in ("Desktop", "SteamOS (Headless)")]
-data["apps"].insert(0, {"name": "Desktop", "image-path": "desktop.png"})
+                if a.get("name") not in ("Desktop", "Low Res Desktop", "Steam Big Picture", "SteamOS (Headless)")]
+data["apps"].insert(0, {
+    "name": "Desktop",
+    "image-path": "desktop.png",
+    "prep-cmd": [
+        {"do":   "$(HOME)/.local/bin/prism-desktop-session.sh set",
+         "undo": "$(HOME)/.local/bin/prism-desktop-session.sh restore"}
+    ]
+})
 data["apps"].append({
     "name": "SteamOS (Headless)",
     "image-path": "steam.png",
