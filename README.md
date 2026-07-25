@@ -1,5 +1,7 @@
 # Prism
 
+<p align="center"><img src="prism.svg" width="128" alt="Prism logo"></p>
+
 **Prism** is a fork of [Sunshine](https://github.com/LizardByte/Sunshine) (the self-hosted
 game stream host for Moonlight) that adds **per-app capture override** on Linux/Wayland.
 
