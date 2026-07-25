@@ -65,14 +65,10 @@ cmake --build "$SRC_DIR/cmake-build-prism" --parallel "$BUILD_JOBS"
 log "Installing to ~/.local"
 DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>/dev/null || {
   # Fallback: install the binary and assets manually
-  install -Dm755 "$SRC_DIR/cmake-build-prism/sunshine" "$HOME/.local/bin/sunshine"
+  install -Dm755 "$SRC_DIR/cmake-build-prism/prism" "$HOME/.local/bin/prism"
   [ -d "$SRC_DIR/cmake-build-prism/assets" ] && rm -rf "$HOME/.local/share/sunshine" && \
     cp -r "$SRC_DIR/cmake-build-prism/assets" "$HOME/.local/share/sunshine" || true
 }
-# The user-facing binary is called "prism" (same build, branded name).
-install -m755 "$HOME/.local/bin/sunshine" "$HOME/.local/bin/prism"
-# Brand the web UI (display text only; upstream source untouched).
-bash "$SRC_DIR/contrib/virtual-session/brand-web-ui.sh" "$HOME/.local/assets/web"
 
 # --- 5. Session stack ---------------------------------------------------------
 log "Installing Prism scripts and systemd user units"

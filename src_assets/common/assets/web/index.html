@@ -132,7 +132,7 @@
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
   import ResourceCard from './ResourceCard.vue'
-  import SunshineVersion from './sunshine_version'
+  import PrismVersion from './sunshine_version'
   import {
     AlertCircle,
     AlertTriangle,
@@ -153,7 +153,7 @@
     sanitize: false
   });
 
-  console.log("Hello, Sunshine!")
+  console.log("Hello, Prism!")
   let app = createApp({
     components: {
       Navbar,
@@ -186,11 +186,11 @@
         this.notifyPreReleases = config.notify_pre_releases;
         this.platform = config.platform;
         this.controllerEnabled = config.controller !== "disabled";
-        this.version = new SunshineVersion(null, config.version);
+        this.version = new PrismVersion(null, config.version);
         console.log("Version: ", this.version.version)
-        this.githubVersion = new SunshineVersion(await fetch("https://api.github.com/repos/LizardByte/Sunshine/releases/latest").then((r) => r.json()), null);
+        this.githubVersion = new PrismVersion(await fetch("https://api.github.com/repos/LizardByte/Prism/releases/latest").then((r) => r.json()), null);
         console.log("GitHub Version: ", this.githubVersion.version)
-        this.preReleaseVersion = new SunshineVersion((await fetch("https://api.github.com/repos/LizardByte/Sunshine/releases").then((r) => r.json())).find(release => release.prerelease), null);
+        this.preReleaseVersion = new PrismVersion((await fetch("https://api.github.com/repos/LizardByte/Prism/releases").then((r) => r.json())).find(release => release.prerelease), null);
         console.log("Pre-Release Version: ", this.preReleaseVersion.version)
 
         // Fetch ViGEmBus status only on Windows when controller is enabled

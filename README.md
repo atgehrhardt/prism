@@ -47,9 +47,11 @@ Then open `https://<host>:47990`, set credentials, and pair Moonlight as usual.
 ```
 
 Fetches the latest upstream Sunshine release tag, rebases the `virtual-capture` branch onto
-it, rebuilds, and reinstalls. Prism's entire diff is one small block in
-`src/platform/linux/misc.cpp` plus `contrib/virtual-session/`, so rebases are nearly always
-clean.
+it, rebuilds, and reinstalls. Prism is a **hard fork**: the rebrand lives in source
+(CMake project, web UI, tray), so a rebase can occasionally conflict in those files —
+the script stops and tells you how to resolve (`git rebase --continue` when done).
+The functional Prism layer (capture patch + `contrib/virtual-session/`) almost never
+conflicts.
 
 ## How it works
 

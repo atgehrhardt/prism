@@ -565,7 +565,7 @@
   import Navbar from './Navbar.vue'
   import Checkbox from './Checkbox.vue'
   import { apiFetch } from './fetch_utils'
-  import SunshineVersion from './sunshine_version'
+  import PrismVersion from './sunshine_version'
   import { Modal } from 'bootstrap/dist/js/bootstrap'
   import {
     ArrowDown,
@@ -717,12 +717,12 @@
         .then(r => r.json())
         .then(r => {
           this.platform = r.platform;
-          this.version = new SunshineVersion(null, r.version);
+          this.version = new PrismVersion(null, r.version);
         });
 
-      fetch("https://api.github.com/repos/LizardByte/Sunshine/releases/latest")
+      fetch("https://api.github.com/repos/LizardByte/Prism/releases/latest")
         .then((r) => r.json())
-        .then((r) => this.githubVersion = new SunshineVersion(r, null))
+        .then((r) => this.githubVersion = new PrismVersion(r, null))
         .catch((e) => console.error(e));
     },
     methods: {
