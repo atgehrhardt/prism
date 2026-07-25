@@ -14,6 +14,11 @@ echo "=== steamos-start $(date -Is) ==="
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
+# Serialize with steamos-stop.sh: if the client disconnects while this script
+# is still setting up, undo must wait for us, then tear everything down.
+exec 9>"$RUNTIME/prism-steamos.lock"
+flock -x 9
+
 # 1. Quit desktop Steam and wait for it to actually exit.
 steam -shutdown 2>/dev/null || true
 for _ in $(seq 1 30); do
@@ -45,5 +50,5 @@ if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
 fi
 setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland \
   gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${HDR_FLAGS[@]}" \
-  -- steam -gamepadui -steamos >>"$LOG" 2>&1 &
+  -- steam -gamepadui -steamos >>"$LOG" 2>&1 9>&- &
 echo "launched gamescope ${W}x${H}@${FPS} hdr=${HDR_FLAGS[*]:-off} pid=$!"

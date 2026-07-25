@@ -3,7 +3,8 @@
  * @brief Forward Sunshine's uinput evdev devices into the headless labwc session.
  *
  * labwc runs with WLR_BACKENDS=headless and has no libinput seat, so it cannot
- * read the "Sunshine *" evdev devices that Sunshine (via inputtino) creates.
+ * read the "* passthrough" evdev devices that Sunshine (via inputtino) creates
+ * ("Keyboard passthrough", "Mouse passthrough", "Touch passthrough", ...).
  * labwc does, however, advertise zwlr_virtual_pointer_manager_v1 and
  * zwp_virtual_keyboard_manager_v1, so this bridge reads the evdev devices
  * directly and replays the events over those virtual-input protocols.
@@ -35,7 +36,7 @@
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 
 #define LOG_PREFIX "prism-input-bridge: "
-#define MAX_EVDEV 32            ///< probe /dev/input/event0..31
+#define MAX_EVDEV 1024          ///< probe /dev/input/event0..1023 (uinput nodes get high minors)
 #define MAX_FDS (MAX_EVDEV + 1) ///< poll capacity: evdev fds + wayland fd
 #define RESCAN_INTERVAL_MS 5000 ///< how often to look for new evdev devices
 #define RECONNECT_DELAY_MS 2000 ///< delay between wayland reconnect attempts
@@ -77,7 +78,35 @@ static struct {
   bool have_abs;
   double wheel_v;
   double wheel_h;
+
+  int grabbed;     ///< whether our evdev sources are currently EVIOCGRABed
+  char override_path[256]; ///< path of the prism-capture-override flag file
 } g;
+
+/**
+ * @brief Whether a headless (capture-override) stream is currently active.
+ *
+ * While active we exclusively grab Sunshine's evdev devices so events reach
+ * only the headless compositor, not the desktop. During normal desktop
+ * streams the devices must stay ungrabbed so the desktop compositor sees them.
+ */
+static int override_active(void) {
+  struct stat st;
+  return stat(g.override_path, &st) == 0;
+}
+
+/**
+ * @brief Apply or release the exclusive grab on all open sources.
+ */
+static void apply_grab(int grab) {
+  for (int i = 0; i < MAX_EVDEV; i++) {
+    if (g.sources[i].fd >= 0) {
+      ioctl(g.sources[i].fd, EVIOCGRAB, grab);
+    }
+  }
+  g.grabbed = grab;
+  fprintf(stderr, LOG_PREFIX "%s evdev grab\n", grab ? "acquired" : "released");
+}
 
 static void log_err(const char *msg) {
   fprintf(stderr, LOG_PREFIX "%s: %s\n", msg, strerror(errno));
@@ -308,11 +337,19 @@ static void try_open_source(int index) {
   snprintf(path, sizeof(path), "/dev/input/event%d", index);
   int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
   if (fd < 0) {
+    if (errno != ENOENT && errno != ENODEV) {
+      static int perm_warned = 0;
+      if (!perm_warned) {
+        perm_warned = 1;
+        fprintf(stderr, LOG_PREFIX "cannot open %s: %s (check uaccess/permissions)\n",
+                path, strerror(errno));
+      }
+    }
     return;
   }
   char name[256] = {0};
   if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0 ||
-      strncmp(name, "Sunshine", 8) != 0) {
+      strstr(name, "passthrough") == NULL) {
     close(fd);
     return;
   }
@@ -334,6 +371,9 @@ static void try_open_source(int index) {
   src->fd = fd;
   src->keyboard = keyboard;
   src->pointer = pointer;
+  if (g.grabbed) {
+    ioctl(fd, EVIOCGRAB, 1);
+  }
   fprintf(stderr, LOG_PREFIX "opened %s (%s)%s%s\n", path, name,
           keyboard ? " keyboard" : "", pointer ? " pointer" : "");
 }
@@ -342,6 +382,10 @@ static void try_open_source(int index) {
  * @brief Scan for new Sunshine evdev devices and prune dead fds.
  */
 static void rescan_sources(void) {
+  int want_grab = override_active();
+  if (want_grab != g.grabbed) {
+    apply_grab(want_grab);
+  }
   for (int i = 0; i < MAX_EVDEV; i++) {
     struct source *src = &g.sources[i];
     if (src->fd >= 0) {
@@ -565,6 +609,12 @@ int main(int argc, char **argv) {
   }
   g.output_width = DEFAULT_WIDTH;
   g.output_height = DEFAULT_HEIGHT;
+
+  const char *runtime = getenv("XDG_RUNTIME_DIR");
+  if (!runtime || !*runtime) {
+    runtime = "/run/user/1000";
+  }
+  snprintf(g.override_path, sizeof(g.override_path), "%s/prism-capture-override", runtime);
 
   for (;;) {
     if (wayland_connect(socket) == 0) {
