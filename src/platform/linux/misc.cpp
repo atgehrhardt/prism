@@ -1285,7 +1285,7 @@ namespace platf {
       }
       lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_socket);
       BOOST_LOG(info) << "[prism] Capture override active; screencasting Wayland socket '"sv << prism_socket << "'"sv;
-      return wl_display(hwdevice_type, ""sv, config);
+      return wl_display(hwdevice_type, std::string {}, config);
     }
     if (prism_override_was_active) {
       if (prism_saved_wayland_display.empty()) {

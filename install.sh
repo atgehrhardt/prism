@@ -39,6 +39,7 @@ fi
 log "Building Prism (this takes a while)"
 cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
   -DSUNSHINE_ENABLE_CUDA=OFF \
   -DBUILD_DOCS=OFF -DBUILD_TESTS=OFF
 cmake --build "$SRC_DIR/cmake-build-prism" --parallel "$BUILD_JOBS"

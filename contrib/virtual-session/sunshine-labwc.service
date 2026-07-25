@@ -6,6 +6,8 @@ PartOf=graphical-session.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/labwc
+ExecStartPost=%h/.local/bin/labwc-link-socket.sh $MAINPID
+ExecStopPost=/usr/bin/rm -f %t/wayland-sunshine
 Environment=WLR_BACKENDS=headless
 Environment=WAYLAND_DISPLAY=wayland-sunshine
 Environment=XDG_SESSION_TYPE=wayland
