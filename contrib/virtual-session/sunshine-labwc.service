@@ -1,0 +1,16 @@
+[Unit]
+Description=Prism headless labwc compositor (virtual Sunshine capture target)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/labwc
+Environment=WLR_BACKENDS=headless
+Environment=WAYLAND_DISPLAY=wayland-sunshine
+Environment=XDG_SESSION_TYPE=wayland
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
