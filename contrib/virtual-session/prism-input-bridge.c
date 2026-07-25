@@ -10,7 +10,7 @@
  * directly and replays the events over those virtual-input protocols.
  *
  * Usage: prism-input-bridge [wayland-socket-name]
- *        (defaults to $PRISM_WAYLAND_SOCKET, then "wayland-sunshine")
+ *        (defaults to $PRISM_WAYLAND_SOCKET, then "wayland-prism")
  */
 
 #define _GNU_SOURCE
@@ -601,7 +601,7 @@ static int run_loop(void) {
 int main(int argc, char **argv) {
   const char *socket = argc > 1 ? argv[1] : getenv("PRISM_WAYLAND_SOCKET");
   if (!socket || !*socket) {
-    socket = "wayland-sunshine";
+    socket = "wayland-prism";
   }
 
   for (int i = 0; i < MAX_EVDEV; i++) {

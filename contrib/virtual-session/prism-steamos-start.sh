@@ -6,7 +6,7 @@ set -u
 
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 OVERRIDE_FILE="$RUNTIME/prism-capture-override"
-SOCKET="wayland-sunshine"
+SOCKET="wayland-prism"
 LOG="$HOME/.local/state/prism-steamos.log"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
@@ -14,7 +14,7 @@ echo "=== steamos-start $(date -Is) ==="
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
-# Serialize with steamos-stop.sh: if the client disconnects while this script
+# Serialize with prism-steamos-stop.sh: if the client disconnects while this script
 # is still setting up, undo must wait for us, then tear everything down.
 exec 9>"$RUNTIME/prism-steamos.lock"
 flock -x 9

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Prism: optional prep command for the "Desktop" app. Snaps the primary output's
 # refresh rate to the closest native mode matching the client's requested FPS.
-# Usage: desktop-refresh.sh set   (prep "do")
-#        desktop-refresh.sh restore (prep "undo")
+# Usage: prism-desktop-refresh.sh set   (prep "do")
+#        prism-desktop-refresh.sh restore (prep "undo")
 set -u
 
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"

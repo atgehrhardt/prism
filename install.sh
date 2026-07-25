@@ -69,16 +69,18 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
   [ -d "$SRC_DIR/cmake-build-prism/assets" ] && rm -rf "$HOME/.local/share/sunshine" && \
     cp -r "$SRC_DIR/cmake-build-prism/assets" "$HOME/.local/share/sunshine" || true
 }
+# The user-facing binary is called "prism" (same build, branded name).
+install -m755 "$HOME/.local/bin/sunshine" "$HOME/.local/bin/prism"
 
 # --- 5. Session stack ---------------------------------------------------------
 log "Installing Prism scripts and systemd user units"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/steamos-start.sh"   "$HOME/.local/bin/steamos-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/steamos-stop.sh"    "$HOME/.local/bin/steamos-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/desktop-refresh.sh" "$HOME/.local/bin/desktop-refresh.sh"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/sunshine-labwc.service" \
-  "$HOME/.config/systemd/user/sunshine-labwc.service"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/sunshine.service" \
-  "$HOME/.config/systemd/user/sunshine.service"
+install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-labwc.service" \
+  "$HOME/.config/systemd/user/prism-labwc.service"
+install -Dm644 "$SRC_DIR/contrib/virtual-session/prism.service" \
+  "$HOME/.config/systemd/user/prism.service"
 
 # Build and install the uinput -> labwc virtual-input bridge (also installs
 # prism-input-bridge.service and runs systemctl --user daemon-reload).
@@ -106,8 +108,8 @@ data["apps"].append({
     "name": "SteamOS (Headless)",
     "image-path": "steam.png",
     "prep-cmd": [
-        {"do":   "$(HOME)/.local/bin/steamos-start.sh",
-         "undo": "$(HOME)/.local/bin/steamos-stop.sh"}
+        {"do":   "$(HOME)/.local/bin/prism-steamos-start.sh",
+         "undo": "$(HOME)/.local/bin/prism-steamos-stop.sh"}
     ]
 })
 with open(apps_path, "w") as f:
@@ -118,8 +120,8 @@ EOF
 # --- 7. Enable services --------------------------------------------------------
 log "Enabling services"
 systemctl --user daemon-reload
-systemctl --user enable --now sunshine-labwc.service
-systemctl --user enable --now sunshine.service
+systemctl --user enable --now prism-labwc.service
+systemctl --user enable --now prism.service
 
 log "Done. Open https://$(hostname -I | awk '{print $1}'):47990 to pair Moonlight."
 log "Apps available: 'Desktop' (dynamic client settings) and 'SteamOS (Headless)'."

@@ -6,10 +6,10 @@ PartOf=graphical-session.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/labwc
-ExecStartPost=%h/.local/bin/labwc-link-socket.sh $MAINPID
-ExecStopPost=/usr/bin/rm -f %t/wayland-sunshine
+ExecStartPost=%h/.local/bin/prism-labwc-link-socket.sh $MAINPID
+ExecStopPost=/usr/bin/rm -f %t/wayland-prism
 Environment=WLR_BACKENDS=headless
-Environment=WAYLAND_DISPLAY=wayland-sunshine
+Environment=WAYLAND_DISPLAY=wayland-prism
 Environment=XDG_SESSION_TYPE=wayland
 Restart=on-failure
 RestartSec=2

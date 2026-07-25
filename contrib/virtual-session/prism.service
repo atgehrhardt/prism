@@ -6,7 +6,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/sunshine
+ExecStart=%h/.local/bin/prism
 Restart=on-failure
 RestartSec=5
 

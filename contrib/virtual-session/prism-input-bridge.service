@@ -1,7 +1,7 @@
 [Unit]
 Description=Prism virtual input bridge (uinput -> headless labwc)
-After=sunshine-labwc.service
-PartOf=sunshine-labwc.service
+After=prism-labwc.service
+PartOf=prism-labwc.service
 
 [Service]
 ExecStart=%h/.local/bin/prism-input-bridge
@@ -9,4 +9,4 @@ Restart=on-failure
 RestartSec=2
 
 [Install]
-WantedBy=sunshine-labwc.service
+WantedBy=prism-labwc.service
