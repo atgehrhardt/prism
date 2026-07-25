@@ -1260,6 +1260,42 @@ namespace platf {
   }
 
   std::shared_ptr<display_t> display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+#ifdef SUNSHINE_BUILD_WAYLAND
+    // Prism: per-stream capture override. When $XDG_RUNTIME_DIR/prism-capture-override
+    // exists and names a Wayland socket, capture that (headless) compositor via the
+    // wlroots backend instead of the session desktop. An app's prep "do" command
+    // writes the file and its "undo" command removes it.
+    static std::string prism_saved_wayland_display;
+    static bool prism_override_was_active = false;
+    std::string prism_socket;
+    {
+      std::string runtime_dir = lizardbyte::common::get_env("XDG_RUNTIME_DIR");
+      if (runtime_dir.empty()) {
+        runtime_dir = "/run/user/" + std::to_string(::getuid());
+      }
+      std::ifstream override_file(runtime_dir + "/prism-capture-override");
+      if (override_file) {
+        std::getline(override_file, prism_socket);
+      }
+    }
+    if (!prism_socket.empty() && sources[source::WAYLAND]) {
+      if (!prism_override_was_active) {
+        prism_saved_wayland_display = lizardbyte::common::get_env("WAYLAND_DISPLAY");
+        prism_override_was_active = true;
+      }
+      lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_socket);
+      BOOST_LOG(info) << "[prism] Capture override active; screencasting Wayland socket '"sv << prism_socket << "'"sv;
+      return wl_display(hwdevice_type, ""sv, config);
+    }
+    if (prism_override_was_active) {
+      if (prism_saved_wayland_display.empty()) {
+        lizardbyte::common::unset_env("WAYLAND_DISPLAY");
+      } else {
+        lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_saved_wayland_display);
+      }
+      prism_override_was_active = false;
+    }
+#endif
     // Keep KMS as first element to check before dropping CAP_SYS_ADMIN
 #ifdef SUNSHINE_BUILD_DRM
     if (sources[source::KMS]) {
