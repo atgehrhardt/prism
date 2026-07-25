@@ -1278,14 +1278,20 @@ namespace platf {
         std::getline(override_file, prism_socket);
       }
     }
-    if (!prism_socket.empty() && sources[source::WAYLAND]) {
+    if (!prism_socket.empty()) {
       if (!prism_override_was_active) {
         prism_saved_wayland_display = lizardbyte::common::get_env("WAYLAND_DISPLAY");
         prism_override_was_active = true;
       }
       lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_socket);
       BOOST_LOG(info) << "[prism] Capture override active; screencasting Wayland socket '"sv << prism_socket << "'"sv;
-      return wl_display(hwdevice_type, std::string {}, config);
+      // Note: sources[source::WAYLAND] may be false here (e.g. KDE, where the
+      // desktop compositor lacks wlr-screencopy) — the override targets a
+      // different compositor that does support it, so attempt it directly.
+      if (auto override_display = wl_display(hwdevice_type, std::string {}, config)) {
+        return override_display;
+      }
+      BOOST_LOG(error) << "[prism] Capture override failed on socket '"sv << prism_socket << "'; falling back to normal capture"sv;
     }
     if (prism_override_was_active) {
       if (prism_saved_wayland_display.empty()) {
