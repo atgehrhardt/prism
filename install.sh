@@ -20,7 +20,7 @@ sudo dnf install -y \
   openssl-devel pipewire-devel glslc vulkan-loader-devel \
   libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
   numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
-  wayland-devel libxkbcommon-devel \
+  wayland-devel libxkbcommon-devel python3-jinja2 \
   gamescope labwc wlr-randr steam kscreen
 
 # --- 2. Source --------------------------------------------------------------
