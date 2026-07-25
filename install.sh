@@ -102,8 +102,8 @@ data["apps"].append({
     "name": "SteamOS (Headless)",
     "image-path": "steam.png",
     "prep-cmd": [
-        {"do":   "bash -c 'sleep 2; $HOME/.local/bin/steamos-start.sh'",
-         "undo": "$HOME/.local/bin/steamos-stop.sh"}
+        {"do":   "$(HOME)/.local/bin/steamos-start.sh",
+         "undo": "$(HOME)/.local/bin/steamos-stop.sh"}
     ]
 })
 with open(apps_path, "w") as f:
