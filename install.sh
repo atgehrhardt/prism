@@ -47,6 +47,11 @@ elif [ -x /usr/local/cuda/bin/nvcc ]; then
   CUDA_FLAG="ON"
   CUDA_COMPILER_FLAG="-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc"
 fi
+# Newer distros ship a GCC newer than nvcc supports; permit it (Sunshine's CUDA
+# code is small and builds fine in practice).
+if [ "$CUDA_FLAG" = "ON" ]; then
+  CUDA_COMPILER_FLAG="$CUDA_COMPILER_FLAG -DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler"
+fi
 cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
