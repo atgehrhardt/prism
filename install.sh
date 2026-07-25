@@ -71,6 +71,8 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
 }
 # The user-facing binary is called "prism" (same build, branded name).
 install -m755 "$HOME/.local/bin/sunshine" "$HOME/.local/bin/prism"
+# Brand the web UI (display text only; upstream source untouched).
+bash "$SRC_DIR/contrib/virtual-session/brand-web-ui.sh" "$HOME/.local/assets/web"
 
 # --- 5. Session stack ---------------------------------------------------------
 log "Installing Prism scripts and systemd user units"
