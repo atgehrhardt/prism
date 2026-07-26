@@ -105,24 +105,17 @@ except Exception:
 data.setdefault("env", {"PATH": "$(PATH):$(HOME)/.local/bin"})
 data.setdefault("apps", [])
 # Remove stock example apps and any previous Prism entries; keep other custom apps.
-data["apps"] = [a for a in data["apps"]
-                if a.get("name") not in ("Desktop", "Low Res Desktop", "Steam Big Picture", "SteamOS (Headless)")]
-data["apps"] = [a for a in data["apps"] if a.get("name") != "Desktop (Virtual)"]
-data["apps"].insert(0, {
-    "name": "Desktop",
-    "image-path": "desktop.png",
-    "prism-capture": "default"
-})
-data["apps"].insert(1, {
-    "name": "Desktop (Virtual)",
-    "image-path": "desktop.png",
-    "prism-capture": "virtual"
-})
-data["apps"].append({
-    "name": "SteamOS (Headless)",
-    "image-path": "steam.png",
-    "prism-capture": "steamos"
-})
+PRISM_APPS = ("Desktop", "Desktop (Mirror)", "Desktop (Virtual)", "Desktop Headless",
+              "Steam Headless", "SteamOS (Headless)", "Low Res Desktop", "Steam Big Picture")
+data["apps"] = [a for a in data["apps"] if a.get("name") not in PRISM_APPS]
+defaults = [
+    ("Desktop (Mirror)", "desktop.png", "default"),
+    ("Desktop (Virtual)", "desktop.png", "virtual"),
+    ("Desktop Headless", "desktop.png", "headless"),
+    ("Steam Headless", "steam.png", "headless"),
+]
+for i, (name, image, mode) in enumerate(defaults):
+    data["apps"].insert(i, {"name": name, "image-path": image, "prism-capture": mode})
 with open(apps_path, "w") as f:
     json.dump(data, f, indent=2)
 print("apps.json updated")
@@ -131,8 +124,12 @@ EOF
 # --- 7. Enable services --------------------------------------------------------
 log "Enabling services"
 systemctl --user daemon-reload
-systemctl --user enable --now prism-labwc.service
+# udev rule: read access to Sunshine's evdev nodes for the input bridge
+sudo install -Dm644 "$SRC_DIR/contrib/virtual-session/61-prism-input.rules" \
+  /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
+
+systemctl --user enable --now prism-labwc.service prism-input-bridge.service
 systemctl --user enable --now prism.service
 
 log "Done. Open https://$(hostname -I | awk '{print $1}'):47990 to pair Moonlight."
-log "Apps available: 'Desktop' (dynamic client settings) and 'SteamOS (Headless)'."
+log "Apps available: Desktop (Mirror), Desktop (Virtual), Desktop Headless, Steam Headless."
