@@ -44,6 +44,16 @@ Fresh installs include four ready-made apps:
 - **Desktop Headless** — empty headless gamescope session
 - **Steam Headless** — headless SteamOS (Big Picture) session
 
+### Steam game sync
+
+Installed Steam games are synced into the app list automatically (`src/steam_games.*`
+parses `libraryfolders.vdf` + `appmanifest_*.acf`; Proton/runtimes are filtered out).
+Launching one brings up the same headless SteamOS session as **Steam Headless** and starts
+the game inside it (the appid is handed to the session's own Steam via `PRISM_STEAM_APP_ID`,
+so there is no race with the Big Picture boot); ending the stream tears the session — and the
+game — down. Synced apps are marked `prism-steam` in the Applications tab; editing one imports
+it as a regular override app, and an app you define yourself always wins on name collision.
+
 ## Status
 
 ⚠️ **Currently validated on Fedora 44 (KDE Plasma 6, Wayland, NVIDIA) only.** The design is

@@ -111,6 +111,12 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
   # -steampal / -steamdeck enable the full Deck interface including the QAM
   # performance tab; plain -steamos does not.
   SESSION_CMD=(steam -gamepadui -steamos3 -steampal -steamdeck)
+  # A direct game launch (PRISM_STEAM_APP_ID, set by Sunshine for synced Steam
+  # game apps) is passed to Steam itself: it processes the URL once the client
+  # is up, so the game starts inside this Big Picture session.
+  if [ -n "${PRISM_STEAM_APP_ID:-}" ]; then
+    SESSION_CMD+=("steam://rungameid/$PRISM_STEAM_APP_ID")
+  fi
   # Two Xwaylands are required for gamescope to export
   # STEAM_MULTIPLE_XWAYLANDS=1, which the Deck UI expects.
   GAMESCOPE_FLAGS+=(--xwayland-count 2)

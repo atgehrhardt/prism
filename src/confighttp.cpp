@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <set>
 #include <string_view>
 
 // lib includes
@@ -42,6 +43,7 @@
 #include "platform/common.h"
 #include "process.h"
 #include "rtsp.h"
+#include "steam_games.h"
 #include "utility.h"
 #include "uuid.h"
 
@@ -661,6 +663,31 @@ namespace confighttp {
         }
       }
 
+      // Merge installed Steam games (live-synced, not stored in apps.json) so
+      // they show up in the Applications tab. They are appended after the file
+      // apps, so the indexes of the file apps are unchanged; entries are marked
+      // with "prism-steam" so the UI can treat them as generated.
+      {
+        std::set<std::string> app_names;
+        for (const auto &app : file_tree["apps"]) {
+          if (app.contains("name")) {
+            app_names.insert(app["name"].get<std::string>());
+          }
+        }
+        for (const auto &game : prism::steam::installed_games()) {
+          if (app_names.count(game.name) != 0) {
+            continue;
+          }
+          nlohmann::json app;
+          app["name"] = game.name;
+          app["cmd"] = "steam steam://rungameid/" + std::to_string(game.appid);
+          app["prism-capture"] = "steamos";
+          app["prism-steam"] = true;
+          app["auto-detach"] = true;
+          file_tree["apps"].push_back(app);
+        }
+      }
+
       send_response(response, file_tree);
     } catch (std::exception &e) {
       BOOST_LOG(warning) << "GetApps: "sv << e.what();
@@ -737,17 +764,26 @@ namespace confighttp {
       int index = input_tree["index"].get<int>();  // this will intentionally cause an exception if the provided value is the wrong type
 
       input_tree.erase("index");
+      // Generated Steam apps (marked in GET /api/apps) are not stored in the
+      // file; saving one imports it as a regular override app.
+      input_tree.erase("prism-steam");
 
       if (index == -1) {
         apps_node.push_back(input_tree);
       } else {
         nlohmann::json newApps = nlohmann::json::array();
+        bool replaced = false;
         for (size_t i = 0; i < apps_node.size(); ++i) {
           if (i == index) {
             newApps.push_back(input_tree);
+            replaced = true;
           } else {
             newApps.push_back(apps_node[i]);
           }
+        }
+        if (!replaced) {
+          // Index beyond the file apps: an edited generated app; append it.
+          newApps.push_back(input_tree);
         }
         file_tree["apps"] = newApps;
       }
