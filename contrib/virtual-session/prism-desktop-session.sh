@@ -153,7 +153,9 @@ case "${1:-}" in
     HDR="${HDR%d}"
     WCG="${WCG%d}"
     echo "restoring $OUT mode $MODE hdr=$HDR wcg=$WCG"
-    [ -n "$MODE" ] && kscreen-doctor "output.$OUT.mode.$MODE" 2>/dev/null || true
+    if [ -n "$MODE" ]; then
+      kscreen-doctor "output.$OUT.mode.$MODE" 2>/dev/null || true
+    fi
     sleep 1  # let the mode change settle before toggling color state
     apply_color "$OUT" "$HDR" "$WCG"
     rm -f "$STATE"

@@ -28,12 +28,13 @@ gen "$WLR_VP_XML" wlr-virtual-pointer-unstable-v1
 gen "$VK_XML" virtual-keyboard-unstable-v1
 
 mkdir -p "$HOME/.local/bin"
+read -r -a BRIDGE_FLAGS <<< "$(pkg-config --cflags --libs wayland-client xkbcommon)"
 cc -O2 -Wall -Wextra -I"$BUILD_DIR" \
   -o "$HOME/.local/bin/prism-input-bridge" \
   "$SCRIPT_DIR/prism-input-bridge.c" \
   "$BUILD_DIR/wlr-virtual-pointer-unstable-v1-protocol.c" \
   "$BUILD_DIR/virtual-keyboard-unstable-v1-protocol.c" \
-  $(pkg-config --cflags --libs wayland-client xkbcommon)
+  "${BRIDGE_FLAGS[@]}"
 
 install -Dm644 "$SCRIPT_DIR/prism-input-bridge.service" \
   "$HOME/.config/systemd/user/prism-input-bridge.service"

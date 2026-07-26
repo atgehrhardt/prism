@@ -1278,7 +1278,7 @@ namespace platf {
         std::getline(override_file, prism_override);
       }
     }
-#ifdef SUNSHINE_BUILD_PORTAL
+  #ifdef SUNSHINE_BUILD_PORTAL
     // Portal form: "portal:<output-name>" captures the named output (e.g. a
     // KWin virtual output) through the normal XDG portal backend.
     if (prism_override.rfind("portal:", 0) == 0) {
@@ -1288,10 +1288,9 @@ namespace platf {
         return override_display;
       }
       BOOST_LOG(error) << "[prism] Portal capture override failed for output '"sv << portal_output << "'; falling back to normal capture"sv;
-    }
-    else
-#endif
-    if (!prism_override.empty()) {
+    } else
+  #endif
+      if (!prism_override.empty()) {
       const std::string &prism_socket = prism_override;
       if (!prism_override_was_active) {
         prism_saved_wayland_display = lizardbyte::common::get_env("WAYLAND_DISPLAY");

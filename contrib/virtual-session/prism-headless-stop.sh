@@ -18,6 +18,7 @@ exec 9>"$RUNTIME/prism-headless.lock"
 flock -x -w 90 9 || echo "headless-stop: lock timeout, proceeding anyway"
 
 STEAM=0
+# shellcheck source=/dev/null
 [ -f "$STATE" ] && . "$STATE" 2>/dev/null && STEAM="${steam:-0}"
 
 # 1. Disarm the capture override first so any new stream uses the desktop.

@@ -52,22 +52,26 @@ fi
 if [ "$CUDA_FLAG" = "ON" ]; then
   CUDA_COMPILER_FLAG="$CUDA_COMPILER_FLAG -DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler"
 fi
+read -r -a CUDA_FLAGS <<< "$CUDA_COMPILER_FLAG"
 cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
   -DSUNSHINE_ENABLE_CUDA="$CUDA_FLAG" \
-  $CUDA_COMPILER_FLAG \
+  "${CUDA_FLAGS[@]}" \
   -DCUDA_FAIL_ON_MISSING=OFF \
   -DBUILD_DOCS=OFF -DBUILD_TESTS=OFF
 cmake --build "$SRC_DIR/cmake-build-prism" --parallel "$BUILD_JOBS"
 
 # --- 4. Install --------------------------------------------------------------
 log "Installing to ~/.local"
+# shellcheck disable=SC1007 # intentional empty DESTDIR env prefix
 DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>/dev/null || {
   # Fallback: install the binary and assets manually
   install -Dm755 "$SRC_DIR/cmake-build-prism/prism" "$HOME/.local/bin/prism"
-  [ -d "$SRC_DIR/cmake-build-prism/assets" ] && rm -rf "$HOME/.local/share/sunshine" && \
-    cp -r "$SRC_DIR/cmake-build-prism/assets" "$HOME/.local/share/sunshine" || true
+  if [ -d "$SRC_DIR/cmake-build-prism/assets" ]; then
+    rm -rf "$HOME/.local/share/sunshine"
+    cp -r "$SRC_DIR/cmake-build-prism/assets" "$HOME/.local/share/sunshine"
+  fi
 }
 
 # --- 5. Session stack ---------------------------------------------------------

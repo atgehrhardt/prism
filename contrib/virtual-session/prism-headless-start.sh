@@ -109,7 +109,7 @@ XDISP=""
 for _ in $(seq 1 40); do
   for s in "$RUNTIME"/gamescope-*; do
     case "$s" in
-      *.lock | *-ei | *-ei.lock | *limiter*) continue ;;
+      *.lock | *-ei | *limiter*) continue ;;
     esac
     [ -S "$s" ] && GSOCKET="$(basename "$s")" && break
   done
