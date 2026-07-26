@@ -15,10 +15,11 @@ wayland-scanner client-header "$XML" "$BUILD_DIR/zkde-screencast-unstable-v1-cli
 wayland-scanner private-code  "$XML" "$BUILD_DIR/zkde-screencast-unstable-v1-protocol.c"
 
 mkdir -p "$HOME/.local/bin"
+read -r -a WAYLAND_FLAGS <<< "$(pkg-config --cflags --libs wayland-client)"
 cc -O2 -Wall -Wextra -I"$BUILD_DIR" \
   -o "$HOME/.local/bin/prism-virtual-output" \
   "$SCRIPT_DIR/prism-virtual-output.c" \
   "$BUILD_DIR/zkde-screencast-unstable-v1-protocol.c" \
-  $(pkg-config --cflags --libs wayland-client)
+  "${WAYLAND_FLAGS[@]}"
 
 echo "prism-virtual-output installed to $HOME/.local/bin/prism-virtual-output"

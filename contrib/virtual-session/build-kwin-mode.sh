@@ -22,11 +22,12 @@ gen "$MGMT_XML" kde-output-management-v2
 gen "$DEV_XML" kde-output-device-v2
 
 mkdir -p "$HOME/.local/bin"
+read -r -a WAYLAND_FLAGS <<< "$(pkg-config --cflags --libs wayland-client)"
 cc -O2 -Wall -Wextra -I"$BUILD_DIR" \
   -o "$HOME/.local/bin/prism-kwin-mode" \
   "$SCRIPT_DIR/prism-kwin-mode.c" \
   "$BUILD_DIR/kde-output-management-v2-protocol.c" \
   "$BUILD_DIR/kde-output-device-v2-protocol.c" \
-  $(pkg-config --cflags --libs wayland-client)
+  "${WAYLAND_FLAGS[@]}"
 
 echo "prism-kwin-mode installed to $HOME/.local/bin/prism-kwin-mode"

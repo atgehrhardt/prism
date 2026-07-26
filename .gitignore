@@ -57,3 +57,4 @@ node_modules/
 *.pyc
 .venv/
 venv/
+.lint-venv/
