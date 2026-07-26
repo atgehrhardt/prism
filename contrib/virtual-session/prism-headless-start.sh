@@ -83,6 +83,13 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     # byte into its auto-created file.
     export MANGOHUD_CONFIGFILE="$RUNTIME/prism-mangoapp.conf"
     echo "no_display" > "$MANGOHUD_CONFIGFILE"
+    # Steam perf level 4 writes "preset=4", which enables MangoHud's "debug"
+    # element (gamescope frametime plots). That element renders invalid ImGui
+    # widgets from the gamescope message data and aborts mangoapp outright on
+    # builds with ImGui assertions enabled (e.g. Fedora's), leaving the
+    # overlay crash-looping and never composited. MANGOHUD_CONFIG is parsed
+    # after the config file, so this wins over anything Steam writes.
+    export MANGOHUD_CONFIG="${MANGOHUD_CONFIG:+$MANGOHUD_CONFIG,}debug=0"
   else
     echo "mangoapp not found; Steam performance overlay will be unavailable"
   fi

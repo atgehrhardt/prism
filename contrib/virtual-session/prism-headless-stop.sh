@@ -48,7 +48,7 @@ rm -f "$STATE"
 if [ "$STEAM" = "1" ]; then
   unset WAYLAND_DISPLAY
   if ! pgrep -x steam >/dev/null; then
-    setsid steam -silent >/dev/null 2>&1 &
+    setsid steam -silent >/dev/null 2>&1 9>&- &
     echo "relaunched desktop steam"
   fi
 fi
