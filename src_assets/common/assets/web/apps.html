@@ -840,7 +840,9 @@
       editApp(id) {
         this.editForm = JSON.parse(JSON.stringify(this.apps[id]));
         this.editForm.index = id;
-        this.captureModeTouched = false;
+        // The name watcher must not override the app's saved capture mode when
+        // the editor opens — only preselect a heuristic mode for NEW apps.
+        this.captureModeTouched = true;
         if (this.editForm["prep-cmd"] === undefined)
           this.editForm["prep-cmd"] = [];
         if (this.editForm["detached"] === undefined)
