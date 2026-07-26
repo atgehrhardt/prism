@@ -18,6 +18,7 @@ namespace prism::steam {
   struct game_t {
     std::uint32_t appid;  ///< Steam app id.
     std::string name;  ///< Display name from the app manifest.
+    std::filesystem::path box_art;  ///< JPEG box art from Steam's library cache (may be empty).
   };
 
   /**
@@ -48,5 +49,19 @@ namespace prism::steam {
    * @return Installed games sorted by name; empty when Steam is not installed.
    */
   std::vector<game_t> installed_games();
+
+  /**
+   * @brief Convert a game's JPEG box art to the PNG format Sunshine requires.
+   *
+   * Converts with ffmpeg into `$XDG_CACHE_HOME/prism/covers/<appid>.png`
+   * (default `~/.cache`), reusing the cached PNG while it is newer than the
+   * source. Steam art is JPEG-only, but Sunshine's image validation requires
+   * PNG, so this bridge is needed for box art to reach Moonlight clients.
+   *
+   * @param appid Steam app id (used as the cache file name).
+   * @param source JPEG source image (typically from game_t::box_art).
+   * @return Path to the PNG, or an empty path when conversion is unavailable.
+   */
+  std::filesystem::path box_art_png(std::uint32_t appid, const std::filesystem::path &source);
 
 }  // namespace prism::steam

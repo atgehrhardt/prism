@@ -48,6 +48,9 @@ Fresh installs include four ready-made apps:
 
 Installed Steam games are synced into the app list automatically (`src/steam_games.*`
 parses `libraryfolders.vdf` + `appmanifest_*.acf`; Proton/runtimes are filtered out).
+The list is re-synced on every client applist request, so installs and uninstalls show
+up without a restart, and box art is pulled from Steam's library cache (converted to PNG
+via ffmpeg into `~/.cache/prism/covers`).
 Launching one brings up the same headless SteamOS session as **Steam Headless** and starts
 the game inside it (the appid is handed to the session's own Steam via `PRISM_STEAM_APP_ID`,
 so there is no race with the Big Picture boot); ending the stream tears the session — and the
