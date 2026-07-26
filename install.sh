@@ -69,8 +69,8 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
   # Fallback: install the binary and assets manually
   install -Dm755 "$SRC_DIR/cmake-build-prism/prism" "$HOME/.local/bin/prism"
   if [ -d "$SRC_DIR/cmake-build-prism/assets" ]; then
-    rm -rf "$HOME/.local/share/sunshine"
-    cp -r "$SRC_DIR/cmake-build-prism/assets" "$HOME/.local/share/sunshine"
+    rm -rf "$HOME/.local/assets"
+    cp -r "$SRC_DIR/cmake-build-prism/assets" "$HOME/.local/assets"
   fi
 }
 
