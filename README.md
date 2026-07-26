@@ -51,10 +51,11 @@ parses `libraryfolders.vdf` + `appmanifest_*.acf`; Proton/runtimes are filtered 
 The list is re-synced on every client applist request, so installs and uninstalls show
 up without a restart, and box art is pulled from Steam's library cache (converted to PNG
 via ffmpeg into `~/.cache/prism/covers`).
-Launching one brings up the same headless SteamOS session as **Steam Headless** and starts
-the game inside it (the appid is handed to the session's own Steam via `PRISM_STEAM_APP_ID`,
-so there is no race with the Big Picture boot); ending the stream tears the session — and the
-game — down. Synced apps are marked `prism-steam` in the Applications tab; editing one imports
+Launching one brings up a lightweight headless Steam session (a plain background
+Steam client — not the heavy SteamOS/Deck UI session) and starts the game inside it
+(the appid is handed to the session via `PRISM_STEAM_APP_ID`, and `prism-steam-game.sh`
+launches the game and exits with it, so closing the game closes the stream); ending the
+stream either way tears the session down. Synced apps are marked `prism-steam` in the Applications tab; editing one imports
 it as a regular override app, and an app you define yourself always wins on name collision.
 
 ## Status

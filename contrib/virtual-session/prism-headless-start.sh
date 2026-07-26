@@ -110,37 +110,39 @@ if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
   GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
 if [ "${PRISM_STEAM:-0}" = "1" ]; then
-  # Deck UI flags (as used by gamescope-session-plus/Bazzite): -steamos3 /
-  # -steampal / -steamdeck enable the full Deck interface including the QAM
-  # performance tab; plain -steamos does not.
-  SESSION_CMD=(steam -gamepadui -steamos3 -steampal -steamdeck)
-  # A direct game launch (PRISM_STEAM_APP_ID, set by Sunshine for synced Steam
-  # game apps) is passed to Steam itself: it processes the URL once the client
-  # is up, so the game starts inside this Big Picture session.
   if [ -n "${PRISM_STEAM_APP_ID:-}" ]; then
-    SESSION_CMD+=("steam://rungameid/$PRISM_STEAM_APP_ID")
-  fi
-  # Two Xwaylands are required for gamescope to export
-  # STEAM_MULTIPLE_XWAYLANDS=1, which the Deck UI expects.
-  GAMESCOPE_FLAGS+=(--xwayland-count 2)
-  # Steam's performance overlay setting drives mangoapp through gamescope's
-  # control interface; without --mangoapp the toggle has no effect.
-  if command -v mangoapp >/dev/null; then
-    GAMESCOPE_FLAGS+=(--mangoapp)
-    # Pre-create the config file shared between Steam (writes presets) and
-    # mangoapp (reads them). gamescope's own fallback writes a stray NUL
-    # byte into its auto-created file.
-    export MANGOHUD_CONFIGFILE="$RUNTIME/prism-mangoapp.conf"
-    echo "no_display" > "$MANGOHUD_CONFIGFILE"
-    # Steam perf level 4 writes "preset=4", which enables MangoHud's "debug"
-    # element (gamescope frametime plots). That element renders invalid ImGui
-    # widgets from the gamescope message data and aborts mangoapp outright on
-    # builds with ImGui assertions enabled (e.g. Fedora's), leaving the
-    # overlay crash-looping and never composited. MANGOHUD_CONFIG is parsed
-    # after the config file, so this wins over anything Steam writes.
-    export MANGOHUD_CONFIG="${MANGOHUD_CONFIG:+$MANGOHUD_CONFIG,}debug=0"
+    # Direct game launch (PRISM_STEAM_APP_ID, set by Sunshine for synced Steam
+    # game apps): lightweight session — a plain background Steam client, no
+    # Deck UI, no second Xwayland, no mangoapp. The app command
+    # (prism-steam-game.sh) launches the game and exits with it.
+    SESSION_CMD=(steam -silent)
   else
-    echo "mangoapp not found; Steam performance overlay will be unavailable"
+    # Deck UI flags (as used by gamescope-session-plus/Bazzite): -steamos3 /
+    # -steampal / -steamdeck enable the full Deck interface including the QAM
+    # performance tab; plain -steamos does not.
+    SESSION_CMD=(steam -gamepadui -steamos3 -steampal -steamdeck)
+    # Two Xwaylands are required for gamescope to export
+    # STEAM_MULTIPLE_XWAYLANDS=1, which the Deck UI expects.
+    GAMESCOPE_FLAGS+=(--xwayland-count 2)
+    # Steam's performance overlay setting drives mangoapp through gamescope's
+    # control interface; without --mangoapp the toggle has no effect.
+    if command -v mangoapp >/dev/null; then
+      GAMESCOPE_FLAGS+=(--mangoapp)
+      # Pre-create the config file shared between Steam (writes presets) and
+      # mangoapp (reads them). gamescope's own fallback writes a stray NUL
+      # byte into its auto-created file.
+      export MANGOHUD_CONFIGFILE="$RUNTIME/prism-mangoapp.conf"
+      echo "no_display" > "$MANGOHUD_CONFIGFILE"
+      # Steam perf level 4 writes "preset=4", which enables MangoHud's "debug"
+      # element (gamescope frametime plots). That element renders invalid ImGui
+      # widgets from the gamescope message data and aborts mangoapp outright on
+      # builds with ImGui assertions enabled (e.g. Fedora's), leaving the
+      # overlay crash-looping and never composited. MANGOHUD_CONFIG is parsed
+      # after the config file, so this wins over anything Steam writes.
+      export MANGOHUD_CONFIG="${MANGOHUD_CONFIG:+$MANGOHUD_CONFIG,}debug=0"
+    else
+      echo "mangoapp not found; Steam performance overlay will be unavailable"
+    fi
   fi
 else
   # Generic keepalive; the app's own command joins the session via the

@@ -265,15 +265,17 @@ namespace proc {
     if (mode == "headless"sv) {
       // A generated Steam game app carries its launch target as
       // "steam steam://rungameid/<appid>". Hand the appid to the start script
-      // (PRISM_STEAM_APP_ID) so the session's own Steam invocation receives
-      // the URL; running it as a separate command would race the Big Picture
-      // boot and could hijack the session with a desktop-mode Steam.
+      // (PRISM_STEAM_APP_ID), which brings up a lightweight (non-Deck-UI)
+      // session Steam, and replace the command with the launcher wrapper: it
+      // starts the game and exits with it, so closing the game ends the app
+      // and therefore the stream.
       const bool had_steam_app = _env.count("PRISM_STEAM_APP_ID") != 0;
       const std::string old_steam_app = had_steam_app ? _env["PRISM_STEAM_APP_ID"].to_string() : std::string();
       constexpr std::string_view rungameid_prefix = "steam steam://rungameid/"sv;
       if (resolved.steam && _app.cmd.rfind(std::string(rungameid_prefix), 0) == 0) {
-        _env["PRISM_STEAM_APP_ID"] = _app.cmd.substr(rungameid_prefix.size());
-        _app.cmd.clear();
+        const std::string appid = _app.cmd.substr(rungameid_prefix.size());
+        _env["PRISM_STEAM_APP_ID"] = appid;
+        _app.cmd = "prism-steam-game.sh "s + appid;
       } else {
         _env.erase("PRISM_STEAM_APP_ID");
       }
