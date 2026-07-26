@@ -21,7 +21,7 @@ sudo dnf install -y \
   libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
   numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
   wayland-devel libxkbcommon-devel python3-jinja2 \
-  gamescope labwc wlr-randr steam kscreen
+  gamescope labwc wlr-randr steam kscreen krfb
 
 # --- 2. Source --------------------------------------------------------------
 if [ -d "$SRC_DIR/.git" ]; then
@@ -103,12 +103,21 @@ data.setdefault("apps", [])
 # Remove stock example apps and any previous Prism entries; keep other custom apps.
 data["apps"] = [a for a in data["apps"]
                 if a.get("name") not in ("Desktop", "Low Res Desktop", "Steam Big Picture", "SteamOS (Headless)")]
+data["apps"] = [a for a in data["apps"] if a.get("name") != "Desktop (Virtual)"]
 data["apps"].insert(0, {
     "name": "Desktop",
     "image-path": "desktop.png",
     "prep-cmd": [
         {"do":   "$(HOME)/.local/bin/prism-desktop-session.sh set",
          "undo": "$(HOME)/.local/bin/prism-desktop-session.sh restore"}
+    ]
+})
+data["apps"].insert(1, {
+    "name": "Desktop (Virtual)",
+    "image-path": "desktop.png",
+    "prep-cmd": [
+        {"do":   "$(HOME)/.local/bin/prism-virtual-start.sh",
+         "undo": "$(HOME)/.local/bin/prism-virtual-stop.sh"}
     ]
 })
 data["apps"].append({

@@ -1267,7 +1267,7 @@ namespace platf {
     // writes the file and its "undo" command removes it.
     static std::string prism_saved_wayland_display;
     static bool prism_override_was_active = false;
-    std::string prism_socket;
+    std::string prism_override;
     {
       std::string runtime_dir = lizardbyte::common::get_env("XDG_RUNTIME_DIR");
       if (runtime_dir.empty()) {
@@ -1275,10 +1275,24 @@ namespace platf {
       }
       std::ifstream override_file(runtime_dir + "/prism-capture-override");
       if (override_file) {
-        std::getline(override_file, prism_socket);
+        std::getline(override_file, prism_override);
       }
     }
-    if (!prism_socket.empty()) {
+#ifdef SUNSHINE_BUILD_PORTAL
+    // Portal form: "portal:<output-name>" captures the named output (e.g. a
+    // KWin virtual output) through the normal XDG portal backend.
+    if (prism_override.rfind("portal:", 0) == 0) {
+      const std::string portal_output = prism_override.substr(7);
+      BOOST_LOG(info) << "[prism] Capture override active; screencasting portal output '"sv << portal_output << "'"sv;
+      if (auto override_display = portal_display(hwdevice_type, portal_output, config)) {
+        return override_display;
+      }
+      BOOST_LOG(error) << "[prism] Portal capture override failed for output '"sv << portal_output << "'; falling back to normal capture"sv;
+    }
+    else
+#endif
+    if (!prism_override.empty()) {
+      const std::string &prism_socket = prism_override;
       if (!prism_override_was_active) {
         prism_saved_wayland_display = lizardbyte::common::get_env("WAYLAND_DISPLAY");
         prism_override_was_active = true;
