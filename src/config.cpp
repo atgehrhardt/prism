@@ -853,6 +853,8 @@ namespace config {
     true,  // ds5_inputtino_randomize_mac
 
     true,  // keyboard enabled
+    true,  // right alt to windows key enabled
+    false,  // android back as guide
     true,  // mouse enabled
     true,  // controller enabled
     true,  // always send scancodes
@@ -1793,6 +1795,7 @@ namespace config {
     bool_f(vars, "motion_as_ds4", input.motion_as_ds4);
     bool_f(vars, "touchpad_as_ds4", input.touchpad_as_ds4);
     bool_f(vars, "ds5_inputtino_randomize_mac", input.ds5_inputtino_randomize_mac);
+    bool_f(vars, "android_back_as_guide", input.android_back_as_guide);
 
     bool_f(vars, "mouse", input.mouse);
     bool_f(vars, "keyboard", input.keyboard);

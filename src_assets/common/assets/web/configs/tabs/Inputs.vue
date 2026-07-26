@@ -155,6 +155,15 @@ const config = ref(props.config)
               default="false"
     ></Checkbox>
 
+    <!-- Mapping Android Back button (Escape) to Gamepad Guide -->
+    <Checkbox v-if="config.keyboard === 'enabled' && config.controller === 'enabled'"
+              class="mb-3"
+              id="android_back_as_guide"
+              locale-prefix="config"
+              v-model="config.android_back_as_guide"
+              default="false"
+    ></Checkbox>
+
     <!-- Enable Mouse Input -->
     <hr>
     <Checkbox class="mb-3"

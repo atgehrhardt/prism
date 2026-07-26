@@ -614,6 +614,30 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### android_back_as_guide
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">Moonlight on Android sends the Escape key when the back button is pressed. When enabled,
+            Sunshine will press the Guide button on the first allocated virtual gamepad instead of sending Escape
+            to the host. If no gamepad is allocated, Escape is sent normally.
+            </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            android_back_as_guide = enabled
+            @endcode</td>
+    </tr>
+</table>
+
 ### mouse
 
 <table>
