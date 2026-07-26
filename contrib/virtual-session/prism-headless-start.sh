@@ -41,6 +41,13 @@ fi
 # 2. Arm the capture override so this stream captures the headless session.
 echo "$SOCKET" > "$OVERRIDE_FILE"
 
+# 2b. Make sure the headless compositor service is actually running (it can be
+# stopped manually or after a crash; the stream fails without it).
+if [ ! -S "$RUNTIME/$SOCKET" ]; then
+  echo "socket $SOCKET missing; starting prism-labwc.service"
+  systemctl --user start prism-labwc.service 2>/dev/null || true
+fi
+
 # 3. Size the headless output to the client's requested mode.
 W="${SUNSHINE_CLIENT_WIDTH:-1920}"
 H="${SUNSHINE_CLIENT_HEIGHT:-1080}"
