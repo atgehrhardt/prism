@@ -64,6 +64,15 @@ if [ -f "$ASTATE" ]; then
   if [ -n "${loop_module:-}" ]; then
     pactl unload-module "$loop_module" 2>/dev/null || true
   fi
+  # If Sunshine's capture sink is still the default, hand the desktop back to
+  # the physical output.
+  if [ -n "${physical_sink:-}" ]; then
+    cur="$(pactl get-default-sink 2>/dev/null || true)"
+    case "$cur" in
+      prism-stream | sink-sunshine-*)
+        pactl set-default-sink "$physical_sink" 2>/dev/null || true ;;
+    esac
+  fi
   rm -f "$ASTATE"
 fi
 pactl list short modules 2>/dev/null | grep 'sink_name=prism-headless' | cut -f1 \

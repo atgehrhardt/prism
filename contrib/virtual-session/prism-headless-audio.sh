@@ -74,19 +74,29 @@ fi
 
 # Routing watchdog: PULSE_SINK is not honored by every audio path (Proton,
 # some native engines), so actively move any stream whose process belongs to
-# the headless session (gamescope env) into the session sink. Runs until the
+# the headless session (gamescope env) into the session sink. The reverse
+# direction matters just as much: Sunshine switches the default sink to its
+# capture sink at stream start, which strands desktop apps on it — move any
+# non-session stream sitting on the capture sink back to the physical output
+# so desktop audio never leaks into the headless stream. Runs until the
 # session's capture override is removed (teardown), then exits.
 while [ -f "$OVERRIDE_FILE" ]; do
   pactl list sink-inputs 2>/dev/null | awk '
     /^Sink Input #/ { idx = substr($3, 2) }
-    /application.process.id = / { gsub(/"/, "", $3); print idx, $3 }
-  ' | while read -r input_id pid; do
+    /^[[:space:]]*Sink: / { sink = $2 }
+    /application.process.id = / { gsub(/"/, "", $3); print idx, $3, sink }
+  ' | while read -r input_id pid cur_sink; do
     [ -d "/proc/$pid" ] || continue
     env_disp="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
     case "$env_disp" in
       *gamescope* | *wayland-prism* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
-        if pactl move-sink-input "$input_id" "$SESSION_SINK" 2>/dev/null; then
+        if [ "$cur_sink" != "$SESSION_SINK" ] && pactl move-sink-input "$input_id" "$SESSION_SINK" 2>/dev/null; then
           echo "routed sink-input $input_id (pid $pid) to $SESSION_SINK"
+        fi ;;
+      *)
+        if [ -n "$PHYSICAL" ] && [ "$cur_sink" = "$CAPTURE_SINK" ] && \
+           pactl move-sink-input "$input_id" "$PHYSICAL" 2>/dev/null; then
+          echo "moved desktop sink-input $input_id (pid $pid) off the capture sink to $PHYSICAL"
         fi ;;
     esac
   done

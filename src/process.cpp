@@ -357,13 +357,16 @@ namespace proc {
         return -1;
       }
       BOOST_LOG(info) << "[prism] Wrote capture override '"sv << mode << "' to ["sv << override_path << ']';
-      return 0;
+      // Portal outputs show the desktop; route desktop audio like mirror mode.
+      return prism_run_session_script("prism-mirror-audio.sh"s, _env, _pipe.get());
     }
 
     if (mode != "default"sv) {
       BOOST_LOG(warning) << "[prism] Unknown capture mode '"sv << mode << "'; using default capture"sv;
     }
-    return 0;
+    // Mirror (default) capture: Sunshine records the dedicated "prism-stream"
+    // capture sink, so desktop audio must be looped into it explicitly.
+    return prism_run_session_script("prism-mirror-audio.sh"s, _env, _pipe.get());
   }
 
   void proc_t::prism_capture_end() {
@@ -389,13 +392,19 @@ namespace proc {
       prism_run_session_script("prism-headless-stop.sh"s, _env, _pipe.get());
     } else if (mode == "virtual"sv) {
       prism_run_session_script("prism-virtual-stop.sh"s, _env, _pipe.get());
-    } else if (mode.rfind("portal:", 0) == 0) {
-      const std::string override_path = prism_runtime_dir() + "/prism-capture-override";
-      std::error_code ec;
-      std::filesystem::remove(override_path, ec);
-      if (ec) {
-        BOOST_LOG(warning) << "[prism] Failed to remove capture override file ["sv << override_path << "]: "sv << ec.message();
+    } else {
+      if (mode.rfind("portal:", 0) == 0) {
+        const std::string override_path = prism_runtime_dir() + "/prism-capture-override";
+        std::error_code ec;
+        std::filesystem::remove(override_path, ec);
+        if (ec) {
+          BOOST_LOG(warning) << "[prism] Failed to remove capture override file ["sv << override_path << "]: "sv << ec.message();
+        }
       }
+      // Mirror and portal-output streams both use the mirror audio router.
+      _env["PRISM_AUDIO_ACTION"] = "stop"s;
+      prism_run_session_script("prism-mirror-audio.sh"s, _env, _pipe.get());
+      _env.erase("PRISM_AUDIO_ACTION");
     }
   }
 

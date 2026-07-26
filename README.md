@@ -100,6 +100,9 @@ resolve. The functional Prism layer stays small.
 systemctl --user stop prism.service prism-input-bridge.service prism-labwc.service
 systemctl --user disable prism.service prism-input-bridge.service prism-labwc.service
 rm -f ~/.local/bin/prism \
+      ~/.local/bin/prism-*.sh \
+      ~/.local/bin/prism-input-bridge \
+      ~/.local/bin/prism-kwin-mode \
       ~/.config/systemd/user/prism.service \
       ~/.config/systemd/user/prism-labwc.service \
       ~/.config/systemd/user/prism-input-bridge.service
@@ -137,10 +140,16 @@ rm -rf ~/.config/sunshine ~/.cache/prism
   libinput seat while a desktop owns it, but speaks `zwlr_virtual_pointer_v1` /
   `zwp_virtual_keyboard_v1`; the bridge re-injects Sunshine's uinput events there and holds
   an exclusive `EVIOCGRAB` only during headless streams.
-- **Audio separation** (`contrib/virtual-session/prism-headless-audio.sh`): headless session
-  apps output to a dedicated `prism-headless` null sink (`PULSE_SINK`), which is looped into
-  Sunshine's capture sink; the guard keeps the desktop's default sink on the physical output
-  so desktop audio is never captured into the stream — mirroring how inputs are separated.
+- **Audio separation** (`contrib/virtual-session/prism-*-audio.sh`): Sunshine captures a
+  dedicated `prism-stream` null sink (`audio_sink` in `sunshine.conf`, set by `install.sh`),
+  and each capture mode routes the right audio into it. **Mirror/portal** streams loop the
+  physical sink's monitor in (stock behavior: audio on stream and host speakers).
+  **Virtual display** selects a `prism-virtual` sink as the system default for the session
+  (physical outputs are off, so everything belongs on the stream) and loops it in.
+  **Headless** session apps output to a dedicated `prism-headless` sink (`PULSE_SINK` plus a
+  routing watchdog), which is looped in, while the desktop's default sink stays on the
+  physical output — desktop audio is never captured, and desktop apps keep playing locally —
+  mirroring how inputs are separated.
 - **`prism-kwin-mode`** (`contrib/virtual-session/prism-kwin-mode.c`): native
   kde-output-management-v2 client for output modes/HDR/custom modes (used by the optional
   `prism-desktop-session.sh` for physical-display switching; not wired up by default).

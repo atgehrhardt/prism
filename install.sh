@@ -84,6 +84,8 @@ install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-audio.sh"  "$HOM
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steam-game.sh"      "$HOME/.local/bin/prism-steam-game.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-start.sh"   "$HOME/.local/bin/prism-virtual-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-stop.sh"    "$HOME/.local/bin/prism-virtual-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-audio.sh"   "$HOME/.local/bin/prism-virtual-audio.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-mirror-audio.sh"    "$HOME/.local/bin/prism-mirror-audio.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-desktop-session.sh" "$HOME/.local/bin/prism-desktop-session.sh"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-labwc.service" \
   "$HOME/.config/systemd/user/prism-labwc.service"
@@ -126,6 +128,18 @@ with open(apps_path, "w") as f:
     json.dump(data, f, indent=2)
 print("apps.json updated")
 EOF
+
+# --- 6b. sunshine.conf: dedicated capture sink --------------------------------
+# Point Sunshine's audio capture at a dedicated "prism-stream" null sink so
+# each capture mode can route exactly the right audio into the stream (mirror
+# loops the desktop in; virtual/headless route only session audio). Respect an
+# audio_sink the user set themselves.
+CONF="$HOME/.config/sunshine/sunshine.conf"
+touch "$CONF"
+if ! grep -q '^audio_sink' "$CONF"; then
+  log "Setting audio_sink=prism-stream in sunshine.conf"
+  printf '\naudio_sink = prism-stream\n' >> "$CONF"
+fi
 
 # --- 7. Enable services --------------------------------------------------------
 log "Enabling services"

@@ -76,6 +76,18 @@ fi
 # Point this stream's portal capture at the virtual output.
 echo "portal:$VOUT" > "$OVERRIDE_FILE"
 
+# Audio: Sunshine is pointed at a dedicated "prism-stream" capture sink
+# (audio_sink in sunshine.conf). Create it up front so it exists before
+# Sunshine's audio init, then start the audio guard: it routes all session
+# audio through a "prism-virtual" sink into the capture sink and restores the
+# physical default on teardown.
+if ! pactl list short sinks 2>/dev/null | grep -q '^[0-9]*[[:space:]]prism-stream[[:space:]]'; then
+  pactl load-module module-null-sink sink_name=prism-stream \
+    sink_properties=device.description="Prism Stream Capture" >/dev/null 2>&1 || true
+fi
+PHYSICAL_SINK="$(pactl get-default-sink 2>/dev/null || true)"
+setsid "$(dirname "$0")/prism-virtual-audio.sh" "$PHYSICAL_SINK" >>"$LOG" 2>&1 9>&- &
+
 # Disable every enabled output except the virtual one (KWin reshuffles
 # priorities when the virtual output appears, so don't rely on "priority 1").
 # Remember which ones we disabled so undo can re-enable exactly those.

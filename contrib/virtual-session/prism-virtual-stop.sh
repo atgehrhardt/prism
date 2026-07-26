@@ -20,6 +20,21 @@ flock -x -w 90 9 || echo "virtual-stop: lock timeout, proceeding anyway"
 # Disarm capture override first so any new stream uses the desktop.
 rm -f "$OVERRIDE_FILE"
 
+# Tear down audio routing: stop the guard, unload the loopback and the
+# session sink, and restore the physical default sink.
+pkill -f prism-virtual-audio.sh 2>/dev/null || true
+ASTATE="$RUNTIME/prism-virtual-audio.state"
+if [ -f "$ASTATE" ]; then
+  # shellcheck source=/dev/null
+  . "$ASTATE" 2>/dev/null || true
+  [ -n "${loop_module:-}" ] && pactl unload-module "$loop_module" 2>/dev/null || true
+  [ -n "${sink_module:-}" ] && pactl unload-module "$sink_module" 2>/dev/null || true
+  if [ -n "${physical_sink:-}" ]; then
+    pactl set-default-sink "$physical_sink" 2>/dev/null || true
+  fi
+  rm -f "$ASTATE"
+fi
+
 # Re-enable the physical outputs we disabled.
 if [ -f "$STATE" ]; then
   while read -r OUT; do

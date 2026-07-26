@@ -99,6 +99,14 @@ if command -v wlr-randr >/dev/null; then
   wlr-randr --output HEADLESS-1 --custom-mode "${W}x${H}@${FPS}" 2>/dev/null || true
 fi
 
+# 3a. Dedicated capture sink Sunshine is pointed at (audio_sink=prism-stream).
+# Sunshine captures this sink's monitor; each capture mode routes the right
+# audio into it. Create it up front so it exists before Sunshine's audio init.
+if ! pactl list short sinks 2>/dev/null | grep -q '^[0-9]*[[:space:]]prism-stream[[:space:]]'; then
+  pactl load-module module-null-sink sink_name=prism-stream \
+    sink_properties=device.description="Prism Stream Capture" >/dev/null 2>&1 || true
+fi
+
 # 3b. Dedicated audio sink for the headless session. Session apps get
 # PULSE_SINK=prism-headless so only their audio is captured; the background
 # guard loops this sink into Sunshine's capture sink and keeps the desktop's
