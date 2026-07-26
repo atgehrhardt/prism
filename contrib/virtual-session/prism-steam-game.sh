@@ -14,15 +14,19 @@ mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 echo "=== steam-game $(date -Is) appid=$ID ==="
 
-# Games run under Steam's reaper as `reaper SteamLaunch AppId=<id> -- ...`;
-# the ( |$) boundary prevents prefix collisions (44 vs 440).
-GAME_PATTERN="SteamLaunch AppId=$ID( |$)"
+# Games run under Steam's reaper as `reaper SteamLaunch AppId=<id> -- ...`.
+# The ` -- ` is required: install-script evaluators run as
+# `reaper SteamLaunch AppId=<id> Install=1 -- ...` and must NOT count as the
+# game. The trailing space also prevents prefix collisions (44 vs 440).
+GAME_PATTERN="SteamLaunch AppId=$ID -- "
 
 # 1. Launch the game through the session Steam client, retrying while the
 #    client is still booting. Steam queues URLs sent to a running instance,
-#    so repeats are harmless until the game process shows up.
+#    so repeats are harmless until the game process shows up. The wait is
+#    generous: install scripts and Vulkan shader processing can take minutes
+#    before the game process appears.
 launched=0
-for _ in $(seq 1 60); do
+for _ in $(seq 1 150); do
   steam "steam://rungameid/$ID" >/dev/null 2>&1 || true
   sleep 2
   if pgrep -f "$GAME_PATTERN" >/dev/null; then

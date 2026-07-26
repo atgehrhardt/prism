@@ -75,12 +75,18 @@ rm -f "$STATE"
 if [ "$STEAM" = "1" ]; then
   unset WAYLAND_DISPLAY
   # Wait for the headless instance to fully exit so Steam's single-instance
-  # lock is released before relaunching on the desktop.
+  # lock is released before relaunching on the desktop. steamwebhelper must
+  # also be gone: relaunching while it lingers makes the new client treat the
+  # launch as "open Steam" and show its window.
   for _ in $(seq 1 40); do
     pgrep -x steam >/dev/null || break
     sleep 0.5
   done
   pkill -9 -x steamwebhelper 2>/dev/null || true
+  for _ in $(seq 1 20); do
+    pgrep -x steamwebhelper >/dev/null || break
+    sleep 0.5
+  done
   # Relaunch with verification: a failed or ignored start is retried, since
   # Steam silently no-ops if its lock has not been released yet.
   # STEAM_FRAME_FORCE_CLOSE keeps the window closed to the tray — after a
