@@ -337,12 +337,14 @@ protected:
    * @brief Build a minimal app context.
    * @param name Application name.
    * @param capture Explicit prism-capture value (may be empty).
+   * @param cmd Application command (may be empty).
    * @return Application context with the fields the resolver reads set.
    */
-  static proc::ctx_t makeApp(const std::string &name, const std::string &capture = "") {
+  static proc::ctx_t makeApp(const std::string &name, const std::string &capture = "", const std::string &cmd = "") {
     proc::ctx_t ctx {};
     ctx.name = name;
     ctx.prism_capture = capture;
+    ctx.cmd = cmd;
     return ctx;
   }
 
@@ -388,5 +390,26 @@ TEST_F(CaptureModeResolveTest, EmptyDefaultFallsBackToDesktopMirror) {
   config::stream.prism_capture_default = "";
   const auto resolved = proc::prism_resolve_capture_mode(makeApp("My Game"));
   EXPECT_EQ(resolved.mode, "default");
+  EXPECT_FALSE(resolved.steam);
+}
+
+TEST_F(CaptureModeResolveTest, RungameidCommandForcesSteamSession) {
+  // A synced game imported with a plain "headless" mode must still get Steam
+  // session behavior (session Steam + launch wrapper), or the game launches
+  // on the desktop and its exit never ends the stream.
+  const auto imported = proc::prism_resolve_capture_mode(makeApp("9 Kings", "headless", "steam steam://rungameid/2784470"));
+  EXPECT_EQ(imported.mode, "headless");
+  EXPECT_TRUE(imported.steam);
+
+  // Even with no explicit mode and a configured global default.
+  config::stream.prism_capture_default = "virtual";
+  const auto generated = proc::prism_resolve_capture_mode(makeApp("9 Kings", "", "steam steam://rungameid/2784470"));
+  EXPECT_EQ(generated.mode, "headless");
+  EXPECT_TRUE(generated.steam);
+}
+
+TEST_F(CaptureModeResolveTest, ExplicitNonHeadlessModeStillWinsForGames) {
+  const auto resolved = proc::prism_resolve_capture_mode(makeApp("9 Kings", "virtual", "steam steam://rungameid/2784470"));
+  EXPECT_EQ(resolved.mode, "virtual");
   EXPECT_FALSE(resolved.steam);
 }
