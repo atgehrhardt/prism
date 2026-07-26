@@ -1260,6 +1260,62 @@ namespace platf {
   }
 
   std::shared_ptr<display_t> display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+#ifdef SUNSHINE_BUILD_WAYLAND
+    // Prism: per-stream capture override. When $XDG_RUNTIME_DIR/prism-capture-override
+    // exists and names a Wayland socket, capture that (headless) compositor via the
+    // wlroots backend instead of the session desktop. An app's prep "do" command
+    // writes the file and its "undo" command removes it.
+    static std::string prism_saved_wayland_display;
+    static bool prism_override_was_active = false;
+    std::string prism_override;
+    {
+      std::string runtime_dir = lizardbyte::common::get_env("XDG_RUNTIME_DIR");
+      if (runtime_dir.empty()) {
+        runtime_dir = "/run/user/" + std::to_string(::getuid());
+      }
+      std::ifstream override_file(runtime_dir + "/prism-capture-override");
+      if (override_file) {
+        std::getline(override_file, prism_override);
+      }
+    }
+#ifdef SUNSHINE_BUILD_PORTAL
+    // Portal form: "portal:<output-name>" captures the named output (e.g. a
+    // KWin virtual output) through the normal XDG portal backend.
+    if (prism_override.rfind("portal:", 0) == 0) {
+      const std::string portal_output = prism_override.substr(7);
+      BOOST_LOG(info) << "[prism] Capture override active; screencasting portal output '"sv << portal_output << "'"sv;
+      if (auto override_display = portal_display(hwdevice_type, portal_output, config)) {
+        return override_display;
+      }
+      BOOST_LOG(error) << "[prism] Portal capture override failed for output '"sv << portal_output << "'; falling back to normal capture"sv;
+    }
+    else
+#endif
+    if (!prism_override.empty()) {
+      const std::string &prism_socket = prism_override;
+      if (!prism_override_was_active) {
+        prism_saved_wayland_display = lizardbyte::common::get_env("WAYLAND_DISPLAY");
+        prism_override_was_active = true;
+      }
+      lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_socket);
+      BOOST_LOG(info) << "[prism] Capture override active; screencasting Wayland socket '"sv << prism_socket << "'"sv;
+      // Note: sources[source::WAYLAND] may be false here (e.g. KDE, where the
+      // desktop compositor lacks wlr-screencopy) — the override targets a
+      // different compositor that does support it, so attempt it directly.
+      if (auto override_display = wl_display(hwdevice_type, std::string {}, config)) {
+        return override_display;
+      }
+      BOOST_LOG(error) << "[prism] Capture override failed on socket '"sv << prism_socket << "'; falling back to normal capture"sv;
+    }
+    if (prism_override_was_active) {
+      if (prism_saved_wayland_display.empty()) {
+        lizardbyte::common::unset_env("WAYLAND_DISPLAY");
+      } else {
+        lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_saved_wayland_display);
+      }
+      prism_override_was_active = false;
+    }
+#endif
     // Keep KMS as first element to check before dropping CAP_SYS_ADMIN
 #ifdef SUNSHINE_BUILD_DRM
     if (sources[source::KMS]) {

@@ -17,27 +17,27 @@
      * @def TRAY_ICON
      * @brief Macro for TRAY ICON.
      */
-    #define TRAY_ICON WEB_DIR "images/sunshine.ico"
+    #define TRAY_ICON WEB_DIR "images/logo-prism.ico"
     /**
      * @def TRAY_ICON_PLAYING
      * @brief Macro for TRAY ICON PLAYING.
      */
-    #define TRAY_ICON_PLAYING WEB_DIR "images/sunshine-playing.ico"
+    #define TRAY_ICON_PLAYING WEB_DIR "images/prism-playing.ico"
     /**
      * @def TRAY_ICON_PAUSING
      * @brief Macro for TRAY ICON PAUSING.
      */
-    #define TRAY_ICON_PAUSING WEB_DIR "images/sunshine-pausing.ico"
+    #define TRAY_ICON_PAUSING WEB_DIR "images/prism-pausing.ico"
     /**
      * @def TRAY_ICON_LOCKED
      * @brief Macro for TRAY ICON LOCKED.
      */
-    #define TRAY_ICON_LOCKED WEB_DIR "images/sunshine-locked.ico"
+    #define TRAY_ICON_LOCKED WEB_DIR "images/prism-locked.ico"
   #elif defined(__linux__) || defined(linux) || defined(__linux) || defined(__FreeBSD__)
-    #define TRAY_ICON WEB_DIR "images/logo-sunshine.svg"
-    #define TRAY_ICON_PLAYING WEB_DIR "images/sunshine-playing.svg"
-    #define TRAY_ICON_PAUSING WEB_DIR "images/sunshine-pausing.svg"
-    #define TRAY_ICON_LOCKED WEB_DIR "images/sunshine-locked.svg"
+    #define TRAY_ICON WEB_DIR "images/logo-prism.svg"
+    #define TRAY_ICON_PLAYING WEB_DIR "images/prism-playing.svg"
+    #define TRAY_ICON_PAUSING WEB_DIR "images/prism-pausing.svg"
+    #define TRAY_ICON_LOCKED WEB_DIR "images/prism-locked.svg"
   #elif defined(__APPLE__) || defined(__MACH__)
     #define TRAY_ICON WEB_DIR "images/logo-sunshine-16.png"
     #define TRAY_ICON_PLAYING WEB_DIR "images/sunshine-playing-16.png"
@@ -153,7 +153,7 @@ namespace system_tray {
     .menu =
       (struct tray_menu[]) {
         // todo - use boost/locale to translate menu strings
-        {.text = "Open Sunshine", .cb = tray_open_ui_cb},
+        {.text = "Open Prism", .cb = tray_open_ui_cb},
         {.text = "-"},
         {.text = "Donate",
          .submenu =

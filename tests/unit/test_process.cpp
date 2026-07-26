@@ -272,3 +272,46 @@ TEST_F(ProcessPNGTest, ValidateAppImagePath_OldSteamDefault) {
   const std::string result = proc::validate_app_image_path("./assets/steam.png");
   EXPECT_EQ(result, SUNSHINE_ASSETS_DIR "/steam.png");
 }
+
+// Tests for parsing the Prism per-app capture mode from apps.json
+class ProcessParseTest: public BaseTest {
+protected:
+  void SetUp() override {
+    BaseTest::SetUp();
+    test_file = fs::temp_directory_path() / "sunshine_process_parse_test_apps.json";  // NOSONAR(cpp:S5443): safe for tests
+  }
+
+  void TearDown() override {
+    fs::remove(test_file);
+    BaseTest::TearDown();
+  }
+
+  fs::path test_file;
+};
+
+TEST_F(ProcessParseTest, Parse_PrismCaptureField) {
+  std::ofstream file(test_file);
+  file << R"json({
+    "env": {},
+    "apps": [
+      {"name": "Desktop"},
+      {"name": "Desktop (Virtual)", "prism-capture": "virtual"},
+      {"name": "SteamOS (Headless)", "prism-capture": "steamos"},
+      {"name": "TV", "prism-capture": "portal:HDMI-A-1"},
+      {"name": "My Game", "prism-capture": "headless"},
+      {"name": "Steam Game", "prism-capture": "headless"}
+    ]
+  })json";
+  file.close();
+
+  auto proc_opt = proc::parse(test_file.string());
+  ASSERT_TRUE(proc_opt.has_value());
+  const auto &apps = proc_opt->get_apps();
+  ASSERT_EQ(apps.size(), 6);
+  EXPECT_TRUE(apps[0].prism_capture.empty());
+  EXPECT_EQ(apps[1].prism_capture, "virtual");
+  EXPECT_EQ(apps[2].prism_capture, "steamos");
+  EXPECT_EQ(apps[3].prism_capture, "portal:HDMI-A-1");
+  EXPECT_EQ(apps[4].prism_capture, "headless");
+  EXPECT_EQ(apps[5].prism_capture, "headless");
+}

@@ -64,10 +64,10 @@ function removeCmd(index) {
       <div class="form-text">{{ $t('config.locale_desc') }}</div>
     </div>
 
-    <!-- Sunshine Name -->
+    <!-- Prism Name -->
     <div class="mb-3">
       <label for="sunshine_name" class="form-label">{{ $t('config.sunshine_name') }}</label>
-      <input type="text" class="form-control" id="sunshine_name" placeholder="Sunshine"
+      <input type="text" class="form-control" id="sunshine_name" placeholder="Prism"
              v-model="config.sunshine_name" />
       <div class="form-text">{{ $t('config.sunshine_name_desc') }}</div>
     </div>

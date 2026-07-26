@@ -70,7 +70,7 @@
         </div>
       </div>
     </div>
-    <!-- Restart Sunshine -->
+    <!-- Restart Prism -->
     <div class="card my-4">
       <div class="card-body">
         <h2 id="restart">{{ $t('troubleshooting.restart_sunshine') }}</h2>
@@ -316,7 +316,7 @@
             if (!raw) continue;
 
             // Determine level based on the *first* level token in the entry.
-            // Sunshine logs are typically: "[ts]: Level: message".
+            // Prism logs are typically: "[ts]: Level: message".
             // Some messages may contain additional embedded timestamps, but we treat
             // those as part of the entry content.
             let level = 'Info';

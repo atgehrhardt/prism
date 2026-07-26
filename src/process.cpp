@@ -5,7 +5,9 @@
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
 // standard includes
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -148,6 +150,227 @@ namespace proc {
     return cmd_path.parent_path();
   }
 
+  /**
+   * @brief Get the runtime directory used for Prism's per-stream capture override file.
+   * @return `$XDG_RUNTIME_DIR`, falling back to `/run/user/<uid>`.
+   */
+  static std::string prism_runtime_dir() {
+    const char *runtime_dir = std::getenv("XDG_RUNTIME_DIR");
+    if (runtime_dir != nullptr && *runtime_dir != '\0') {
+      return runtime_dir;
+    }
+    return "/run/user/" + std::to_string(::getuid());
+  }
+
+  /**
+   * @brief Effective Prism capture settings for an application.
+   */
+  struct prism_capture_mode_t {
+    std::string mode;  ///< Effective mode: "default", "virtual", "headless" or "portal:<output>".
+    bool steam;  ///< Whether a headless session should run Steam (SteamOS behavior).
+  };
+
+  /**
+   * @brief Check whether an app name indicates a Steam app.
+   * @param name Application name.
+   * @return True when the name contains "steam" (any case).
+   */
+  static bool prism_name_is_steam(const std::string &name) {
+    return boost::to_lower_copy(name).find("steam") != std::string::npos;
+  }
+
+  /**
+   * @brief Resolve the effective Prism capture mode for an application.
+   *
+   * Uses the app's `prism-capture` value when set; otherwise falls back to a
+   * name-based default: names containing "virtual" select a virtual display,
+   * names containing "steam" select a headless session with Steam behavior,
+   * and everything else (e.g. "Desktop") mirrors the session. Apps with no
+   * command launch nothing — mirror and virtual modes simply stream the
+   * (virtual) desktop. The legacy `steamos` field value is an alias for a
+   * headless session with Steam behavior; a plain `headless` field value only
+   * enables Steam behavior when the app name contains "steam".
+   *
+   * @param app Application context.
+   * @return Effective mode plus Steam flag for headless sessions.
+   */
+  static prism_capture_mode_t prism_resolve_capture_mode(const ctx_t &app) {
+    if (!app.prism_capture.empty()) {
+      if (app.prism_capture == "steamos"s) {
+        // Legacy alias: headless session with Steam behavior.
+        return {"headless"s, true};
+      }
+      if (app.prism_capture == "headless"s) {
+        return {"headless"s, prism_name_is_steam(app.name)};
+      }
+      return {app.prism_capture, false};
+    }
+    const std::string lower_name = boost::to_lower_copy(app.name);
+    if (lower_name.find("virtual") != std::string::npos) {
+      return {"virtual"s, false};
+    }
+    if (lower_name.find("headless") != std::string::npos) {
+      return {"headless"s, prism_name_is_steam(app.name)};
+    }
+    if (prism_name_is_steam(app.name)) {
+      return {"headless"s, true};
+    }
+    return {"default"s, false};
+  }
+
+  /**
+   * @brief Read one KEY=VALUE entry from the headless session state file.
+   *
+   * @param key Key to look up (e.g. `wayland_display`).
+   * @return The value, or an empty string when the file or key is missing.
+   */
+  static std::string prism_headless_state_value(const std::string &key) {
+    std::ifstream state(prism_runtime_dir() + "/prism-headless.state");
+    const std::string prefix = key + "=";
+    std::string line;
+    while (std::getline(state, line)) {
+      if (line.rfind(prefix, 0) == 0) {
+        return line.substr(prefix.size());
+      }
+    }
+    return {};
+  }
+
+  /**
+   * @brief Run one of Prism's session scripts synchronously, like a prep command.
+   *
+   * @param script Script file name inside `$HOME/.local/bin`.
+   * @param env Environment for the child process (carries the SUNSHINE_CLIENT_* variables).
+   * @param pipe Optional log sink for the script's output.
+   * @return 0 on success, -1 on failure.
+   */
+  static int prism_run_session_script(const std::string &script, boost::process::v1::environment &env, FILE *pipe) {
+    const char *home = std::getenv("HOME");
+    if (home == nullptr || *home == '\0') {
+      BOOST_LOG(error) << "[prism] HOME is not set; cannot run "sv << script;
+      return -1;
+    }
+    const std::string script_path = std::string(home) + "/.local/bin/" + script;
+    std::error_code ec;
+    boost::filesystem::path working_dir = find_working_directory(script_path, env);
+    BOOST_LOG(info) << "[prism] Executing: ["sv << script_path << ']';
+    auto child = platf::run_command(false, true, script_path, working_dir, env, pipe, ec, nullptr);
+    if (ec) {
+      BOOST_LOG(error) << "[prism] Couldn't run ["sv << script_path << "]: System: "sv << ec.message();
+      return -1;
+    }
+    child.wait(ec);
+    if (ec) {
+      BOOST_LOG(error) << "[prism] ["sv << script_path << "] wait failed with error code ["sv << ec << ']';
+      return -1;
+    }
+    auto ret = child.exit_code();
+    if (ret != 0) {
+      BOOST_LOG(error) << "[prism] ["sv << script_path << "] exited with code ["sv << ret << ']';
+      return -1;
+    }
+    return 0;
+  }
+
+  int proc_t::prism_capture_begin() {
+    const auto resolved = prism_resolve_capture_mode(_app);
+    const std::string &mode = resolved.mode;
+    BOOST_LOG(info) << "[prism] Capture mode for app '"sv << _app.name << "': "sv << mode
+                    << (resolved.steam ? " (steam)"sv : ""sv);
+
+    if (mode == "headless"sv) {
+      // PRISM_STEAM controls whether the session runs Steam (SteamOS behavior);
+      // export it for the start script only, then restore the previous state.
+      const bool had_prism_steam = _env.count("PRISM_STEAM") != 0;
+      const std::string old_prism_steam = had_prism_steam ? _env["PRISM_STEAM"].to_string() : std::string();
+      _env["PRISM_STEAM"] = resolved.steam ? "1" : "0";
+      const int rc = prism_run_session_script("prism-headless-start.sh"s, _env, _pipe.get());
+      if (had_prism_steam) {
+        _env["PRISM_STEAM"] = old_prism_steam;
+      } else {
+        _env.erase("PRISM_STEAM");
+      }
+      if (rc != 0) {
+        return -1;
+      }
+      if (!_app.cmd.empty()) {
+        // Run the app's own command inside the gamescope session that the
+        // start script launched in the headless compositor. The script
+        // records the actual socket/display names in its state file.
+        std::string wayland_display = prism_headless_state_value("wayland_display"s);
+        std::string x_display = prism_headless_state_value("x_display"s);
+        if (wayland_display.empty()) {
+          wayland_display = "gamescope-0"s;
+        }
+        if (x_display.empty()) {
+          x_display = ":2"s;
+        }
+        _env["WAYLAND_DISPLAY"] = wayland_display;
+        _env["DISPLAY"] = x_display;
+        _prism_env_overridden = true;
+        BOOST_LOG(info) << "[prism] App command will run inside the gamescope session (WAYLAND_DISPLAY="sv
+                        << wayland_display << ", DISPLAY="sv << x_display << ')';
+      }
+      return 0;
+    }
+
+    if (mode == "virtual"sv) {
+      return prism_run_session_script("prism-virtual-start.sh"s, _env, _pipe.get());
+    }
+
+    if (mode.rfind("portal:", 0) == 0) {
+      const std::string override_path = prism_runtime_dir() + "/prism-capture-override";
+      std::error_code ec;
+      std::filesystem::create_directories(std::filesystem::path(override_path).parent_path(), ec);
+      std::ofstream override_file(override_path, std::ios::trunc);
+      override_file << mode << '\n';
+      if (!override_file) {
+        BOOST_LOG(error) << "[prism] Failed to write capture override file ["sv << override_path << ']';
+        return -1;
+      }
+      BOOST_LOG(info) << "[prism] Wrote capture override '"sv << mode << "' to ["sv << override_path << ']';
+      return 0;
+    }
+
+    if (mode != "default"sv) {
+      BOOST_LOG(warning) << "[prism] Unknown capture mode '"sv << mode << "'; using default capture"sv;
+    }
+    return 0;
+  }
+
+  void proc_t::prism_capture_end() {
+    const std::string mode = prism_resolve_capture_mode(_app).mode;
+
+    // Restore the environment that prism_capture_begin() may have overridden
+    // for a headless app command, so the next app launches on the desktop again.
+    // _env is a copy made at parse time; the process environment still holds
+    // the original values.
+    if (_prism_env_overridden) {
+      _prism_env_overridden = false;
+      for (const char *var : {"WAYLAND_DISPLAY", "DISPLAY"}) {
+        const char *original = std::getenv(var);
+        if (original != nullptr) {
+          _env[var] = original;
+        } else {
+          _env.erase(var);
+        }
+      }
+    }
+
+    if (mode == "headless"sv) {
+      prism_run_session_script("prism-headless-stop.sh"s, _env, _pipe.get());
+    } else if (mode == "virtual"sv) {
+      prism_run_session_script("prism-virtual-stop.sh"s, _env, _pipe.get());
+    } else if (mode.rfind("portal:", 0) == 0) {
+      const std::string override_path = prism_runtime_dir() + "/prism-capture-override";
+      std::error_code ec;
+      std::filesystem::remove(override_path, ec);
+      if (ec) {
+        BOOST_LOG(warning) << "[prism] Failed to remove capture override file ["sv << override_path << "]: "sv << ec.message();
+      }
+    }
+  }
+
   int proc_t::execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
     // Ensure starting from a clean slate
     terminate();
@@ -210,6 +433,13 @@ namespace proc {
     auto fg = util::fail_guard([&]() {
       terminate();
     });
+
+    // Prism: act on the app's capture mode before any prep commands run and
+    // long before the stream's display initializes (display() reads the
+    // capture override file at display init).
+    if (prism_capture_begin() != 0) {
+      return -1;
+    }
 
     for (; _app_prep_it != std::end(_app.prep_cmds); ++_app_prep_it) {
       auto &cmd = *_app_prep_it;
@@ -324,6 +554,9 @@ namespace proc {
     terminate_process_group(_process, _process_group, _app.exit_timeout);
     _process = boost::process::v1::child();
     _process_group = boost::process::v1::group();
+
+    // Prism: undo the capture mode before running prep "undo" commands.
+    prism_capture_end();
 
     for (; _app_prep_it != _app_prep_begin; --_app_prep_it) {
       auto &cmd = *(_app_prep_it - 1);
@@ -695,6 +928,7 @@ namespace proc {
         auto auto_detach = app_node.get_optional<bool>("auto-detach"s);
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
+        auto prism_capture = app_node.get_optional<std::string>("prism-capture"s);
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -744,6 +978,10 @@ namespace proc {
 
         if (cmd) {
           ctx.cmd = parse_env_val(this_env, *cmd);
+        }
+
+        if (prism_capture) {
+          ctx.prism_capture = parse_env_val(this_env, *prism_capture);
         }
 
         if (working_dir) {

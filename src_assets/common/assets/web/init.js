@@ -1,7 +1,7 @@
 import i18n from './locale'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
-// Load Sunshine.css after bootstrap to override some of the styles.
+// Load Prism.css after bootstrap to override some of the styles.
 // Makes themes load and style correctly.
 import './sunshine.css'
 
