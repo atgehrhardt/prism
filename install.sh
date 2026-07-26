@@ -104,22 +104,20 @@ data.setdefault("apps", [])
 data["apps"] = [a for a in data["apps"]
                 if a.get("name") not in ("Desktop", "Low Res Desktop", "Steam Big Picture", "SteamOS (Headless)")]
 data["apps"] = [a for a in data["apps"] if a.get("name") != "Desktop (Virtual)"]
-data["apps"].insert(0, {"name": "Desktop", "image-path": "desktop.png"})
+data["apps"].insert(0, {
+    "name": "Desktop",
+    "image-path": "desktop.png",
+    "prism-capture": "default"
+})
 data["apps"].insert(1, {
     "name": "Desktop (Virtual)",
     "image-path": "desktop.png",
-    "prep-cmd": [
-        {"do":   "$(HOME)/.local/bin/prism-virtual-start.sh",
-         "undo": "$(HOME)/.local/bin/prism-virtual-stop.sh"}
-    ]
+    "prism-capture": "virtual"
 })
 data["apps"].append({
     "name": "SteamOS (Headless)",
     "image-path": "steam.png",
-    "prep-cmd": [
-        {"do":   "$(HOME)/.local/bin/prism-steamos-start.sh",
-         "undo": "$(HOME)/.local/bin/prism-steamos-stop.sh"}
-    ]
+    "prism-capture": "steamos"
 })
 with open(apps_path, "w") as f:
     json.dump(data, f, indent=2)

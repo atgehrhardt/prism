@@ -130,6 +130,21 @@
               <input type="text" class="form-control" id="appName" aria-describedby="appNameHelp" v-model="editForm.name" />
               <div id="appNameHelp" class="form-text">{{ $t('apps.app_name_desc') }}</div>
             </div>
+            <!-- Prism capture mode -->
+            <div class="mb-3">
+              <label for="appPrismCapture" class="form-label">{{ $t('apps.capture_mode') }}</label>
+              <select class="form-select" id="appPrismCapture" aria-describedby="appPrismCaptureHelp"
+                      v-model="captureMode" @change="captureModeTouched = true">
+                <option value="default">{{ $t('apps.capture_default') }}</option>
+                <option value="virtual">{{ $t('apps.capture_virtual') }}</option>
+                <option value="steamos">{{ $t('apps.capture_steamos') }}</option>
+                <option value="portal">{{ $t('apps.capture_portal') }}</option>
+              </select>
+              <input type="text" class="form-control monospace mt-2" v-if="captureMode === 'portal'"
+                     v-model="capturePortalOutput" @input="captureModeTouched = true"
+                     :placeholder="$t('apps.capture_portal_output_placeholder')" />
+              <div id="appPrismCaptureHelp" class="form-text">{{ $t('apps.capture_mode_desc') }}</div>
+            </div>
             <!-- output -->
             <div class="mb-3">
               <label for="appOutput" class="form-label">{{ $t('apps.output_name') }}</label>
@@ -621,6 +636,7 @@
       return {
         apps: [],
         editForm: null,
+        captureModeTouched: false,
         detachedCmd: "",
         coverSearching: false,
         coverFinderBusy: false,
@@ -709,6 +725,50 @@
           ? `${action}: ${this.editForm.name}`
           : action;
       },
+      // Prism capture mode, mapped onto the raw "prism-capture" field:
+      // "default" | "virtual" | "steamos" | "portal:<output-name>"
+      captureMode: {
+        get() {
+          const v = (this.editForm && this.editForm["prism-capture"]) || "";
+          if (v.startsWith("portal:")) {
+            return "portal";
+          }
+          return ["default", "virtual", "steamos"].includes(v) ? v : "default";
+        },
+        set(mode) {
+          if (mode === "portal") {
+            const cur = this.editForm["prism-capture"] || "";
+            if (!cur.startsWith("portal:")) {
+              this.editForm["prism-capture"] = "portal:";
+            }
+          } else {
+            this.editForm["prism-capture"] = mode;
+          }
+        },
+      },
+      capturePortalOutput: {
+        get() {
+          const v = (this.editForm && this.editForm["prism-capture"]) || "";
+          return v.startsWith("portal:") ? v.slice("portal:".length) : "";
+        },
+        set(name) {
+          this.editForm["prism-capture"] = "portal:" + name;
+        },
+      },
+    },
+    watch: {
+      // Preselect a capture mode from the app name until the user picks one manually.
+      "editForm.name"(name) {
+        if (this.captureModeTouched) {
+          return;
+        }
+        const n = (name || "").toLowerCase();
+        if (n === "desktop") {
+          this.captureMode = "default";
+        } else if (n.includes("steam")) {
+          this.captureMode = "steamos";
+        }
+      },
     },
     created() {
       this.loadApps();
@@ -732,6 +792,7 @@
           output: "",
           cmd: "",
           index: -1,
+          "prism-capture": "default",
           "exclude-global-prep-cmd": false,
           elevated: false,
           "auto-detach": true,
@@ -741,11 +802,13 @@
           detached: [],
           "image-path": ""
         };
+        this.captureModeTouched = false;
         this.openEditModal();
       },
       editApp(id) {
         this.editForm = JSON.parse(JSON.stringify(this.apps[id]));
         this.editForm.index = id;
+        this.captureModeTouched = false;
         if (this.editForm["prep-cmd"] === undefined)
           this.editForm["prep-cmd"] = [];
         if (this.editForm["detached"] === undefined)

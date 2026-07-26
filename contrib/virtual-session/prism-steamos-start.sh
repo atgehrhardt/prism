@@ -19,12 +19,17 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 exec 9>"$RUNTIME/prism-steamos.lock"
 flock -x 9
 
-# 1. Quit desktop Steam and wait for it to actually exit.
-steam -shutdown 2>/dev/null || true
-for _ in $(seq 1 30); do
-  pgrep -x steam >/dev/null || break
-  sleep 0.5
-done
+# 1. Quit desktop Steam only if it is actually running (`steam -shutdown`
+# would otherwise launch the client just to close it again).
+if pgrep -x steam >/dev/null; then
+  steam -shutdown 2>/dev/null || true
+  for _ in $(seq 1 30); do
+    pgrep -x steam >/dev/null || break
+    sleep 0.5
+  done
+else
+  echo "desktop steam not running, skipping shutdown"
+fi
 
 # 2. Arm the capture override (Prism patch reads this at display init for this stream).
 echo "$SOCKET" > "$OVERRIDE_FILE"

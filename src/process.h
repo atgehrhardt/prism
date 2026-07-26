@@ -73,6 +73,7 @@ namespace proc {
 
     std::string name;  ///< Human-readable name for this item.
     std::string cmd;  ///< Command line used to launch the application.
+    std::string prism_capture;  ///< Prism capture mode: empty/"default", "virtual", "steamos" or "portal:<output>".
     std::string working_dir;  ///< Working dir.
     std::string output;  ///< Captured output from the launched process.
     std::string image_path;  ///< Image path.
@@ -153,6 +154,19 @@ namespace proc {
 
   private:
     int _app_id;
+
+    /**
+     * @brief Apply the app's Prism capture mode before the stream's display initializes.
+     *
+     * @return 0 on success, -1 on failure (aborts the app launch).
+     */
+    int prism_capture_begin();
+    /**
+     * @brief Undo the app's Prism capture mode during session teardown.
+     */
+    void prism_capture_end();
+
+    bool _prism_env_overridden = false;  ///< Whether prism_capture_begin() overrode WAYLAND_DISPLAY/DISPLAY in `_env`.
 
     boost::process::v1::environment _env;
     std::vector<ctx_t> _apps;
