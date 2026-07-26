@@ -12,8 +12,10 @@ headless, fully virtual gaming session alongside your normal desktop stream, und
 
 | Moonlight app | What it does |
 |---|---|
-| **Desktop** | Streams your real desktop. Resolution, FPS, bitrate and codec follow the client's settings automatically. |
+| **Desktop** | Pure mirror of your desktop as-is. Resolution, FPS, bitrate and codec follow the client's settings automatically (Sunshine scales the capture); host display settings are untouched. |
 | **SteamOS (Headless)** | Quits Steam on your desktop, starts a headless [labwc](https://github.com/labwc/labwc) compositor + [gamescope](https://github.com/ValveSoftware/gamescope) at your client's exact resolution/FPS, launches Steam Big Picture in SteamOS mode, and streams that. Your physical monitors are untouched. When the stream ends (or the client disconnects), everything is torn down and Steam reopens on your desktop. |
+
+| **Desktop (Virtual)** | Creates a KWin virtual output at the client's exact resolution, streams it, and turns the physical monitor off for the session (60Hz/SDR — KWin limitation). |
 
 No dummy plugs, no second GPU, no second paired device.
 
