@@ -25,6 +25,21 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 exec 9>"$RUNTIME/prism-headless.lock"
 flock -x 9
 
+# 0. Recover from a previous session that was never torn down (e.g. sunshine
+# crashed): a leftover gamescope would fight the new one for the session.
+if [ -f "$STATE" ]; then
+  echo "found stale state file; tearing down previous headless session"
+  pkill -x gamescope 2>/dev/null || true
+  pkill -x gamescopereaper 2>/dev/null || true
+  for _ in $(seq 1 20); do
+    pgrep -x gamescope >/dev/null || break
+    sleep 0.5
+  done
+  pkill -9 -x gamescope 2>/dev/null || true
+  pkill -9 -x gamescopereaper 2>/dev/null || true
+  rm -f "$STATE"
+fi
+
 # 1. Steam handling (only when requested): quit desktop Steam if running.
 if [ "${PRISM_STEAM:-0}" = "1" ]; then
   if pgrep -x steam >/dev/null; then
@@ -35,6 +50,19 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     done
   else
     echo "desktop steam not running, skipping shutdown"
+  fi
+  # steamwebhelper regularly outlives `steam -shutdown`. A stale helper keeps
+  # the Steam single-instance lock and the fossilize shader-cache state, which
+  # both prevents the desktop Steam from relaunching later and hangs every
+  # game after the first at "Processing Vulkan shaders" in the new session.
+  if pgrep -x steamwebhelper >/dev/null; then
+    echo "killing stale steamwebhelper left behind by desktop steam"
+    pkill -x steamwebhelper 2>/dev/null || true
+    for _ in $(seq 1 20); do
+      pgrep -x steamwebhelper >/dev/null || break
+      sleep 0.5
+    done
+    pkill -9 -x steamwebhelper 2>/dev/null || true
   fi
 fi
 
