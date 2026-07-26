@@ -135,6 +135,28 @@ resolve. The functional Prism layer stays small.
 - The udev rule `contrib/virtual-session/61-prism-input.rules` (installed by `install.sh`,
   needs sudo) grants the session user read access to Sunshine's evdev nodes.
 
+## Latency notes
+
+What is already latency-optimal, verified before changing anything:
+
+- **Encoder**: nvenc runs with `NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY` and defaults to the
+  fastest preset (P1) — nothing to gain here.
+- **Audio**: the headless audio separation loopback runs at 20 ms.
+- **Refresh pacing**: virtual outputs and headless sessions run at the client's exact FPS.
+
+Applied:
+
+- **gamescope `--rt`** for headless sessions (realtime scheduling on the compositor
+  thread; degrades gracefully without rtkit).
+
+Explored and deliberately **not** applied (unsafe or not measurable):
+
+- `gamescope --immediate-flips` — can capture partial/torn frames.
+- Encoder two-pass / B-frame tuning — already handled by the ultra-low-latency tune.
+- Removing the labwc↔gamescope compositor hop (gamescope headless backend as the capture
+  target directly) would cut ~1 frame of queueing but restructures the whole session stack
+  (input bridge, socket layout); left as future work.
+
 ## Credits
 
 All the heavy lifting is upstream [Sunshine](https://github.com/LizardByte/Sunshine) by

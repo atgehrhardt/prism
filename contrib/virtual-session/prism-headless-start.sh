@@ -102,7 +102,10 @@ setsid "$(dirname "$0")/prism-headless-audio.sh" "$PHYSICAL_SINK" >>"$LOG" 2>&1 
 # --adaptive-sync lets gamescope present frames as they arrive instead of
 # holding them for a fixed vblank (VRR); on a headless output this removes
 # the artificial fixed-refresh cap on frame pacing for the stream.
-GAMESCOPE_FLAGS=(--adaptive-sync)
+# --rt asks for realtime scheduling, which reduces frame-pacing jitter on the
+# compositor thread; gamescope degrades gracefully when rtkit/CAP_SYS_NICE is
+# unavailable, so this is safe everywhere.
+GAMESCOPE_FLAGS=(--adaptive-sync --rt)
 if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
   GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
