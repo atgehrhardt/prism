@@ -1424,6 +1424,11 @@ namespace input {
       packet->rightStickY
     };
 
+    // Map the Android back button (gamepad Back/Select) to Guide when enabled.
+    if (config::input.android_back_as_guide && (gamepad_state.buttonFlags & platf::BACK)) {
+      gamepad_state.buttonFlags = (gamepad_state.buttonFlags & ~platf::BACK) | platf::HOME;
+    }
+
     auto bf_new = gamepad_state.buttonFlags;
     switch (gamepad.back_button_state) {
       case button_state_e::UP:
