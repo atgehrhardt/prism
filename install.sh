@@ -80,6 +80,7 @@ install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-start.sh"   "$HOM
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-stop.sh"    "$HOME/.local/bin/prism-steamos-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-start.sh"  "$HOME/.local/bin/prism-headless-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-stop.sh"   "$HOME/.local/bin/prism-headless-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-audio.sh"  "$HOME/.local/bin/prism-headless-audio.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-start.sh"   "$HOME/.local/bin/prism-virtual-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-stop.sh"    "$HOME/.local/bin/prism-virtual-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-desktop-session.sh" "$HOME/.local/bin/prism-desktop-session.sh"

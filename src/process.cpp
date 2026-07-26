@@ -307,6 +307,9 @@ namespace proc {
         }
         _env["WAYLAND_DISPLAY"] = wayland_display;
         _env["DISPLAY"] = x_display;
+        // Route the app's audio to the headless session's dedicated sink so
+        // only session audio is captured (see prism-headless-audio.sh).
+        _env["PULSE_SINK"] = "prism-headless"s;
         _prism_env_overridden = true;
         BOOST_LOG(info) << "[prism] App command will run inside the gamescope session (WAYLAND_DISPLAY="sv
                         << wayland_display << ", DISPLAY="sv << x_display << ')';
@@ -347,7 +350,7 @@ namespace proc {
     // the original values.
     if (_prism_env_overridden) {
       _prism_env_overridden = false;
-      for (const char *var : {"WAYLAND_DISPLAY", "DISPLAY"}) {
+      for (const char *var : {"WAYLAND_DISPLAY", "DISPLAY", "PULSE_SINK"}) {
         const char *original = std::getenv(var);
         if (original != nullptr) {
           _env[var] = original;

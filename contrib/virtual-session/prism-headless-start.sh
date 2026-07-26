@@ -89,6 +89,15 @@ if command -v wlr-randr >/dev/null; then
   wlr-randr --output HEADLESS-1 --custom-mode "${W}x${H}@${FPS}" 2>/dev/null || true
 fi
 
+# 3b. Dedicated audio sink for the headless session. Session apps get
+# PULSE_SINK=prism-headless so only their audio is captured; the background
+# guard loops this sink into Sunshine's capture sink and keeps the desktop's
+# default sink on the physical output (Sunshine switches it at stream start).
+PHYSICAL_SINK="$(pactl get-default-sink 2>/dev/null || true)"
+pactl load-module module-null-sink sink_name=prism-headless \
+  sink_properties=device.description="Prism Headless Session" >/dev/null 2>&1 || true
+setsid "$(dirname "$0")/prism-headless-audio.sh" "$PHYSICAL_SINK" >>"$LOG" 2>&1 9>&- &
+
 # 4. Launch gamescope inside the headless compositor.
 # --adaptive-sync lets gamescope present frames as they arrive instead of
 # holding them for a fixed vblank (VRR); on a headless output this removes
@@ -129,7 +138,7 @@ else
   # gamescope wayland/X sockets (see state file).
   SESSION_CMD=(sleep infinity)
 fi
-setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland \
+setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland PULSE_SINK=prism-headless \
   gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${GAMESCOPE_FLAGS[@]}" \
   -- "${SESSION_CMD[@]}" >>"$LOG" 2>&1 9>&- &
 
