@@ -199,24 +199,50 @@ namespace prism::steam {
   }
 
   fs::path box_art_png(std::uint32_t appid, const fs::path &source) {
-    if (source.empty()) {
-      return {};
-    }
-    std::error_code ec;
-    if (!fs::is_regular_file(source, ec)) {
-      return {};
-    }
-
     const char *cache_home = std::getenv("XDG_CACHE_HOME");
-    fs::path dir;
+    fs::path cache_root;
     if (cache_home != nullptr && *cache_home != '\0') {
-      dir = fs::path(cache_home);
+      cache_root = fs::path(cache_home);
     } else if (const char *home = std::getenv("HOME"); home != nullptr && *home != '\0') {
-      dir = fs::path(home) / ".cache";
+      cache_root = fs::path(home) / ".cache";
     } else {
       return {};
     }
-    dir /= "prism/covers";
+
+    std::error_code ec;
+
+    // No local art: download from Steam's public CDN (cached, with a 24h
+    // negative-cache marker so missing art is not retried on every sync).
+    fs::path jpg = source;
+    if (jpg.empty() || !fs::is_regular_file(jpg, ec)) {
+      const fs::path art_dir = cache_root / "prism" / "steam-art";
+      fs::create_directories(art_dir, ec);
+      jpg = art_dir / (std::to_string(appid) + ".jpg");
+      const fs::path marker = art_dir / (std::to_string(appid) + ".none");
+      if (!fs::is_regular_file(jpg, ec)) {
+        const auto marker_age = fs::is_regular_file(marker, ec) ? fs::last_write_time(marker, ec) : fs::file_time_type::min();
+        if (marker_age < fs::file_time_type::clock::now() - std::chrono::hours(24)) {
+          bool downloaded = false;
+          for (const char *asset : {"library_600x900", "header"}) {
+            const std::string url = "https://cdn.cloudflare.steamstatic.com/steam/apps/"s + std::to_string(appid) + "/"s + asset + ".jpg"s;
+            const std::string cmd = "curl -fsSL --max-time 10 -o "s + shell_quote(jpg.string()) + " "s + shell_quote(url);
+            if (std::system(cmd.c_str()) == 0 && fs::is_regular_file(jpg, ec)) {
+              downloaded = true;
+              break;
+            }
+          }
+          if (!downloaded) {
+            std::ofstream(marker) << "no art";
+            BOOST_LOG(debug) << "[prism] No Steam CDN box art for app "sv << appid;
+            return {};
+          }
+        } else {
+          return {};
+        }
+      }
+    }
+
+    const fs::path dir = cache_root / "prism" / "covers";
     fs::create_directories(dir, ec);
     if (ec) {
       return {};
@@ -224,13 +250,13 @@ namespace prism::steam {
 
     const fs::path dst = dir / (std::to_string(appid) + ".png");
     // Reuse the cached PNG while it is at least as new as the JPEG source.
-    if (fs::is_regular_file(dst, ec) && fs::last_write_time(dst, ec) >= fs::last_write_time(source, ec)) {
+    if (fs::is_regular_file(dst, ec) && fs::last_write_time(dst, ec) >= fs::last_write_time(jpg, ec)) {
       return dst;
     }
 
-    const std::string cmd = "ffmpeg -y -loglevel error -i "s + shell_quote(source.string()) + " "s + shell_quote(dst.string());
+    const std::string cmd = "ffmpeg -y -loglevel error -i "s + shell_quote(jpg.string()) + " "s + shell_quote(dst.string());
     if (std::system(cmd.c_str()) != 0 || !fs::is_regular_file(dst, ec)) {
-      BOOST_LOG(warning) << "[prism] Could not convert Steam box art to PNG (is ffmpeg installed?): "sv << source;
+      BOOST_LOG(warning) << "[prism] Could not convert Steam box art to PNG (is ffmpeg installed?): "sv << jpg;
       return {};
     }
     return dst;

@@ -167,8 +167,12 @@ TEST_F(SteamGamesTest, BoxArtPngConvertsAndCaches) {
 }
 
 TEST(SteamBoxArtTest, EmptyOrMissingSourceReturnsEmpty) {
+  const fs::path cache_dir = fs::temp_directory_path() / "prism_boxart_empty_test";  // NOSONAR(cpp:S5443): safe for tests
+  setenv("XDG_CACHE_HOME", cache_dir.string().c_str(), 1);
   EXPECT_TRUE(prism::steam::box_art_png(1, "").empty());
   EXPECT_TRUE(prism::steam::box_art_png(1, "/nonexistent/art.jpg").empty());
+  unsetenv("XDG_CACHE_HOME");
+  fs::remove_all(cache_dir);
 }
 
 TEST(SteamRootTest, FindSteamRootWithoutHome) {

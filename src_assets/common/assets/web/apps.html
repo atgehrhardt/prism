@@ -70,12 +70,10 @@
       <div class="col-12 col-sm-6 col-md-4 col-lg-3" v-for="{ app, index } in displayedApps" :key="index">
         <div class="card app-card h-100">
           <div class="app-poster-container">
-            <div v-if="app['prism-steam']" class="position-absolute top-0 start-0 m-2 z-1">
-              <span class="badge text-bg-secondary">{{ $t('apps.steam_synced') }}</span>
-            </div>
-            <div v-else class="form-check position-absolute top-0 start-0 m-2 z-1">
+            <div class="position-absolute top-0 start-0 m-2 z-1 d-flex align-items-center gap-1">
               <input type="checkbox" class="form-check-input" :checked="!!selectedApps[app.name]"
                      @change="toggleSelect(app.name)" :title="$t('apps.select_app')" />
+              <span v-if="app['prism-steam']" class="badge text-bg-secondary">{{ $t('apps.steam_synced') }}</span>
             </div>
             <img
               v-if="app['image-path']"
@@ -894,16 +892,39 @@
         if (!names.length) {
           return;
         }
-        apiFetch("./api/apps/capture", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            names,
-            "prism-capture": this.bulkMode
-          })
-        })
+        // Generated Steam apps are not in apps.json: import each as a regular
+        // override app with the chosen mode (the generated copy then disappears).
+        const steamApps = this.apps.filter((a) => a["prism-steam"] && names.includes(a.name));
+        const fileNames = names.filter((n) => !steamApps.some((a) => a.name === n));
+        const jobs = [];
+        if (fileNames.length) {
+          jobs.push(
+            apiFetch("./api/apps/capture", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                names: fileNames,
+                "prism-capture": this.bulkMode
+              })
+            })
+          );
+        }
+        for (const app of steamApps) {
+          const body = { ...app, "prism-capture": this.bulkMode, index: -1 };
+          delete body["prism-steam"];
+          jobs.push(
+            apiFetch("./api/apps", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify(body)
+            })
+          );
+        }
+        Promise.all(jobs)
           .then(() => {
             this.clearSelection();
             return this.loadApps();

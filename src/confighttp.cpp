@@ -684,6 +684,9 @@ namespace confighttp {
           app["prism-capture"] = "steamos";
           app["prism-steam"] = true;
           app["auto-detach"] = true;
+          if (const auto png = prism::steam::box_art_png(game.appid, game.box_art); !png.empty()) {
+            app["image-path"] = png.string();
+          }
           file_tree["apps"].push_back(app);
         }
       }
@@ -1213,20 +1216,40 @@ namespace confighttp {
 
     try {
       const int index = std::stoi(request->path_match[1]);
-      if (!check_app_index(response, request, index)) {
-        return;
-      }
 
       std::string file = file_handler::read_file(config::stream.file_apps.c_str());
       nlohmann::json file_tree = nlohmann::json::parse(file);
       auto &apps = file_tree["apps"];
 
-      auto &app = apps[index];
-
-      // Get the image path from the app configuration
       std::string app_image_path;
-      if (app.contains("image-path") && !app["image-path"].is_null()) {
-        app_image_path = app["image-path"];
+      if (index >= 0 && index < static_cast<int>(apps.size())) {
+        auto &app = apps[index];
+        // Get the image path from the app configuration
+        if (app.contains("image-path") && !app["image-path"].is_null()) {
+          app_image_path = app["image-path"];
+        }
+      } else if (index >= static_cast<int>(apps.size())) {
+        // Generated Steam apps are appended after the file apps (same order as
+        // GET /api/apps); resolve the cover from Steam's art cache.
+        std::set<std::string> app_names;
+        for (const auto &app : apps) {
+          if (app.contains("name")) {
+            app_names.insert(app["name"].get<std::string>());
+          }
+        }
+        int steam_index = index - static_cast<int>(apps.size());
+        for (const auto &game : prism::steam::installed_games()) {
+          if (app_names.count(game.name) != 0) {
+            continue;
+          }
+          if (steam_index-- == 0) {
+            app_image_path = prism::steam::box_art_png(game.appid, game.box_art).string();
+            break;
+          }
+        }
+      } else {
+        bad_request(response, request, "index out of range");
+        return;
       }
 
       // Use validate_app_image_path to resolve and validate the path
