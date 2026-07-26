@@ -98,7 +98,9 @@ resolve. The functional Prism layer stays small.
   via Sunshine's wlroots backend.
 - **Per-app modes** (`src/process.cpp`): the `prism-capture` field (with name-based
   defaults) drives session bring-up/teardown before/after each stream — no prep commands
-  to write yourself.
+  to write yourself. A global `prism_capture_default` (Settings → General → Default
+  Streaming Mode) covers apps with no explicit mode, and the Applications tab supports
+  multiselect bulk changes (backed by `POST /api/apps/capture`, matched by name).
 - **Headless session** (`contrib/virtual-session/prism-headless-*.sh`): sizes the headless
   output to the client (`wlr-randr`), launches gamescope at the client's mode, records the
   session sockets for app commands, and tears everything down — serialized with a lock so

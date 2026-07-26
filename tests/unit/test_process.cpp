@@ -10,6 +10,7 @@
 #include <fstream>
 
 // local imports
+#include <src/config.h>
 #include <src/process.h>
 
 namespace fs = std::filesystem;
@@ -317,4 +318,75 @@ TEST_F(ProcessParseTest, Parse_PrismCaptureField) {
   EXPECT_EQ(apps[3].prism_capture, "portal:HDMI-A-1");
   EXPECT_EQ(apps[4].prism_capture, "headless");
   EXPECT_EQ(apps[5].prism_capture, "headless");
+}
+
+// Tests for Prism capture mode resolution precedence.
+class CaptureModeResolveTest: public BaseTest {
+protected:
+  void SetUp() override {
+    BaseTest::SetUp();
+    saved_default = config::stream.prism_capture_default;
+  }
+
+  void TearDown() override {
+    config::stream.prism_capture_default = saved_default;
+    BaseTest::TearDown();
+  }
+
+  /**
+   * @brief Build a minimal app context.
+   * @param name Application name.
+   * @param capture Explicit prism-capture value (may be empty).
+   * @return Application context with the fields the resolver reads set.
+   */
+  static proc::ctx_t makeApp(const std::string &name, const std::string &capture = "") {
+    proc::ctx_t ctx {};
+    ctx.name = name;
+    ctx.prism_capture = capture;
+    return ctx;
+  }
+
+  std::string saved_default;  ///< Saved prism_capture_default to restore after each test.
+};
+
+TEST_F(CaptureModeResolveTest, ExplicitValueWinsOverNameAndConfig) {
+  config::stream.prism_capture_default = "headless";
+  const auto resolved = proc::prism_resolve_capture_mode(makeApp("My Steam Game", "virtual"));
+  EXPECT_EQ(resolved.mode, "virtual");
+  EXPECT_FALSE(resolved.steam);
+}
+
+TEST_F(CaptureModeResolveTest, SteamosAliasEnablesSteam) {
+  const auto resolved = proc::prism_resolve_capture_mode(makeApp("Anything", "steamos"));
+  EXPECT_EQ(resolved.mode, "headless");
+  EXPECT_TRUE(resolved.steam);
+}
+
+TEST_F(CaptureModeResolveTest, NameHeuristicsBeatConfiguredDefault) {
+  config::stream.prism_capture_default = "headless";
+  const auto virtual_app = proc::prism_resolve_capture_mode(makeApp("Desktop (Virtual)"));
+  EXPECT_EQ(virtual_app.mode, "virtual");
+  const auto steam_app = proc::prism_resolve_capture_mode(makeApp("Steam Headless"));
+  EXPECT_EQ(steam_app.mode, "headless");
+  EXPECT_TRUE(steam_app.steam);
+}
+
+TEST_F(CaptureModeResolveTest, ConfiguredDefaultAppliesToPlainNames) {
+  config::stream.prism_capture_default = "headless";
+  const auto resolved = proc::prism_resolve_capture_mode(makeApp("My Game"));
+  EXPECT_EQ(resolved.mode, "headless");
+  EXPECT_FALSE(resolved.steam);
+}
+
+TEST_F(CaptureModeResolveTest, PortalDefaultPassesThrough) {
+  config::stream.prism_capture_default = "portal:HDMI-A-1";
+  const auto resolved = proc::prism_resolve_capture_mode(makeApp("My Game"));
+  EXPECT_EQ(resolved.mode, "portal:HDMI-A-1");
+}
+
+TEST_F(CaptureModeResolveTest, EmptyDefaultFallsBackToDesktopMirror) {
+  config::stream.prism_capture_default = "";
+  const auto resolved = proc::prism_resolve_capture_mode(makeApp("My Game"));
+  EXPECT_EQ(resolved.mode, "default");
+  EXPECT_FALSE(resolved.steam);
 }

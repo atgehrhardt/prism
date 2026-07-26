@@ -64,6 +64,18 @@ function removeCmd(index) {
       <div class="form-text">{{ $t('config.locale_desc') }}</div>
     </div>
 
+    <!-- Default Streaming Mode -->
+    <div class="mb-3">
+      <label for="prism_capture_default" class="form-label">{{ $t('config.prism_capture_default') }}</label>
+      <select id="prism_capture_default" class="form-select" v-model="config.prism_capture_default">
+        <option value="">{{ $t('config.prism_capture_default_none') }}</option>
+        <option value="default">{{ $t('config.prism_capture_default_default') }}</option>
+        <option value="virtual">{{ $t('config.prism_capture_default_virtual') }}</option>
+        <option value="headless">{{ $t('config.prism_capture_default_headless') }}</option>
+      </select>
+      <div class="form-text">{{ $t('config.prism_capture_default_desc') }}</div>
+    </div>
+
     <!-- Prism Name -->
     <div class="mb-3">
       <label for="sunshine_name" class="form-label">{{ $t('config.sunshine_name') }}</label>

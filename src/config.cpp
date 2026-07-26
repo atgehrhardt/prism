@@ -809,6 +809,8 @@ namespace config {
 
     APPS_JSON_PATH,
 
+    {},  // prism_capture_default
+
     20,  // fecPercentage
 
     ENCRYPTION_MODE_NEVER,  // lan_encryption_mode
@@ -1745,6 +1747,12 @@ namespace config {
     int_between_f(vars, "packetsize", stream.packetsize, {0, PACKETSIZE_MAX});
 
     path_f(vars, "file_apps", stream.file_apps);
+
+    string_f(vars, "prism_capture_default", stream.prism_capture_default);
+    if (!stream.prism_capture_default.empty() && stream.prism_capture_default != "default"s && stream.prism_capture_default != "virtual"s && stream.prism_capture_default != "headless"s && stream.prism_capture_default.rfind("portal:"s, 0) != 0) {
+      BOOST_LOG(warning) << "config: unknown prism_capture_default value ["sv << stream.prism_capture_default << "]; ignoring"sv;
+      stream.prism_capture_default.clear();
+    }
 #ifndef __ANDROID__
     // TODO: Android can possibly support this
     if (!fs::exists(stream.file_apps.c_str())) {

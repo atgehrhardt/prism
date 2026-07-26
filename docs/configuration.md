@@ -140,6 +140,44 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### prism_capture_default
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            The default Prism capture (streaming) mode for applications that do not set one
+            themselves and whose name matches none of the built-in heuristics (names containing
+            "virtual", "headless" or "steam"). An explicit per-app streaming mode always wins.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}@endcode (empty: mirror the desktop session)</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{prism_capture_default = headless}@endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="4">Choices</td>
+        <td>default</td>
+        <td>Mirror the desktop session</td>
+    </tr>
+    <tr>
+        <td>virtual</td>
+        <td>Client-sized virtual display</td>
+    </tr>
+    <tr>
+        <td>headless</td>
+        <td>Headless gamescope session</td>
+    </tr>
+    <tr>
+        <td>portal:&lt;output&gt;</td>
+        <td>Capture a named output through the portal</td>
+    </tr>
+</table>
+
 ### sunshine_name
 
 <table>

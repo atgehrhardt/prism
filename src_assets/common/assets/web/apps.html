@@ -48,11 +48,35 @@
       </div>
     </div>
 
+    <!-- Bulk actions -->
+    <div v-if="selectedCount > 0" class="card mb-3">
+      <div class="card-body d-flex flex-wrap align-items-center gap-2 py-2">
+        <span class="fw-semibold">{{ selectedCount }} {{ $t('apps.selected_suffix') }}</span>
+        <div class="input-group input-group-sm w-auto">
+          <span class="input-group-text">{{ $t('apps.bulk_set_mode') }}</span>
+          <select class="form-select" v-model="bulkMode">
+            <option value="default">{{ $t('apps.capture_default') }}</option>
+            <option value="virtual">{{ $t('apps.capture_virtual') }}</option>
+            <option value="headless">{{ $t('apps.capture_headless') }}</option>
+          </select>
+        </div>
+        <button class="btn btn-sm btn-primary" @click="applyBulkMode">{{ $t('apps.bulk_apply') }}</button>
+        <button class="btn btn-sm btn-outline-secondary" @click="clearSelection">{{ $t('apps.bulk_clear') }}</button>
+      </div>
+    </div>
+
     <!-- Apps Grid -->
     <div class="row g-3" v-if="displayedApps.length > 0">
       <div class="col-12 col-sm-6 col-md-4 col-lg-3" v-for="{ app, index } in displayedApps" :key="index">
         <div class="card app-card h-100">
           <div class="app-poster-container">
+            <div v-if="app['prism-steam']" class="position-absolute top-0 start-0 m-2 z-1">
+              <span class="badge text-bg-secondary">{{ $t('apps.steam_synced') }}</span>
+            </div>
+            <div v-else class="form-check position-absolute top-0 start-0 m-2 z-1">
+              <input type="checkbox" class="form-check-input" :checked="!!selectedApps[app.name]"
+                     @change="toggleSelect(app.name)" :title="$t('apps.select_app')" />
+            </div>
             <img
               v-if="app['image-path']"
               :src="'/api/covers/' + index"
@@ -655,6 +679,8 @@
         fileBrowserTypedPath: "",
         searchQuery: "",
         sortMode: "default",
+        selectedApps: {},
+        bulkMode: "headless",
         deleteTarget: null,
         version: null,
         githubVersion: null,
@@ -671,8 +697,10 @@
         const docsVersion = this.installedVersionNotStable ? 'master' : 'latest'
         return `https://docs.lizardbyte.dev/projects/sunshine/${docsVersion}`
       },
-      displayedApps() {
-        let list = this.apps.map((app, index) => ({ app, index }));
+      selectedCount() {
+        return Object.values(this.selectedApps).filter(Boolean).length;
+      },
+      displayedApps() {        let list = this.apps.map((app, index) => ({ app, index }));
 
         const query = this.searchQuery.trim().toLowerCase();
         if (query) {
@@ -851,6 +879,36 @@
           .then((r) => {
             this.apps = r.apps;
           });
+      },
+      toggleSelect(name) {
+        this.selectedApps[name] = !this.selectedApps[name];
+        if (!this.selectedApps[name]) {
+          delete this.selectedApps[name];
+        }
+      },
+      clearSelection() {
+        this.selectedApps = {};
+      },
+      applyBulkMode() {
+        const names = Object.keys(this.selectedApps).filter((k) => this.selectedApps[k]);
+        if (!names.length) {
+          return;
+        }
+        apiFetch("./api/apps/capture", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            names,
+            "prism-capture": this.bulkMode
+          })
+        })
+          .then(() => {
+            this.clearSelection();
+            return this.loadApps();
+          })
+          .catch((e) => console.error(e));
       },
       confirmDelete() {
         apiFetch("./api/apps/" + this.deleteTarget.index, {

@@ -164,14 +164,6 @@ namespace proc {
   }
 
   /**
-   * @brief Effective Prism capture settings for an application.
-   */
-  struct prism_capture_mode_t {
-    std::string mode;  ///< Effective mode: "default", "virtual", "headless" or "portal:<output>".
-    bool steam;  ///< Whether a headless session should run Steam (SteamOS behavior).
-  };
-
-  /**
    * @brief Check whether an app name indicates a Steam app.
    * @param name Application name.
    * @return True when the name contains "steam" (any case).
@@ -180,22 +172,7 @@ namespace proc {
     return boost::to_lower_copy(name).find("steam") != std::string::npos;
   }
 
-  /**
-   * @brief Resolve the effective Prism capture mode for an application.
-   *
-   * Uses the app's `prism-capture` value when set; otherwise falls back to a
-   * name-based default: names containing "virtual" select a virtual display,
-   * names containing "steam" select a headless session with Steam behavior,
-   * and everything else (e.g. "Desktop") mirrors the session. Apps with no
-   * command launch nothing — mirror and virtual modes simply stream the
-   * (virtual) desktop. The legacy `steamos` field value is an alias for a
-   * headless session with Steam behavior; a plain `headless` field value only
-   * enables Steam behavior when the app name contains "steam".
-   *
-   * @param app Application context.
-   * @return Effective mode plus Steam flag for headless sessions.
-   */
-  static prism_capture_mode_t prism_resolve_capture_mode(const ctx_t &app) {
+  prism_capture_mode_t prism_resolve_capture_mode(const ctx_t &app) {
     if (!app.prism_capture.empty()) {
       if (app.prism_capture == "steamos"s) {
         // Legacy alias: headless session with Steam behavior.
@@ -215,6 +192,12 @@ namespace proc {
     }
     if (prism_name_is_steam(app.name)) {
       return {"headless"s, true};
+    }
+    // Configured global default for apps without an explicit mode; unknown or
+    // empty values fall back to mirroring the session. (Non-Steam names reach
+    // this point, so a headless default never implies Steam behavior.)
+    if (!config::stream.prism_capture_default.empty()) {
+      return {config::stream.prism_capture_default, false};
     }
     return {"default"s, false};
   }
