@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Block pushes that would fail the GitHub "common lint" workflow.
+# Enable with: git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/scripts/lint.sh"
