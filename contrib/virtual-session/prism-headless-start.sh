@@ -122,10 +122,13 @@ fi
 if [ "${PRISM_STEAM:-0}" = "1" ]; then
   if [ -n "${PRISM_STEAM_APP_ID:-}" ]; then
     # Direct game launch (PRISM_STEAM_APP_ID, set by Sunshine for synced Steam
-    # game apps): lightweight session — a plain background Steam client, no
-    # Deck UI, no second Xwayland, no mangoapp. The app command
+    # game apps): lightweight session — a plain Steam client (visible, per user
+    # preference; no Deck UI flags), no mangoapp. The app command
     # (prism-steam-game.sh) launches the game and exits with it.
-    SESSION_CMD=(steam -silent)
+    # Two Xwaylands like the Deck session: gamescope treats the second as the
+    # game display, which is what makes late-launched game windows composite.
+    SESSION_CMD=(steam)
+    GAMESCOPE_FLAGS+=(--xwayland-count 2)
   else
     # Deck UI flags (as used by gamescope-session-plus/Bazzite): -steamos3 /
     # -steampal / -steamdeck enable the full Deck interface including the QAM
