@@ -108,10 +108,13 @@ resolve. The functional Prism layer stays small.
 
 - **HDR**: attempted via `gamescope --hdr-enabled` for HDR clients in headless mode
   (depends on labwc color-management support); desktop HDR capture depends on your
-  portal/compositor. Virtual outputs are SDR-only.
+  portal/compositor. KWin virtual outputs are marked HDR/WCG-capable for HDR clients
+  (needs Plasma 6).
+- **VRR**: headless sessions run gamescope with `--adaptive-sync`, and KWin virtual
+  outputs get `vrrpolicy.always`, so frame pacing follows the content instead of a
+  fixed vblank.
 - **Virtual outputs match the client's refresh rate** (a custom mode is added via
-  `kscreen-doctor` when the client requests more than the 60Hz default); virtual outputs
-  are SDR-only.
+  `kscreen-doctor` when the client requests more than the 60Hz default).
 - **Physical-display resolution switching is limited by your driver**: e.g. NVIDIA + DSC
   panels reject compositor-generated modelines. Mirror mode handles this with GPU scaling
   instead — visually lossless at the client.
