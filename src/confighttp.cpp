@@ -882,6 +882,65 @@ namespace confighttp {
   }
 
   /**
+   * @brief Set the Prism capture mode for multiple applications at once.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * The body for the post request should be JSON serialized in the following format:
+   * @code{.json}
+   * {
+   *   "names": ["App One", "App Two"],
+   *   "prism-capture": "headless"
+   * }
+   * @endcode
+   *
+   * Apps are matched by name (indexes shift when apps are sorted on save, so
+   * they are unsafe for bulk operations). Generated Steam apps are not stored
+   * in apps.json and are therefore untouched.
+   *
+   * @api_examples{/api/apps/capture| POST| {"names":["Game"],"prism-capture":"headless"}}
+   */
+  void bulkSetCaptureMode(const resp_https_t &response, const req_https_t &request) {
+    if (!authenticate(response, request)) {
+      return;
+    }
+
+    std::string client_id = get_client_id(request);
+    if (!validate_csrf_token(response, request, client_id)) {
+      return;
+    }
+
+    print_req(request);
+
+    try {
+      nlohmann::json output_tree;
+      nlohmann::json input_tree = nlohmann::json::parse(request->content);
+      const auto names = input_tree.at("names").get<std::vector<std::string>>();
+      const std::string mode = input_tree.at("prism-capture").get<std::string>();
+
+      std::string file = file_handler::read_file(config::stream.file_apps.c_str());
+      nlohmann::json file_tree = nlohmann::json::parse(file);
+
+      size_t updated = 0;
+      for (auto &app : file_tree["apps"]) {
+        if (std::find(names.begin(), names.end(), app.value("name", "")) != names.end()) {
+          app["prism-capture"] = mode;
+          updated++;
+        }
+      }
+
+      file_handler::write_file(config::stream.file_apps.c_str(), file_tree.dump(4));
+      proc::refresh(config::stream.file_apps);
+
+      output_tree["status"] = true;
+      output_tree["result"] = std::format("capture mode set on {} application(s)", updated);
+      send_response(response, output_tree);
+    } catch (std::exception &e) {
+      BOOST_LOG(warning) << "BulkSetCaptureMode: "sv << e.what();
+      bad_request(response, request, e.what());
+    }
+  }
+
+  /**
    * @brief Get the list of paired clients.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
@@ -1830,6 +1889,7 @@ namespace confighttp {
     server.resource["^/api/browse$"]["GET"] = browseDirectory;
     server.resource["^/api/apps$"]["GET"] = getApps;
     server.resource["^/api/apps$"]["POST"] = saveApp;
+    server.resource["^/api/apps/capture$"]["POST"] = bulkSetCaptureMode;
     server.resource["^/api/apps/([0-9]+)$"]["DELETE"] = deleteApp;
     server.resource["^/api/apps/close$"]["POST"] = closeApp;
     server.resource["^/api/clients/list$"]["GET"] = getClients;

@@ -85,6 +85,29 @@ namespace proc {
   };
 
   /**
+   * @brief Effective Prism capture settings for an application.
+   */
+  struct prism_capture_mode_t {
+    std::string mode;  ///< Effective mode: "default", "virtual", "headless" or "portal:<output>".
+    bool steam;  ///< Whether a headless session should run Steam (SteamOS behavior).
+  };
+
+  /**
+   * @brief Resolve the effective Prism capture mode for an application.
+   *
+   * Uses the app's `prism-capture` value when set; otherwise falls back to a
+   * name-based default: names containing "virtual" select a virtual display,
+   * names containing "steam" select a headless session with Steam behavior,
+   * then the configured `prism_capture_default`, and finally "default".
+   * The legacy `steamos` field value is an alias for a headless session with
+   * Steam behavior.
+   *
+   * @param app Application context.
+   * @return Effective mode plus Steam flag for headless sessions.
+   */
+  prism_capture_mode_t prism_resolve_capture_mode(const ctx_t &app);
+
+  /**
    * @brief Tracks launched child processes and terminates them during shutdown.
    */
   class proc_t {

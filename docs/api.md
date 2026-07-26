@@ -43,6 +43,9 @@ curl -u user:pass -H "X-CSRF-Token: your_token_here" \
 ## POST /api/apps
 @copydoc confighttp::saveApp()
 
+## POST /api/apps/capture
+@copydoc confighttp::bulkSetCaptureMode()
+
 ## POST /api/apps/close
 @copydoc confighttp::closeApp()
 

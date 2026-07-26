@@ -236,6 +236,8 @@ namespace config {
 
     std::string file_apps;  ///< Path to the configured applications file.
 
+    std::string prism_capture_default;  ///< Default Prism capture mode for apps without an explicit mode ("", "default", "virtual", "headless" or "portal:<output>"); empty keeps the name-based heuristic fallback of "default".
+
     int fec_percentage;  ///< Percentage of forward-error-correction packets to add to the stream.
 
     // Video encryption settings for LAN and WAN streams
