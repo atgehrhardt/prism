@@ -17,8 +17,25 @@ echo "=== virtual-desktop start $(date -Is) client=${SUNSHINE_CLIENT_WIDTH:-?}x$
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
+# kscreen-doctor can hang indefinitely when KWin is in a degenerate state
+# (e.g. all outputs disabled by a previous session that was never torn down);
+# never let a single call block the launch forever.
+KSD="timeout 10 kscreen-doctor"
+
 exec 9>"$RUNTIME/prism-virtual.lock"
 flock -x -w 90 9 || exit 1
+
+# Recover from a previous session that was never torn down (e.g. sunshine was
+# killed mid-stream): re-enable any physical outputs it disabled, otherwise
+# KWin sits in a zero-output state where kscreen-doctor hangs.
+if [ -f "$STATE" ]; then
+  echo "found stale state file; re-enabling outputs from previous session"
+  while read -r OUT; do
+    [ -z "$OUT" ] && continue
+    $KSD "output.$OUT.enable" 2>/dev/null || true
+  done < "$STATE"
+  rm -f "$STATE"
+fi
 
 W="${SUNSHINE_CLIENT_WIDTH:-1920}"
 H="${SUNSHINE_CLIENT_HEIGHT:-1080}"
@@ -37,7 +54,7 @@ setsid krfb-virtualmonitor --name "$VNAME" --resolution "${W}x${H}" \
 # Wait for the output to appear.
 OUT_FOUND=""
 for _ in $(seq 1 40); do
-  if kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "Output:.* $VOUT "; then
+  if $KSD -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "Output:.* $VOUT "; then
     OUT_FOUND=1
     break
   fi
@@ -53,14 +70,14 @@ fi
 # resulting mode may be slightly off (e.g. 119.85) but mode.WxH@FPS resolves it.
 if [ "$FPS" != "60" ]; then
   echo "setting $VOUT mode to ${W}x${H}@${FPS}"
-  kscreen-doctor "output.$VOUT.addCustomMode.$W.$H.$((FPS * 1000)).full" 2>/dev/null || true
-  kscreen-doctor "output.$VOUT.mode.${W}x${H}@${FPS}" 2>/dev/null \
+  $KSD "output.$VOUT.addCustomMode.$W.$H.$((FPS * 1000)).full" 2>/dev/null || true
+  $KSD "output.$VOUT.mode.${W}x${H}@${FPS}" 2>/dev/null \
     || echo "WARN: could not switch $VOUT to ${W}x${H}@${FPS}, staying at 60Hz"
 fi
 
 # Enable VRR on the virtual output so KWin paces frames by content instead of
 # a fixed vblank; the streamer captures frames as they are produced.
-kscreen-doctor "output.$VOUT.vrrpolicy.always" 2>/dev/null \
+$KSD "output.$VOUT.vrrpolicy.always" 2>/dev/null \
   || echo "WARN: could not set vrrpolicy on $VOUT (needs Plasma 6)"
 
 # HDR: mark the virtual output as HDR/WCG capable when the client asked for an
@@ -68,7 +85,7 @@ kscreen-doctor "output.$VOUT.vrrpolicy.always" 2>/dev/null \
 if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
   echo "enabling hdr/wcg on $VOUT"
   for _ in 1 2 3; do
-    kscreen-doctor "output.$VOUT.hdr.enable" "output.$VOUT.wcg.enable" 2>/dev/null && break
+    $KSD "output.$VOUT.hdr.enable" "output.$VOUT.wcg.enable" 2>/dev/null && break
     sleep 1
   done || echo "WARN: could not enable hdr on $VOUT"
 fi
@@ -92,13 +109,13 @@ setsid "$(dirname "$0")/prism-virtual-audio.sh" "$PHYSICAL_SINK" >>"$LOG" 2>&1 9
 # priorities when the virtual output appears, so don't rely on "priority 1").
 # Remember which ones we disabled so undo can re-enable exactly those.
 : > "$STATE"
-kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '
+$KSD -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '
   /^Output:/ {name=$3}
   /^\tenabled$/ {if (name != "") print name}
 ' | while read -r OUT; do
   [ "$OUT" = "$VOUT" ] && continue
   echo "$OUT" >> "$STATE"
   echo "disabling physical output $OUT"
-  kscreen-doctor "output.$OUT.disable" 2>/dev/null || true
+  $KSD "output.$OUT.disable" 2>/dev/null || true
 done
 echo "virtual desktop ready: $VOUT ${W}x${H}"

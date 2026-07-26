@@ -14,6 +14,9 @@ echo "=== virtual-desktop stop $(date -Is) ==="
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
+# kscreen-doctor can hang when KWin is in a degenerate state; cap every call.
+KSD="timeout 10 kscreen-doctor"
+
 exec 9>"$RUNTIME/prism-virtual.lock"
 flock -x -w 90 9 || echo "virtual-stop: lock timeout, proceeding anyway"
 
@@ -47,7 +50,7 @@ if [ -f "$STATE" ]; then
   while read -r OUT; do
     [ -z "$OUT" ] && continue
     echo "re-enabling physical output $OUT"
-    kscreen-doctor "output.$OUT.enable" 2>/dev/null || true
+    $KSD "output.$OUT.enable" 2>/dev/null || true
   done < "$STATE"
   rm -f "$STATE"
 fi
