@@ -94,6 +94,27 @@ it, rebuilds, and reinstalls. Prism is a **hard fork** (the rebrand lives in sou
 rebase can occasionally conflict in rebranded files — the script stops and tells you how to
 resolve. The functional Prism layer stays small.
 
+## Uninstall
+
+```bash
+systemctl --user stop prism.service prism-input-bridge.service prism-labwc.service
+systemctl --user disable prism.service prism-input-bridge.service prism-labwc.service
+rm -f ~/.local/bin/prism \
+      ~/.config/systemd/user/prism.service \
+      ~/.config/systemd/user/prism-labwc.service \
+      ~/.config/systemd/user/prism-input-bridge.service
+rm -rf ~/.config/systemd/user/prism-labwc.service.wants
+systemctl --user daemon-reload
+```
+
+To also remove the input-bridge udev rule and wipe configuration, credentials, and app
+data (full clean slate):
+
+```bash
+sudo rm -f /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
+rm -rf ~/.config/sunshine ~/.cache/prism
+```
+
 ## How it works
 
 - **Capture override patch** (`src/platform/linux/misc.cpp`): when a stream's display is
