@@ -543,10 +543,8 @@ by default. You may replace *localhost* with your internal ip address.
    ![Applications](images/applications.png)
 3. Adjust any configuration settings as needed. You can search for options in the search bar.
    ![Configuration](images/configuration-search.png)
-4. Find Moonlight clients and other tools for Sunshine in the `Featured Apps` tab.
-   ![Featured Apps](images/featured-apps.png)
-5. In Moonlight, you may need to add the PC manually.
-6. When Moonlight requests for you insert the pin:
+4. In Moonlight, you may need to add the PC manually.
+5. When Moonlight requests for you insert the pin:
 
    - Login to the web-ui
    - Go to "PIN" in the Navbar

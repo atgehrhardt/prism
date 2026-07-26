@@ -14,6 +14,9 @@
  */
 
 #define _GNU_SOURCE
+#include "virtual-keyboard-unstable-v1-client-protocol.h"
+#include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/input.h>
@@ -28,27 +31,23 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-
 #include <wayland-client.h>
 #include <xkbcommon/xkbcommon.h>
 
-#include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
-#include "virtual-keyboard-unstable-v1-client-protocol.h"
-
 #define LOG_PREFIX "prism-input-bridge: "
-#define MAX_EVDEV 1024          ///< probe /dev/input/event0..1023 (uinput nodes get high minors)
-#define MAX_FDS (MAX_EVDEV + 1) ///< poll capacity: evdev fds + wayland fd
-#define RESCAN_INTERVAL_MS 5000 ///< how often to look for new evdev devices
-#define RECONNECT_DELAY_MS 2000 ///< delay between wayland reconnect attempts
-#define DEFAULT_WIDTH 1920      ///< pointer x extent before any output mode arrives
-#define DEFAULT_HEIGHT 1080     ///< pointer y extent before any output mode arrives
+#define MAX_EVDEV 1024  ///< probe /dev/input/event0..1023 (uinput nodes get high minors)
+#define MAX_FDS (MAX_EVDEV + 1)  ///< poll capacity: evdev fds + wayland fd
+#define RESCAN_INTERVAL_MS 5000  ///< how often to look for new evdev devices
+#define RECONNECT_DELAY_MS 2000  ///< delay between wayland reconnect attempts
+#define DEFAULT_WIDTH 1920  ///< pointer x extent before any output mode arrives
+#define DEFAULT_HEIGHT 1080  ///< pointer y extent before any output mode arrives
 
 /**
  * @brief One open evdev source device.
  */
 struct source {
-  int fd;        ///< open file descriptor, or -1 when the slot is free
-  bool keyboard; ///< device reports alphanumeric keys (KEY_A..KEY_Z)
+  int fd;  ///< open file descriptor, or -1 when the slot is free
+  bool keyboard;  ///< device reports alphanumeric keys (KEY_A..KEY_Z)
   bool pointer;  ///< device reports pointer motion and BTN_LEFT
 };
 
@@ -65,8 +64,8 @@ static struct {
   struct zwp_virtual_keyboard_v1 *keyboard;
 
   int output_width;  ///< current mode width of the first output
-  int output_height; ///< current mode height of the first output
-  bool output_bound; ///< whether we already bound an output
+  int output_height;  ///< current mode height of the first output
+  bool output_bound;  ///< whether we already bound an output
 
   struct source sources[MAX_EVDEV];
 
@@ -79,8 +78,8 @@ static struct {
   double wheel_v;
   double wheel_h;
 
-  int grabbed;     ///< whether our evdev sources are currently EVIOCGRABed
-  char override_path[256]; ///< path of the prism-capture-override flag file
+  int grabbed;  ///< whether our evdev sources are currently EVIOCGRABed
+  char override_path[256];  ///< path of the prism-capture-override flag file
 } g;
 
 /**
@@ -137,16 +136,23 @@ static uint32_t event_time_ms(const struct input_event *ev) {
  * wl_output: track the current mode of the first output for pointer extents.
  * ------------------------------------------------------------------------ */
 
-static void output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y,
-                            int32_t physical_width, int32_t physical_height, int32_t subpixel,
-                            const char *make, const char *model, int32_t transform) {
-  (void) data; (void) output; (void) x; (void) y; (void) physical_width;
-  (void) physical_height; (void) subpixel; (void) make; (void) model; (void) transform;
+static void output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y, int32_t physical_width, int32_t physical_height, int32_t subpixel, const char *make, const char *model, int32_t transform) {
+  (void) data;
+  (void) output;
+  (void) x;
+  (void) y;
+  (void) physical_width;
+  (void) physical_height;
+  (void) subpixel;
+  (void) make;
+  (void) model;
+  (void) transform;
 }
 
-static void output_mode(void *data, struct wl_output *output, uint32_t flags,
-                        int32_t width, int32_t height, int32_t refresh) {
-  (void) data; (void) output; (void) refresh;
+static void output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
+  (void) data;
+  (void) output;
+  (void) refresh;
   if (flags & WL_OUTPUT_MODE_CURRENT) {
     g.output_width = width;
     g.output_height = height;
@@ -155,11 +161,14 @@ static void output_mode(void *data, struct wl_output *output, uint32_t flags,
 }
 
 static void output_done(void *data, struct wl_output *output) {
-  (void) data; (void) output;
+  (void) data;
+  (void) output;
 }
 
 static void output_scale(void *data, struct wl_output *output, int32_t factor) {
-  (void) data; (void) output; (void) factor;
+  (void) data;
+  (void) output;
+  (void) factor;
 }
 
 static const struct wl_output_listener output_listener = {
@@ -173,28 +182,25 @@ static const struct wl_output_listener output_listener = {
  * wl_registry
  * ------------------------------------------------------------------------ */
 
-static void registry_global(void *data, struct wl_registry *registry, uint32_t name,
-                            const char *interface, uint32_t version) {
+static void registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
   (void) data;
   if (strcmp(interface, wl_seat_interface.name) == 0 && g.seat == NULL) {
     g.seat = wl_registry_bind(registry, name, &wl_seat_interface, 1);
   } else if (strcmp(interface, wl_output_interface.name) == 0 && !g.output_bound) {
-    struct wl_output *output = wl_registry_bind(registry, name, &wl_output_interface,
-                                                version < 2 ? version : 2);
+    struct wl_output *output = wl_registry_bind(registry, name, &wl_output_interface, version < 2 ? version : 2);
     wl_output_add_listener(output, &output_listener, NULL);
     g.output_bound = true;
   } else if (strcmp(interface, zwlr_virtual_pointer_manager_v1_interface.name) == 0) {
-    g.pointer_manager = wl_registry_bind(registry, name,
-                                         &zwlr_virtual_pointer_manager_v1_interface,
-                                         version < 2 ? version : 2);
+    g.pointer_manager = wl_registry_bind(registry, name, &zwlr_virtual_pointer_manager_v1_interface, version < 2 ? version : 2);
   } else if (strcmp(interface, zwp_virtual_keyboard_manager_v1_interface.name) == 0) {
-    g.keyboard_manager = wl_registry_bind(registry, name,
-                                          &zwp_virtual_keyboard_manager_v1_interface, 1);
+    g.keyboard_manager = wl_registry_bind(registry, name, &zwp_virtual_keyboard_manager_v1_interface, 1);
   }
 }
 
 static void registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) {
-  (void) data; (void) registry; (void) name;
+  (void) data;
+  (void) registry;
+  (void) name;
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -244,8 +250,7 @@ static int send_keymap(void) {
     log_err("keymap memfd write");
   } else {
     lseek(fd, 0, SEEK_SET);
-    zwp_virtual_keyboard_v1_keymap(g.keyboard, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                   (uint32_t) fd, (uint32_t) size);
+    zwp_virtual_keyboard_v1_keymap(g.keyboard, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, (uint32_t) fd, (uint32_t) size);
   }
   close(fd);
   free(str);
@@ -277,7 +282,8 @@ static int wayland_connect(const char *name) {
     return -1;
   }
   if (!g.seat || !g.pointer_manager || !g.keyboard_manager) {
-    fprintf(stderr, LOG_PREFIX "compositor is missing wl_seat, "
+    fprintf(stderr, LOG_PREFIX
+            "compositor is missing wl_seat, "
             "zwlr_virtual_pointer_manager_v1 or zwp_virtual_keyboard_manager_v1\n");
     return -1;
   }
@@ -333,7 +339,8 @@ static void wayland_disconnect(void) {
  */
 static bool test_bit(int bit, const unsigned long *array) {
   return (array[bit / (8 * sizeof(unsigned long))] >>
-          (bit % (8 * sizeof(unsigned long)))) & 1;
+          (bit % (8 * sizeof(unsigned long)))) &
+         1;
 }
 
 /**
@@ -353,8 +360,7 @@ static void try_open_source(int index) {
       static int perm_warned = 0;
       if (!perm_warned) {
         perm_warned = 1;
-        fprintf(stderr, LOG_PREFIX "cannot open %s: %s (check uaccess/permissions)\n",
-                path, strerror(errno));
+        fprintf(stderr, LOG_PREFIX "cannot open %s: %s (check uaccess/permissions)\n", path, strerror(errno));
       }
     }
     return;
@@ -386,8 +392,7 @@ static void try_open_source(int index) {
   if (g.grabbed) {
     ioctl(fd, EVIOCGRAB, 1);
   }
-  fprintf(stderr, LOG_PREFIX "opened %s (%s)%s%s\n", path, name,
-          keyboard ? " keyboard" : "", pointer ? " pointer" : "");
+  fprintf(stderr, LOG_PREFIX "opened %s (%s)%s%s\n", path, name, keyboard ? " keyboard" : "", pointer ? " pointer" : "");
 }
 
 /**
@@ -425,29 +430,23 @@ static void rescan_sources(void) {
  */
 static void pointer_frame(uint32_t time_ms) {
   if (g.dx != 0 || g.dy != 0) {
-    zwlr_virtual_pointer_v1_motion(g.pointer, time_ms,
-                                   wl_fixed_from_double(g.dx),
-                                   wl_fixed_from_double(g.dy));
+    zwlr_virtual_pointer_v1_motion(g.pointer, time_ms, wl_fixed_from_double(g.dx), wl_fixed_from_double(g.dy));
     g.dx = g.dy = 0;
   }
   if (g.have_abs) {
     int width = g.output_width > 0 ? g.output_width : DEFAULT_WIDTH;
     int height = g.output_height > 0 ? g.output_height : DEFAULT_HEIGHT;
-    zwlr_virtual_pointer_v1_motion_absolute(g.pointer, time_ms,
-                                            (uint32_t) g.abs_x, (uint32_t) g.abs_y,
-                                            (uint32_t) width, (uint32_t) height);
+    zwlr_virtual_pointer_v1_motion_absolute(g.pointer, time_ms, (uint32_t) g.abs_x, (uint32_t) g.abs_y, (uint32_t) width, (uint32_t) height);
     g.have_abs = false;
   }
   if (g.wheel_v != 0) {
     zwlr_virtual_pointer_v1_axis_source(g.pointer, WL_POINTER_AXIS_SOURCE_WHEEL);
-    zwlr_virtual_pointer_v1_axis(g.pointer, time_ms, WL_POINTER_AXIS_VERTICAL_SCROLL,
-                                 wl_fixed_from_double(-g.wheel_v));
+    zwlr_virtual_pointer_v1_axis(g.pointer, time_ms, WL_POINTER_AXIS_VERTICAL_SCROLL, wl_fixed_from_double(-g.wheel_v));
     g.wheel_v = 0;
   }
   if (g.wheel_h != 0) {
     zwlr_virtual_pointer_v1_axis_source(g.pointer, WL_POINTER_AXIS_SOURCE_WHEEL);
-    zwlr_virtual_pointer_v1_axis(g.pointer, time_ms, WL_POINTER_AXIS_HORIZONTAL_SCROLL,
-                                 wl_fixed_from_double(-g.wheel_h));
+    zwlr_virtual_pointer_v1_axis(g.pointer, time_ms, WL_POINTER_AXIS_HORIZONTAL_SCROLL, wl_fixed_from_double(-g.wheel_h));
     g.wheel_h = 0;
   }
   zwlr_virtual_pointer_v1_frame(g.pointer);
@@ -466,25 +465,30 @@ static void forward_event(const struct source *src, const struct input_event *ev
       if (ev->code == BTN_LEFT || ev->code == BTN_RIGHT || ev->code == BTN_MIDDLE ||
           ev->code == BTN_SIDE || ev->code == BTN_EXTRA) {
         if (src->pointer && (ev->value == 0 || ev->value == 1)) {
-          zwlr_virtual_pointer_v1_button(g.pointer, t, ev->code,
-                                         ev->value ? WL_POINTER_BUTTON_STATE_PRESSED
-                                                   : WL_POINTER_BUTTON_STATE_RELEASED);
+          zwlr_virtual_pointer_v1_button(g.pointer, t, ev->code, ev->value ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
           zwlr_virtual_pointer_v1_frame(g.pointer);
           wl_display_flush(g.display);
         }
       } else if (src->keyboard && ev->value <= 2) {
-        zwp_virtual_keyboard_v1_key(g.keyboard, t, ev->code,
-                                    ev->value ? WL_KEYBOARD_KEY_STATE_PRESSED
-                                              : WL_KEYBOARD_KEY_STATE_RELEASED);
+        zwp_virtual_keyboard_v1_key(g.keyboard, t, ev->code, ev->value ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
       }
       break;
     case EV_REL:
       switch (ev->code) {
-        case REL_X: g.dx += ev->value; break;
-        case REL_Y: g.dy += ev->value; break;
-        case REL_WHEEL: g.wheel_v += ev->value; break;
-        case REL_HWHEEL: g.wheel_h += ev->value; break;
-        default: break;
+        case REL_X:
+          g.dx += ev->value;
+          break;
+        case REL_Y:
+          g.dy += ev->value;
+          break;
+        case REL_WHEEL:
+          g.wheel_v += ev->value;
+          break;
+        case REL_HWHEEL:
+          g.wheel_h += ev->value;
+          break;
+        default:
+          break;
       }
       break;
     case EV_ABS:
@@ -550,12 +554,12 @@ static int run_loop(void) {
 
     struct pollfd fds[MAX_FDS];
     struct source *map[MAX_FDS];
-    fds[0] = (struct pollfd) { .fd = wl_fd, .events = POLLIN };
+    fds[0] = (struct pollfd) {.fd = wl_fd, .events = POLLIN};
     int nfds = 1;
     for (int i = 0; i < MAX_EVDEV; i++) {
       if (g.sources[i].fd >= 0) {
         map[nfds] = &g.sources[i];
-        fds[nfds] = (struct pollfd) { .fd = g.sources[i].fd, .events = POLLIN };
+        fds[nfds] = (struct pollfd) {.fd = g.sources[i].fd, .events = POLLIN};
         nfds++;
       }
     }
@@ -633,10 +637,8 @@ int main(int argc, char **argv) {
       run_loop();
       wayland_disconnect();
     }
-    fprintf(stderr, LOG_PREFIX "retrying wayland connection in %d ms\n",
-            RECONNECT_DELAY_MS);
-    struct timespec ts = { RECONNECT_DELAY_MS / 1000,
-                           (long) (RECONNECT_DELAY_MS % 1000) * 1000000L };
+    fprintf(stderr, LOG_PREFIX "retrying wayland connection in %d ms\n", RECONNECT_DELAY_MS);
+    struct timespec ts = {RECONNECT_DELAY_MS / 1000, (long) (RECONNECT_DELAY_MS % 1000) * 1000000L};
     nanosleep(&ts, NULL);
   }
 }

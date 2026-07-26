@@ -469,7 +469,6 @@
   "navbar": {
     "applications": "Applications",
     "configuration": "Configuration",
-    "featured": "Featured Apps",
     "home": "Home",
     "logout": "Log Out",
     "password": "Change Password",
@@ -569,25 +568,6 @@
     "vigembus_install_success": "ViGEmBus driver installed successfully! You may need to restart your computer.",
     "vigembus_force_reinstall_button": "Force Reinstall ViGEmBus v{version}",
     "vigembus_not_installed": "ViGEmBus is not installed."
-  },
-  "featured": {
-    "categories": {
-      "client": "Clients",
-      "tool": "Tools"
-    },
-    "description": "Discover clients, tools, and integrations that enhance your Prism streaming experience.",
-    "docs": "Docs",
-    "documentation": "Documentation",
-    "get": "Get",
-    "github": "GitHub Repository",
-    "github_forks": "Forks",
-    "github_issues": "Open Issues",
-    "github_stars": "Stars",
-    "last_updated": "Last Updated",
-    "no_apps": "No apps found in this category.",
-    "official": "Official",
-    "title": "Featured Apps",
-    "website": "Website"
   },
   "file_browser": {
     "empty": "No items to display",
