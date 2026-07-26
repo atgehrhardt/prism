@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Prism — rebase the virtual-capture patch onto the latest upstream Sunshine
+# Prism — rebase the Prism branch onto the latest upstream Sunshine
 # release, rebuild, and reinstall. Run from anywhere:
 #   ~/Dev/prism/update.sh
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BRANCH="virtual-capture"
+BRANCH="master"
 UPSTREAM="https://github.com/LizardByte/Sunshine.git"
 
 cd "$SRC_DIR"

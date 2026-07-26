@@ -55,7 +55,7 @@ try Prism on another distro, GPU, or desktop environment, please report back in
 ## Install (Fedora 44)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/virtual-capture/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
 ```
 
 Installs dependencies, builds Prism, and sets up:
@@ -75,7 +75,7 @@ Then open `https://<host>:47990`, set credentials, and pair Moonlight as usual.
 ~/Dev/prism/update.sh
 ```
 
-Fetches the latest upstream Sunshine release tag, rebases the `virtual-capture` branch onto
+Fetches the latest upstream Sunshine release tag, rebases the `master` branch onto
 it, rebuilds, and reinstalls. Prism is a **hard fork** (the rebrand lives in source), so a
 rebase can occasionally conflict in rebranded files — the script stops and tells you how to
 resolve. The functional Prism layer stays small.

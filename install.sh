@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Prism — one-command install for Fedora.
-#   curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/virtual-capture/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
 set -euo pipefail
 
 REPO="https://github.com/atgehrhardt/prism.git"
-BRANCH="virtual-capture"
+BRANCH="master"
 SRC_DIR="${PRISM_SRC_DIR:-$HOME/Dev/prism}"
 BUILD_JOBS="$(nproc)"
 
