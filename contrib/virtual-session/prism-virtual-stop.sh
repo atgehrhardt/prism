@@ -27,8 +27,12 @@ ASTATE="$RUNTIME/prism-virtual-audio.state"
 if [ -f "$ASTATE" ]; then
   # shellcheck source=/dev/null
   . "$ASTATE" 2>/dev/null || true
-  [ -n "${loop_module:-}" ] && pactl unload-module "$loop_module" 2>/dev/null || true
-  [ -n "${sink_module:-}" ] && pactl unload-module "$sink_module" 2>/dev/null || true
+  if [ -n "${loop_module:-}" ]; then
+    pactl unload-module "$loop_module" 2>/dev/null || true
+  fi
+  if [ -n "${sink_module:-}" ]; then
+    pactl unload-module "$sink_module" 2>/dev/null || true
+  fi
   if [ -n "${physical_sink:-}" ]; then
     pactl set-default-sink "$physical_sink" 2>/dev/null || true
   fi

@@ -29,7 +29,9 @@ if [ "$ACTION" = "stop" ]; then
   if [ -f "$STATE" ]; then
     # shellcheck source=/dev/null
     . "$STATE" 2>/dev/null || true
-    [ -n "${loop_module:-}" ] && pactl unload-module "$loop_module" 2>/dev/null || true
+    if [ -n "${loop_module:-}" ]; then
+      pactl unload-module "$loop_module" 2>/dev/null || true
+    fi
     if [ -n "${physical_sink:-}" ]; then
       pactl set-default-sink "$physical_sink" 2>/dev/null || true
     fi

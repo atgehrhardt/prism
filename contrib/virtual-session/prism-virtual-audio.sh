@@ -61,8 +61,9 @@ echo "session sink module: ${SINK_MODULE:-failed}"
 
 pactl set-default-sink "$SESSION_SINK" 2>/dev/null || true
 pactl list short sink-inputs 2>/dev/null | cut -f1 | while read -r input_id; do
-  pactl move-sink-input "$input_id" "$SESSION_SINK" 2>/dev/null \
-    && echo "moved sink-input $input_id to $SESSION_SINK" || true
+  if pactl move-sink-input "$input_id" "$SESSION_SINK" 2>/dev/null; then
+    echo "moved sink-input $input_id to $SESSION_SINK"
+  fi
 done
 
 # Loop the session sink into the capture sink so apps are heard on the stream.
