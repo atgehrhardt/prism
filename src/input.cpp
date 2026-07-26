@@ -56,6 +56,7 @@ namespace input {
   constexpr auto VKEY_LCONTROL = 0xA2;  ///< Windows virtual-key code for lcontrol.
   constexpr auto VKEY_RCONTROL = 0xA3;  ///< Windows virtual-key code for rcontrol.
   constexpr auto VKEY_MENU = 0x12;  ///< Windows virtual-key code for menu.
+  constexpr auto VKEY_ESCAPE = 0x1B;  ///< Windows virtual-key code for escape.
   constexpr auto VKEY_LMENU = 0xA4;  ///< Windows virtual-key code for lmenu.
   constexpr auto VKEY_RMENU = 0xA5;  ///< Windows virtual-key code for rmenu.
 
@@ -204,6 +205,8 @@ namespace input {
     // Sunshine forces the button to be in a specific state until the gamepad state matches that of
     // Moonlight once more.
     button_state_e back_button_state;  ///< Back button state.
+
+    bool escape_as_guide_pressed {false};  ///< Whether the Guide button is currently held due to an Escape key remap.
   };
 
   /**
@@ -914,6 +917,52 @@ namespace input {
   }
 
   /**
+   * @brief Emulate a gamepad Guide button press in place of an Escape key press.
+   *
+   * Moonlight on Android sends an Escape key press for the back button. When the
+   * android_back_as_guide option is enabled, the Escape event is remapped to the
+   * Guide button of the first allocated virtual gamepad.
+   *
+   * @param input Platform input backend that receives the event.
+   * @param key_code Moonlight keyboard packet key code.
+   * @param release Whether the key is being released.
+   * @return True if the Escape event was consumed, false to fall through to normal Escape handling.
+   */
+  bool escape_as_guide(std::shared_ptr<input_t> &input, uint16_t key_code, bool release) {
+    // Find the first allocated gamepad.
+    auto it = std::find_if(input->gamepads.begin(), input->gamepads.end(), [](const gamepad_t &gamepad) {
+      return gamepad.id >= 0;
+    });
+    if (it == input->gamepads.end()) {
+      // No gamepad allocated, fall through to normal Escape handling.
+      return false;
+    }
+
+    auto &gamepad = *it;
+    if (release) {
+      if (!gamepad.escape_as_guide_pressed) {
+        // This Escape press was not remapped (e.g. no gamepad was allocated when it was pressed),
+        // let normal Escape handling release the key.
+        return false;
+      }
+    } else if (gamepad.escape_as_guide_pressed) {
+      // Ignore repeated key-down events while the button is already held.
+      return true;
+    }
+
+    gamepad.escape_as_guide_pressed = !release;
+
+    auto &state = gamepad.gamepad_state;
+    if (release) {
+      state.buttonFlags &= ~platf::HOME;
+    } else {
+      state.buttonFlags |= platf::HOME;
+    }
+    platf::gamepad_update(platf_input, gamepad.id, state);
+    return true;
+  }
+
+  /**
    * @brief Forward a client input packet directly to the platform backend.
    *
    * @param input Platform input backend that receives the event.
@@ -926,6 +975,11 @@ namespace input {
 
     auto release = util::endian::little(packet->header.magic) == KEY_UP_EVENT_MAGIC;
     auto keyCode = packet->keyCode & 0x00FF;
+
+    // Remap the Escape key (Android back button) to the gamepad Guide button if requested.
+    if (config::input.android_back_as_guide && keyCode == VKEY_ESCAPE && escape_as_guide(input, keyCode, release)) {
+      return;
+    }
 
     if (keyCode == VKEY_LMENU) {
       input->left_alt_pressed = !release;
@@ -1369,6 +1423,11 @@ namespace input {
       packet->rightStickX,
       packet->rightStickY
     };
+
+    // Map the Android back button (gamepad Back/Select) to Guide when enabled.
+    if (config::input.android_back_as_guide && (gamepad_state.buttonFlags & platf::BACK)) {
+      gamepad_state.buttonFlags = (gamepad_state.buttonFlags & ~platf::BACK) | platf::HOME;
+    }
 
     auto bf_new = gamepad_state.buttonFlags;
     switch (gamepad.back_button_state) {

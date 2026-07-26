@@ -282,6 +282,7 @@ namespace config {
 
     bool keyboard;  ///< Enable keyboard input from clients.
     bool key_rightalt_to_key_win;  ///< Map the client Right Alt key to the Windows key.
+    bool android_back_as_guide;  ///< Map the client Escape key (Android back button) to the gamepad Guide button.
     bool mouse;  ///< Enable mouse input from clients.
     bool controller;  ///< Enable controller input from clients.
 
