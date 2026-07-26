@@ -159,12 +159,18 @@ else
   # gamescope wayland/X sockets (see state file).
   SESSION_CMD=(sleep infinity)
 fi
+# Snapshot existing sockets so step 5 can tell the new session's sockets apart
+# from stale ones left by crashed sessions.
+GS_BEFORE="$(find "$RUNTIME" -maxdepth 1 -name 'gamescope-*' -printf '%f ' 2>/dev/null)"
+X_BEFORE="$(find /tmp/.X11-unix -maxdepth 1 -name 'X*' -printf '%f ' 2>/dev/null | tr -d 'X')"
 setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland PULSE_SINK=prism-headless \
   gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${GAMESCOPE_FLAGS[@]}" \
   -- "${SESSION_CMD[@]}" >>"$LOG" 2>&1 9>&- &
 
 # 5. Discover the gamescope session sockets and record state for the app
-# command environment and for teardown.
+# command environment and for teardown. Stale sockets from crashed sessions
+# linger in $XDG_RUNTIME_DIR and /tmp/.X11-unix, so discover by diffing against
+# a pre-launch snapshot instead of taking the first match.
 GSOCKET=""
 XDISP=""
 for _ in $(seq 1 40); do
@@ -172,15 +178,20 @@ for _ in $(seq 1 40); do
     case "$s" in
       *.lock | *-ei | *limiter*) continue ;;
     esac
-    [ -S "$s" ] && GSOCKET="$(basename "$s")" && break
+    b="$(basename "$s")"
+    [ -S "$s" ] || continue
+    case " $GS_BEFORE " in *" $b "*) continue ;; esac
+    GSOCKET="$b" && break
   done
   for x in /tmp/.X11-unix/X*; do
     [ -S "$x" ] || continue
     owner="$(stat -c %U "$x" 2>/dev/null)"
     [ "$owner" = "$(id -un)" ] || continue
-    # gamescope's Xwayland is the one that is NOT the desktop :0
     n="${x##*/X}"
     [ "$n" = "0" ] && continue
+    case " $X_BEFORE " in *" $n "*) continue ;; esac
+    # must belong to a live Xwayland, not a stale socket
+    pgrep -f "Xwayland :$n " >/dev/null || pgrep -f "Xwayland :$n$" >/dev/null || continue
     XDISP=":$n" && break
   done
   [ -n "$GSOCKET" ] && [ -n "$XDISP" ] && break
