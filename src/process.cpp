@@ -30,6 +30,7 @@
 #include "logging.h"
 #include "platform/common.h"
 #include "process.h"
+#include "steam_games.h"
 #include "system_tray.h"
 #include "utility.h"
 
@@ -279,6 +280,20 @@ namespace proc {
                     << (resolved.steam ? " (steam)"sv : ""sv);
 
     if (mode == "headless"sv) {
+      // A generated Steam game app carries its launch target as
+      // "steam steam://rungameid/<appid>". Hand the appid to the start script
+      // (PRISM_STEAM_APP_ID) so the session's own Steam invocation receives
+      // the URL; running it as a separate command would race the Big Picture
+      // boot and could hijack the session with a desktop-mode Steam.
+      const bool had_steam_app = _env.count("PRISM_STEAM_APP_ID") != 0;
+      const std::string old_steam_app = had_steam_app ? _env["PRISM_STEAM_APP_ID"].to_string() : std::string();
+      constexpr std::string_view rungameid_prefix = "steam steam://rungameid/"sv;
+      if (resolved.steam && _app.cmd.rfind(std::string(rungameid_prefix), 0) == 0) {
+        _env["PRISM_STEAM_APP_ID"] = _app.cmd.substr(rungameid_prefix.size());
+        _app.cmd.clear();
+      } else {
+        _env.erase("PRISM_STEAM_APP_ID");
+      }
       // PRISM_STEAM controls whether the session runs Steam (SteamOS behavior);
       // export it for the start script only, then restore the previous state.
       const bool had_prism_steam = _env.count("PRISM_STEAM") != 0;
@@ -289,6 +304,11 @@ namespace proc {
         _env["PRISM_STEAM"] = old_prism_steam;
       } else {
         _env.erase("PRISM_STEAM");
+      }
+      if (had_steam_app) {
+        _env["PRISM_STEAM_APP_ID"] = old_steam_app;
+      } else {
+        _env.erase("PRISM_STEAM_APP_ID");
       }
       if (rc != 0) {
         return -1;
@@ -307,6 +327,9 @@ namespace proc {
         }
         _env["WAYLAND_DISPLAY"] = wayland_display;
         _env["DISPLAY"] = x_display;
+        // Route the app's audio to the headless session's dedicated sink so
+        // only session audio is captured (see prism-headless-audio.sh).
+        _env["PULSE_SINK"] = "prism-headless"s;
         _prism_env_overridden = true;
         BOOST_LOG(info) << "[prism] App command will run inside the gamescope session (WAYLAND_DISPLAY="sv
                         << wayland_display << ", DISPLAY="sv << x_display << ')';
@@ -347,7 +370,7 @@ namespace proc {
     // the original values.
     if (_prism_env_overridden) {
       _prism_env_overridden = false;
-      for (const char *var : {"WAYLAND_DISPLAY", "DISPLAY"}) {
+      for (const char *var : {"WAYLAND_DISPLAY", "DISPLAY", "PULSE_SINK"}) {
         const char *original = std::getenv(var);
         if (original != nullptr) {
           _env[var] = original;
@@ -1018,6 +1041,36 @@ namespace proc {
         ctx.detached = std::move(detached);
 
         apps.emplace_back(std::move(ctx));
+      }
+
+      // Live-sync installed Steam games as launchable headless SteamOS apps:
+      // launching one brings up the same session as Steam Headless and then
+      // starts the game inside it. User-defined apps win on name collision.
+      // Set PRISM_STEAM_SYNC=0 to disable (used by tests).
+      if (const char *sync = std::getenv("PRISM_STEAM_SYNC"); sync == nullptr || std::string_view(sync) != "0"sv) {
+        std::set<std::string> app_names;
+        for (const auto &app : apps) {
+          app_names.insert(app.name);
+        }
+        for (const auto &game : prism::steam::installed_games()) {
+          if (app_names.count(game.name) != 0) {
+            continue;
+          }
+          proc::ctx_t ctx;
+          ctx.name = game.name;
+          ctx.cmd = "steam steam://rungameid/"s + std::to_string(game.appid);
+          ctx.prism_capture = "steamos"s;
+          ctx.elevated = false;
+          ctx.auto_detach = true;
+          ctx.wait_all = true;
+          ctx.exit_timeout = std::chrono::seconds {5};
+
+          auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+          ctx.id = ids.count(std::get<0>(possible_ids)) == 0 ? std::get<0>(possible_ids) : std::get<1>(possible_ids);
+          ids.insert(ctx.id);
+
+          apps.emplace_back(std::move(ctx));
+        }
       }
 
       return proc::proc_t {

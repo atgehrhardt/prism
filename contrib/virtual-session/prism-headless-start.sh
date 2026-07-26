@@ -89,11 +89,23 @@ if command -v wlr-randr >/dev/null; then
   wlr-randr --output HEADLESS-1 --custom-mode "${W}x${H}@${FPS}" 2>/dev/null || true
 fi
 
+# 3b. Dedicated audio sink for the headless session. Session apps get
+# PULSE_SINK=prism-headless so only their audio is captured; the background
+# guard loops this sink into Sunshine's capture sink and keeps the desktop's
+# default sink on the physical output (Sunshine switches it at stream start).
+PHYSICAL_SINK="$(pactl get-default-sink 2>/dev/null || true)"
+pactl load-module module-null-sink sink_name=prism-headless \
+  sink_properties=device.description="Prism Headless Session" >/dev/null 2>&1 || true
+setsid "$(dirname "$0")/prism-headless-audio.sh" "$PHYSICAL_SINK" >>"$LOG" 2>&1 9>&- &
+
 # 4. Launch gamescope inside the headless compositor.
+# --adaptive-sync lets gamescope present frames as they arrive instead of
+# holding them for a fixed vblank (VRR); on a headless output this removes
+# the artificial fixed-refresh cap on frame pacing for the stream.
 # --rt asks for realtime scheduling, which reduces frame-pacing jitter on the
 # compositor thread; gamescope degrades gracefully when rtkit/CAP_SYS_NICE is
 # unavailable, so this is safe everywhere.
-GAMESCOPE_FLAGS=(--rt)
+GAMESCOPE_FLAGS=(--adaptive-sync --rt)
 if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
   GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
@@ -102,6 +114,12 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
   # -steampal / -steamdeck enable the full Deck interface including the QAM
   # performance tab; plain -steamos does not.
   SESSION_CMD=(steam -gamepadui -steamos3 -steampal -steamdeck)
+  # A direct game launch (PRISM_STEAM_APP_ID, set by Sunshine for synced Steam
+  # game apps) is passed to Steam itself: it processes the URL once the client
+  # is up, so the game starts inside this Big Picture session.
+  if [ -n "${PRISM_STEAM_APP_ID:-}" ]; then
+    SESSION_CMD+=("steam://rungameid/$PRISM_STEAM_APP_ID")
+  fi
   # Two Xwaylands are required for gamescope to export
   # STEAM_MULTIPLE_XWAYLANDS=1, which the Deck UI expects.
   GAMESCOPE_FLAGS+=(--xwayland-count 2)
@@ -129,7 +147,7 @@ else
   # gamescope wayland/X sockets (see state file).
   SESSION_CMD=(sleep infinity)
 fi
-setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland \
+setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland PULSE_SINK=prism-headless \
   gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${GAMESCOPE_FLAGS[@]}" \
   -- "${SESSION_CMD[@]}" >>"$LOG" 2>&1 9>&- &
 

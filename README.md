@@ -44,6 +44,16 @@ Fresh installs include four ready-made apps:
 - **Desktop Headless** — empty headless gamescope session
 - **Steam Headless** — headless SteamOS (Big Picture) session
 
+### Steam game sync
+
+Installed Steam games are synced into the app list automatically (`src/steam_games.*`
+parses `libraryfolders.vdf` + `appmanifest_*.acf`; Proton/runtimes are filtered out).
+Launching one brings up the same headless SteamOS session as **Steam Headless** and starts
+the game inside it (the appid is handed to the session's own Steam via `PRISM_STEAM_APP_ID`,
+so there is no race with the Big Picture boot); ending the stream tears the session — and the
+game — down. Synced apps are marked `prism-steam` in the Applications tab; editing one imports
+it as a regular override app, and an app you define yourself always wins on name collision.
+
 ## Status
 
 ⚠️ **Currently validated on Fedora 44 (KDE Plasma 6, Wayland, NVIDIA) only.** The design is
@@ -100,6 +110,10 @@ resolve. The functional Prism layer stays small.
   libinput seat while a desktop owns it, but speaks `zwlr_virtual_pointer_v1` /
   `zwp_virtual_keyboard_v1`; the bridge re-injects Sunshine's uinput events there and holds
   an exclusive `EVIOCGRAB` only during headless streams.
+- **Audio separation** (`contrib/virtual-session/prism-headless-audio.sh`): headless session
+  apps output to a dedicated `prism-headless` null sink (`PULSE_SINK`), which is looped into
+  Sunshine's capture sink; the guard keeps the desktop's default sink on the physical output
+  so desktop audio is never captured into the stream — mirroring how inputs are separated.
 - **`prism-kwin-mode`** (`contrib/virtual-session/prism-kwin-mode.c`): native
   kde-output-management-v2 client for output modes/HDR/custom modes (used by the optional
   `prism-desktop-session.sh` for physical-display switching; not wired up by default).
@@ -108,10 +122,13 @@ resolve. The functional Prism layer stays small.
 
 - **HDR**: attempted via `gamescope --hdr-enabled` for HDR clients in headless mode
   (depends on labwc color-management support); desktop HDR capture depends on your
-  portal/compositor. Virtual outputs are SDR-only.
+  portal/compositor. KWin virtual outputs are marked HDR/WCG-capable for HDR clients
+  (needs Plasma 6).
+- **VRR**: headless sessions run gamescope with `--adaptive-sync`, and KWin virtual
+  outputs get `vrrpolicy.always`, so frame pacing follows the content instead of a
+  fixed vblank.
 - **Virtual outputs match the client's refresh rate** (a custom mode is added via
-  `kscreen-doctor` when the client requests more than the 60Hz default); virtual outputs
-  are SDR-only.
+  `kscreen-doctor` when the client requests more than the 60Hz default).
 - **Physical-display resolution switching is limited by your driver**: e.g. NVIDIA + DSC
   panels reject compositor-generated modelines. Mirror mode handles this with GPU scaling
   instead — visually lossless at the client.

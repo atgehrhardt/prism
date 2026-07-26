@@ -278,10 +278,13 @@ class ProcessParseTest: public BaseTest {
 protected:
   void SetUp() override {
     BaseTest::SetUp();
+    // Steam game sync would otherwise append the host's real Steam library.
+    setenv("PRISM_STEAM_SYNC", "0", 1);
     test_file = fs::temp_directory_path() / "sunshine_process_parse_test_apps.json";  // NOSONAR(cpp:S5443): safe for tests
   }
 
   void TearDown() override {
+    unsetenv("PRISM_STEAM_SYNC");
     fs::remove(test_file);
     BaseTest::TearDown();
   }
