@@ -34,22 +34,51 @@ done
 pkill -9 -x gamescope 2>/dev/null || true
 pkill -9 -x gamescopereaper 2>/dev/null || true
 
-# 2b. Kill any Steam still attached to the headless session.
-for p in $(pgrep -x steam); do
-  env_disp="$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
-  case "$env_disp" in
-    *wayland-prism* | *gamescope* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
-      kill "$p" 2>/dev/null || true ;;
-  esac
+# 2b. Kill any Steam still attached to the headless session. steamwebhelper
+# is a separate process name and survives killing `steam` alone; left behind
+# it holds the single-instance lock and the fossilize shader-cache state.
+for name in steam steamwebhelper; do
+  for p in $(pgrep -x "$name"); do
+    env_disp="$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
+    case "$env_disp" in
+      *wayland-prism* | *gamescope* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
+        kill "$p" 2>/dev/null || true ;;
+    esac
+  done
 done
+
+# Shader-compile workers from the torn-down session must not outlive it; they
+# keep cache locks that hang the next session's shader processing.
+if [ "$STEAM" = "1" ]; then
+  pkill -x fossilize_replay 2>/dev/null || true
+fi
 
 rm -f "$STATE"
 
 # 3. Return Steam to the desktop if this was a Steam session.
 if [ "$STEAM" = "1" ]; then
   unset WAYLAND_DISPLAY
-  if ! pgrep -x steam >/dev/null; then
+  # Wait for the headless instance to fully exit so Steam's single-instance
+  # lock is released before relaunching on the desktop.
+  for _ in $(seq 1 40); do
+    pgrep -x steam >/dev/null || break
+    sleep 0.5
+  done
+  pkill -9 -x steamwebhelper 2>/dev/null || true
+  # Relaunch with verification: a failed or ignored start is retried, since
+  # Steam silently no-ops if its lock has not been released yet.
+  for attempt in 1 2 3; do
+    pgrep -x steam >/dev/null && break
+    echo "relaunching desktop steam (attempt $attempt)"
     setsid steam -silent >/dev/null 2>&1 9>&- &
-    echo "relaunched desktop steam"
+    for _ in $(seq 1 20); do
+      pgrep -x steam >/dev/null && break
+      sleep 0.5
+    done
+  done
+  if pgrep -x steam >/dev/null; then
+    echo "desktop steam running"
+  else
+    echo "WARNING: failed to relaunch desktop steam after 3 attempts"
   fi
 fi
