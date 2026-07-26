@@ -64,6 +64,16 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     done
     pkill -9 -x steamwebhelper 2>/dev/null || true
   fi
+  # The session Steam must not start until the desktop instance is COMPLETELY
+  # gone (main process and helpers): starting earlier makes it forward to the
+  # dying desktop instance instead of becoming the session instance, and
+  # launch URLs then open games on the desktop.
+  for _ in $(seq 1 40); do
+    pgrep -x steam >/dev/null && sleep 0.5 && continue
+    pgrep -x steamwebhelper >/dev/null && sleep 0.5 && continue
+    break
+  done
+  pgrep -x steam >/dev/null && echo "WARNING: desktop steam still running; session launch may misroute"
 fi
 
 # 2. Arm the capture override so this stream captures the headless session.
@@ -112,12 +122,13 @@ fi
 if [ "${PRISM_STEAM:-0}" = "1" ]; then
   if [ -n "${PRISM_STEAM_APP_ID:-}" ]; then
     # Direct game launch (PRISM_STEAM_APP_ID, set by Sunshine for synced Steam
-    # game apps): lightweight session — a plain background Steam client, no
-    # Deck UI, no second Xwayland, no mangoapp. The app command
+    # game apps): lightweight session — a plain Steam client (visible, per user
+    # preference; no Deck UI flags), no mangoapp. The app command
     # (prism-steam-game.sh) launches the game and exits with it.
-    # STEAM_FRAME_FORCE_CLOSE keeps the Steam window closed; only the game
-    # should be visible in the session.
-    SESSION_CMD=(env STEAM_FRAME_FORCE_CLOSE=1 steam -silent)
+    # Two Xwaylands like the Deck session: gamescope treats the second as the
+    # game display, which is what makes late-launched game windows composite.
+    SESSION_CMD=(steam)
+    GAMESCOPE_FLAGS+=(--xwayland-count 2)
   else
     # Deck UI flags (as used by gamescope-session-plus/Bazzite): -steamos3 /
     # -steampal / -steamdeck enable the full Deck interface including the QAM
@@ -151,12 +162,18 @@ else
   # gamescope wayland/X sockets (see state file).
   SESSION_CMD=(sleep infinity)
 fi
+# Snapshot existing sockets so step 5 can tell the new session's sockets apart
+# from stale ones left by crashed sessions.
+GS_BEFORE="$(find "$RUNTIME" -maxdepth 1 -name 'gamescope-*' -printf '%f ' 2>/dev/null)"
+X_BEFORE="$(find /tmp/.X11-unix -maxdepth 1 -name 'X*' -printf '%f ' 2>/dev/null | tr -d 'X')"
 setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland PULSE_SINK=prism-headless \
   gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${GAMESCOPE_FLAGS[@]}" \
   -- "${SESSION_CMD[@]}" >>"$LOG" 2>&1 9>&- &
 
 # 5. Discover the gamescope session sockets and record state for the app
-# command environment and for teardown.
+# command environment and for teardown. Stale sockets from crashed sessions
+# linger in $XDG_RUNTIME_DIR and /tmp/.X11-unix, so discover by diffing against
+# a pre-launch snapshot instead of taking the first match.
 GSOCKET=""
 XDISP=""
 for _ in $(seq 1 40); do
@@ -164,15 +181,20 @@ for _ in $(seq 1 40); do
     case "$s" in
       *.lock | *-ei | *limiter*) continue ;;
     esac
-    [ -S "$s" ] && GSOCKET="$(basename "$s")" && break
+    b="$(basename "$s")"
+    [ -S "$s" ] || continue
+    case " $GS_BEFORE " in *" $b "*) continue ;; esac
+    GSOCKET="$b" && break
   done
   for x in /tmp/.X11-unix/X*; do
     [ -S "$x" ] || continue
     owner="$(stat -c %U "$x" 2>/dev/null)"
     [ "$owner" = "$(id -un)" ] || continue
-    # gamescope's Xwayland is the one that is NOT the desktop :0
     n="${x##*/X}"
     [ "$n" = "0" ] && continue
+    case " $X_BEFORE " in *" $n "*) continue ;; esac
+    # must belong to a live Xwayland, not a stale socket
+    pgrep -f "Xwayland :$n " >/dev/null || pgrep -f "Xwayland :$n$" >/dev/null || continue
     XDISP=":$n" && break
   done
   [ -n "$GSOCKET" ] && [ -n "$XDISP" ] && break
