@@ -20,7 +20,7 @@ Every app gets a **Capture Mode** (dropdown in the web UI app editor, stored as
 | Mode | What it does |
 |---|---|
 | **Default (mirror)** | Streams your desktop as-is. Resolution, FPS, bitrate and codec follow the client's settings automatically (Sunshine scales the capture); host display settings are untouched. |
-| **Virtual display** | Creates a KWin virtual output at the client's *exact* resolution, streams it, and turns the physical monitor(s) off for the session. 60Hz / SDR only (KWin limitation). |
+| **Virtual display** | Creates a KWin virtual output at the client's *exact* resolution and refresh rate, streams it, and turns the physical monitor(s) off for the session. SDR only (KWin limitation). |
 | **Headless (gamescope)** | Brings up a fully headless [labwc](https://github.com/labwc/labwc) + [gamescope](https://github.com/ValveSoftware/gamescope) session at the client's resolution/FPS and streams that. Works with **any** app — its command runs inside the session. Your physical monitors are untouched. If the app name contains "steam", it additionally quits Steam on the desktop, launches Steam Big Picture (SteamOS mode) in the session, and returns Steam to the desktop when the stream ends. |
 | **Portal output** | Captures a specific named output through the XDG portal. |
 
@@ -109,7 +109,9 @@ resolve. The functional Prism layer stays small.
 - **HDR**: attempted via `gamescope --hdr-enabled` for HDR clients in headless mode
   (depends on labwc color-management support); desktop HDR capture depends on your
   portal/compositor. Virtual outputs are SDR-only.
-- **Virtual outputs are 60Hz** (KWin limitation).
+- **Virtual outputs match the client's refresh rate** (a custom mode is added via
+  `kscreen-doctor` when the client requests more than the 60Hz default); virtual outputs
+  are SDR-only.
 - **Physical-display resolution switching is limited by your driver**: e.g. NVIDIA + DSC
   panels reject compositor-generated modelines. Mirror mode handles this with GPU scaling
   instead — visually lossless at the client.
