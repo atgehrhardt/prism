@@ -232,6 +232,30 @@ namespace prism::steam {
             }
           }
           if (!downloaded) {
+            // Unreleased/very new games have no static CDN assets yet; the
+            // store API still serves a header image.
+            const std::string api_cmd = "curl -fsSL --max-time 10 "s + shell_quote("https://store.steampowered.com/api/appdetails?appids="s + std::to_string(appid) + "&filters=basic"s);
+            if (FILE *pipe = popen(api_cmd.c_str(), "r")) {
+              std::string json;
+              char buf[4096];
+              while (fgets(buf, sizeof(buf), pipe)) {
+                json += buf;
+              }
+              pclose(pipe);
+              static const std::regex header_re {R"re("header_image"\s*:\s*"([^"]+)")re"};
+              if (std::smatch match; std::regex_search(json, match, header_re)) {
+                std::string url = match[1].str();
+                // JSON-escaped slashes
+                size_t pos = 0;
+                while ((pos = url.find("\\/", pos)) != std::string::npos) {
+                  url.replace(pos, 2, "/");
+                }
+                const std::string cmd = "curl -fsSL --max-time 10 -o "s + shell_quote(jpg.string()) + " "s + shell_quote(url);
+                downloaded = std::system(cmd.c_str()) == 0 && fs::is_regular_file(jpg, ec);
+              }
+            }
+          }
+          if (!downloaded) {
             std::ofstream(marker) << "no art";
             BOOST_LOG(debug) << "[prism] No Steam CDN box art for app "sv << appid;
             return {};
