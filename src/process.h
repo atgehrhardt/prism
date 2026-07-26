@@ -175,6 +175,19 @@ namespace proc {
      */
     void terminate();
 
+    /**
+     * @brief Replace the application list without disturbing a running app.
+     *
+     * Unlike a full refresh (re-parsing replaces the whole `proc_t`), this
+     * preserves all launch state — the running app, its process handles, and
+     * the active Prism capture mode — so re-syncing the app list (e.g. on a
+     * client applist request when backing out of a stream) does not make the
+     * running app vanish.
+     *
+     * @param apps New application launch contexts.
+     */
+    void replace_apps(std::vector<ctx_t> &&apps);
+
   private:
     int _app_id;
 
@@ -232,6 +245,16 @@ namespace proc {
    * @param file_name File name.
    */
   void refresh(const std::string &file_name);
+  /**
+   * @brief Re-read the apps file and replace only the application list.
+   *
+   * Unlike refresh(), any currently running app keeps its launch state. Use
+   * this for re-syncs that can happen mid-session (client applist requests,
+   * web UI app edits).
+   *
+   * @param file_name File name.
+   */
+  void refresh_apps(const std::string &file_name);
   /**
    * @brief Parse serialized text into the corresponding runtime representation.
    *

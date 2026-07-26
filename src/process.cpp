@@ -657,6 +657,10 @@ namespace proc {
     return _apps;
   }
 
+  void proc_t::replace_apps(std::vector<ctx_t> &&apps) {
+    _apps = std::move(apps);
+  }
+
   std::vector<ctx_t> &proc_t::get_apps() {
     return _apps;
   }
@@ -1123,6 +1127,14 @@ namespace proc {
 
     if (proc_opt) {
       proc = std::move(*proc_opt);
+    }
+  }
+
+  void refresh_apps(const std::string &file_name) {
+    auto proc_opt = proc::parse(file_name);
+
+    if (proc_opt) {
+      proc.replace_apps(std::move(proc_opt->get_apps()));
     }
   }
 }  // namespace proc

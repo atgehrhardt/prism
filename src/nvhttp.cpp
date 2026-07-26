@@ -957,8 +957,10 @@ namespace nvhttp {
     print_req<SunshineHTTPS>(request);
 
     // Re-read apps.json and re-enumerate synced Steam games so installs and
-    // uninstalls show up in the client without a Sunshine restart.
-    proc::refresh(config::stream.file_apps);
+    // uninstalls show up in the client without a Sunshine restart. Only the
+    // app list is replaced; a running app must keep its launch state (a
+    // client requests the applist right after backing out of a stream).
+    proc::refresh_apps(config::stream.file_apps);
 
     pt::ptree tree;
 
