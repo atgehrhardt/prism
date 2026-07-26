@@ -90,7 +90,10 @@ if command -v wlr-randr >/dev/null; then
 fi
 
 # 4. Launch gamescope inside the headless compositor.
-GAMESCOPE_FLAGS=()
+# --rt asks for realtime scheduling, which reduces frame-pacing jitter on the
+# compositor thread; gamescope degrades gracefully when rtkit/CAP_SYS_NICE is
+# unavailable, so this is safe everywhere.
+GAMESCOPE_FLAGS=(--rt)
 if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
   GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
