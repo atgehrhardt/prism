@@ -1043,6 +1043,7 @@ namespace proc {
           ctx.name = game.name;
           ctx.cmd = "steam steam://rungameid/"s + std::to_string(game.appid);
           ctx.prism_capture = "steamos"s;
+          ctx.image_path = prism::steam::box_art_png(game.appid, game.box_art).string();
           ctx.elevated = false;
           ctx.auto_detach = true;
           ctx.wait_all = true;

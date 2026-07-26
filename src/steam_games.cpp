@@ -87,7 +87,52 @@ namespace {
     return prism::steam::game_t {
       static_cast<std::uint32_t>(std::stoul(appid_match[1].str())),
       name,
+      {},
     };
+  }
+
+  /**
+   * @brief Quote a path for safe use in a shell command.
+   *
+   * @param path Path to quote.
+   * @return Single-quoted path with embedded quotes escaped.
+   */
+  std::string shell_quote(const std::string &path) {
+    std::string quoted {"'"};
+    for (const char c : path) {
+      if (c == '\'') {
+        quoted += "'\\''";
+      } else {
+        quoted += c;
+      }
+    }
+    quoted += "'";
+    return quoted;
+  }
+
+  /**
+   * @brief Find a game's box art in Steam's library cache.
+   *
+   * Prefers the portrait capsule (library_600x900.jpg) used for game grids,
+   * falling back to the landscape header.
+   *
+   * @param steam_root Steam root directory.
+   * @param appid Steam app id.
+   * @return Path to the JPEG, or an empty path when no art is cached.
+   */
+  fs::path find_box_art(const fs::path &steam_root, std::uint32_t appid) {
+    const fs::path cache_dir = steam_root / "appcache" / "librarycache" / std::to_string(appid);
+    std::error_code ec;
+    for (const char *filename : {"library_600x900.jpg", "header.jpg"}) {
+      if (fs::path candidate = cache_dir / filename; fs::is_regular_file(candidate, ec)) {
+        return candidate;
+      }
+    }
+    // Legacy flat layout: librarycache/<appid>_header.jpg
+    if (fs::path legacy = steam_root / "appcache" / "librarycache" / (std::to_string(appid) + "_header.jpg"); fs::is_regular_file(legacy, ec)) {
+      return legacy;
+    }
+    return {};
   }
 
 }  // namespace
@@ -131,6 +176,7 @@ namespace prism::steam {
         }
         if (auto game = parse_manifest(entry.path())) {
           if (seen.insert(game->appid).second) {
+            game->box_art = find_box_art(steam_root, game->appid);
             games.emplace_back(std::move(*game));
           }
         }
@@ -150,6 +196,44 @@ namespace prism::steam {
     auto games = installed_games(*root);
     BOOST_LOG(debug) << "[prism] Found "sv << games.size() << " installed Steam games"sv;
     return games;
+  }
+
+  fs::path box_art_png(std::uint32_t appid, const fs::path &source) {
+    if (source.empty()) {
+      return {};
+    }
+    std::error_code ec;
+    if (!fs::is_regular_file(source, ec)) {
+      return {};
+    }
+
+    const char *cache_home = std::getenv("XDG_CACHE_HOME");
+    fs::path dir;
+    if (cache_home != nullptr && *cache_home != '\0') {
+      dir = fs::path(cache_home);
+    } else if (const char *home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+      dir = fs::path(home) / ".cache";
+    } else {
+      return {};
+    }
+    dir /= "prism/covers";
+    fs::create_directories(dir, ec);
+    if (ec) {
+      return {};
+    }
+
+    const fs::path dst = dir / (std::to_string(appid) + ".png");
+    // Reuse the cached PNG while it is at least as new as the JPEG source.
+    if (fs::is_regular_file(dst, ec) && fs::last_write_time(dst, ec) >= fs::last_write_time(source, ec)) {
+      return dst;
+    }
+
+    const std::string cmd = "ffmpeg -y -loglevel error -i "s + shell_quote(source.string()) + " "s + shell_quote(dst.string());
+    if (std::system(cmd.c_str()) != 0 || !fs::is_regular_file(dst, ec)) {
+      BOOST_LOG(warning) << "[prism] Could not convert Steam box art to PNG (is ffmpeg installed?): "sv << source;
+      return {};
+    }
+    return dst;
   }
 
 }  // namespace prism::steam
