@@ -58,6 +58,21 @@ if [ "$FPS" != "60" ]; then
     || echo "WARN: could not switch $VOUT to ${W}x${H}@${FPS}, staying at 60Hz"
 fi
 
+# Enable VRR on the virtual output so KWin paces frames by content instead of
+# a fixed vblank; the streamer captures frames as they are produced.
+kscreen-doctor "output.$VOUT.vrrpolicy.always" 2>/dev/null \
+  || echo "WARN: could not set vrrpolicy on $VOUT (needs Plasma 6)"
+
+# HDR: mark the virtual output as HDR/WCG capable when the client asked for an
+# HDR stream, so KWin accepts and passes through HDR content.
+if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
+  echo "enabling hdr/wcg on $VOUT"
+  for _ in 1 2 3; do
+    kscreen-doctor "output.$VOUT.hdr.enable" "output.$VOUT.wcg.enable" 2>/dev/null && break
+    sleep 1
+  done || echo "WARN: could not enable hdr on $VOUT"
+fi
+
 # Point this stream's portal capture at the virtual output.
 echo "portal:$VOUT" > "$OVERRIDE_FILE"
 

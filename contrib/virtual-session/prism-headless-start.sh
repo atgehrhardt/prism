@@ -90,7 +90,10 @@ if command -v wlr-randr >/dev/null; then
 fi
 
 # 4. Launch gamescope inside the headless compositor.
-GAMESCOPE_FLAGS=()
+# --adaptive-sync lets gamescope present frames as they arrive instead of
+# holding them for a fixed vblank (VRR); on a headless output this removes
+# the artificial fixed-refresh cap on frame pacing for the stream.
+GAMESCOPE_FLAGS=(--adaptive-sync)
 if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
   GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
