@@ -118,11 +118,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Resources -->
-    <div class="my-4">
-      <Resource-Card :installed-version-not-stable="installedVersionNotStable"></Resource-Card>
-    </div>
   </div>
 </body>
 
@@ -131,7 +126,6 @@
   import { marked } from 'marked'
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
-  import ResourceCard from './ResourceCard.vue'
   import PrismVersion from './sunshine_version'
   import {
     AlertCircle,
@@ -157,7 +151,6 @@
   let app = createApp({
     components: {
       Navbar,
-      ResourceCard,
       AlertCircle,
       AlertTriangle,
       FileText,
