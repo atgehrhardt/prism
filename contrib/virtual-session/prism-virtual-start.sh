@@ -22,6 +22,7 @@ flock -x -w 90 9 || exit 1
 
 W="${SUNSHINE_CLIENT_WIDTH:-1920}"
 H="${SUNSHINE_CLIENT_HEIGHT:-1080}"
+FPS="${SUNSHINE_CLIENT_FPS:-60}"
 
 # Clean up any previous virtual output.
 pkill -f "krfb-virtualmonitor --name $VNAME" 2>/dev/null || true
@@ -45,6 +46,16 @@ done
 if [ -z "$OUT_FOUND" ]; then
   echo "ERROR: virtual output $VOUT did not appear"
   exit 1
+fi
+
+# Switch the virtual output to the client's refresh rate. Virtual outputs only
+# advertise 60Hz, so add a custom mode first (kscreen-doctor takes mHz). The
+# resulting mode may be slightly off (e.g. 119.85) but mode.WxH@FPS resolves it.
+if [ "$FPS" != "60" ]; then
+  echo "setting $VOUT mode to ${W}x${H}@${FPS}"
+  kscreen-doctor "output.$VOUT.addCustomMode.$W.$H.$((FPS * 1000)).full" 2>/dev/null || true
+  kscreen-doctor "output.$VOUT.mode.${W}x${H}@${FPS}" 2>/dev/null \
+    || echo "WARN: could not switch $VOUT to ${W}x${H}@${FPS}, staying at 60Hz"
 fi
 
 # Point this stream's portal capture at the virtual output.
