@@ -64,6 +64,16 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     done
     pkill -9 -x steamwebhelper 2>/dev/null || true
   fi
+  # The session Steam must not start until the desktop instance is COMPLETELY
+  # gone (main process and helpers): starting earlier makes it forward to the
+  # dying desktop instance instead of becoming the session instance, and
+  # launch URLs then open games on the desktop.
+  for _ in $(seq 1 40); do
+    pgrep -x steam >/dev/null && sleep 0.5 && continue
+    pgrep -x steamwebhelper >/dev/null && sleep 0.5 && continue
+    break
+  done
+  pgrep -x steam >/dev/null && echo "WARNING: desktop steam still running; session launch may misroute"
 fi
 
 # 2. Arm the capture override so this stream captures the headless session.
@@ -115,9 +125,7 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     # game apps): lightweight session — a plain background Steam client, no
     # Deck UI, no second Xwayland, no mangoapp. The app command
     # (prism-steam-game.sh) launches the game and exits with it.
-    # STEAM_FRAME_FORCE_CLOSE keeps the Steam window closed; only the game
-    # should be visible in the session.
-    SESSION_CMD=(env STEAM_FRAME_FORCE_CLOSE=1 steam -silent)
+    SESSION_CMD=(steam -silent)
   else
     # Deck UI flags (as used by gamescope-session-plus/Bazzite): -steamos3 /
     # -steampal / -steamdeck enable the full Deck interface including the QAM

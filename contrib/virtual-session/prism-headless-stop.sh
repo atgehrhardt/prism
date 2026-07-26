@@ -89,12 +89,10 @@ if [ "$STEAM" = "1" ]; then
   done
   # Relaunch with verification: a failed or ignored start is retried, since
   # Steam silently no-ops if its lock has not been released yet.
-  # STEAM_FRAME_FORCE_CLOSE keeps the window closed to the tray — after a
-  # headless session Steam would otherwise reopen (Big Picture) windows.
   for attempt in 1 2 3; do
     pgrep -x steam >/dev/null && break
     echo "relaunching desktop steam (attempt $attempt)"
-    setsid env STEAM_FRAME_FORCE_CLOSE=1 steam -silent >/dev/null 2>&1 9>&- &
+    setsid steam -silent >/dev/null 2>&1 9>&- &
     for _ in $(seq 1 20); do
       pgrep -x steam >/dev/null && break
       sleep 0.5

@@ -13,6 +13,7 @@ LOG="$HOME/.local/state/prism-headless.log"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 echo "=== steam-game $(date -Is) appid=$ID ==="
+echo "wrapper env: WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-unset} DISPLAY=${DISPLAY:-unset}"
 
 # Games run under Steam's reaper as `reaper SteamLaunch AppId=<id> -- ...`.
 # The ` -- ` is required: install-script evaluators run as
@@ -38,7 +39,11 @@ if [ "$launched" != "1" ]; then
   echo "game $ID never appeared; giving up"
   exit 1
 fi
-echo "game $ID launched"
+GAME_PID="$(pgrep -f "$GAME_PATTERN" | head -1)"
+echo "game $ID launched (pid $GAME_PID)"
+if [ -n "$GAME_PID" ]; then
+  echo "game env: $(tr '\0' '\n' < "/proc/$GAME_PID/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' | tr '\n' ' ')"
+fi
 
 # 2. Wait for the game to exit.
 while pgrep -f "$GAME_PATTERN" >/dev/null; do
