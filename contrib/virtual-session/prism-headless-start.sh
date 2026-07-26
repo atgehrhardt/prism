@@ -67,11 +67,22 @@ if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
   GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
 if [ "${PRISM_STEAM:-0}" = "1" ]; then
-  SESSION_CMD=(steam -gamepadui -steamos)
+  # Deck UI flags (as used by gamescope-session-plus/Bazzite): -steamos3 /
+  # -steampal / -steamdeck enable the full Deck interface including the QAM
+  # performance tab; plain -steamos does not.
+  SESSION_CMD=(steam -gamepadui -steamos3 -steampal -steamdeck)
+  # Two Xwaylands are required for gamescope to export
+  # STEAM_MULTIPLE_XWAYLANDS=1, which the Deck UI expects.
+  GAMESCOPE_FLAGS+=(--xwayland-count 2)
   # Steam's performance overlay setting drives mangoapp through gamescope's
   # control interface; without --mangoapp the toggle has no effect.
   if command -v mangoapp >/dev/null; then
     GAMESCOPE_FLAGS+=(--mangoapp)
+    # Pre-create the config file shared between Steam (writes presets) and
+    # mangoapp (reads them). gamescope's own fallback writes a stray NUL
+    # byte into its auto-created file.
+    export MANGOHUD_CONFIGFILE="$RUNTIME/prism-mangoapp.conf"
+    echo "no_display" > "$MANGOHUD_CONFIGFILE"
   else
     echo "mangoapp not found; Steam performance overlay will be unavailable"
   fi
