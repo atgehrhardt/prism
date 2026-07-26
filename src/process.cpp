@@ -281,6 +281,10 @@ namespace proc {
     const std::string &mode = resolved.mode;
     BOOST_LOG(info) << "[prism] Capture mode for app '"sv << _app.name << "': "sv << mode
                     << (resolved.steam ? " (steam)"sv : ""sv);
+    // Remember the mode for prism_capture_end(): _app may be mutated below
+    // (Steam game launches rewrite _app.cmd) or be stale by the time teardown
+    // runs, so re-resolving at end time can pick the wrong teardown path.
+    _prism_active_mode = mode;
 
     if (mode == "headless"sv) {
       // A generated Steam game app carries its launch target as
@@ -370,7 +374,19 @@ namespace proc {
   }
 
   void proc_t::prism_capture_end() {
-    const std::string mode = prism_resolve_capture_mode(_app).mode;
+    // Use the mode captured at bring-up so teardown is symmetric with it.
+    // Fall back to resolving the (possibly stale) app only if begin never ran.
+    std::string mode = _prism_active_mode;
+    if (mode.empty()) {
+      if (_app_id <= 0) {
+        // No app is (or was) running and no capture mode was brought up;
+        // nothing to tear down.
+        return;
+      }
+      mode = prism_resolve_capture_mode(_app).mode;
+    }
+    _prism_active_mode.clear();
+    BOOST_LOG(info) << "[prism] Tearing down capture mode '"sv << mode << "' for app '"sv << _app.name << "'";
 
     // Restore the environment that prism_capture_begin() may have overridden
     // for a headless app command, so the next app launches on the desktop again.

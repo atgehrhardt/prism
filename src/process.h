@@ -190,6 +190,7 @@ namespace proc {
     void prism_capture_end();
 
     bool _prism_env_overridden = false;  ///< Whether prism_capture_begin() overrode WAYLAND_DISPLAY/DISPLAY in `_env`.
+    std::string _prism_active_mode;  ///< Capture mode resolved by prism_capture_begin(); consumed by prism_capture_end() so teardown matches bring-up even if `_app` was since mutated.
 
     boost::process::v1::environment _env;
     std::vector<ctx_t> _apps;
