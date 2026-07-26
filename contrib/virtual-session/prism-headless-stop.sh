@@ -53,6 +53,22 @@ if [ "$STEAM" = "1" ]; then
   pkill -x fossilize_replay 2>/dev/null || true
 fi
 
+# 2c. Tear down headless audio separation: stop the guard if it is still
+# waiting, remove the loopback into the capture sink, and destroy the
+# session's dedicated sink.
+pkill -f prism-headless-audio.sh 2>/dev/null || true
+ASTATE="$RUNTIME/prism-headless-audio.state"
+if [ -f "$ASTATE" ]; then
+  # shellcheck source=/dev/null
+  . "$ASTATE" 2>/dev/null || true
+  if [ -n "${loop_module:-}" ]; then
+    pactl unload-module "$loop_module" 2>/dev/null || true
+  fi
+  rm -f "$ASTATE"
+fi
+pactl list short modules 2>/dev/null | grep 'sink_name=prism-headless' | cut -f1 \
+  | while read -r m; do pactl unload-module "$m" 2>/dev/null || true; done
+
 rm -f "$STATE"
 
 # 3. Return Steam to the desktop if this was a Steam session.
