@@ -149,7 +149,10 @@ rm -rf ~/.config/sunshine ~/.cache/prism
   **Headless** session apps output to a dedicated `prism-headless` sink (`PULSE_SINK` plus a
   routing watchdog), which is looped in, while the desktop's default sink stays on the
   physical output — desktop audio is never captured, and desktop apps keep playing locally —
-  mirroring how inputs are separated.
+  mirroring how inputs are separated. Set `prism_default_sink = <sink-name>` in
+  `sunshine.conf` to force a specific default sink whenever any stream ends
+  (e.g. your speakers, if the physical output varies); without it the sink
+  recorded at stream start is restored.
 - **`prism-kwin-mode`** (`contrib/virtual-session/prism-kwin-mode.c`): native
   kde-output-management-v2 client for output modes/HDR/custom modes (used by the optional
   `prism-desktop-session.sh` for physical-display switching; not wired up by default).

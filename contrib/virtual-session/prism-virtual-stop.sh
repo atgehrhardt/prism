@@ -34,7 +34,10 @@ if [ -f "$ASTATE" ]; then
     pactl unload-module "$sink_module" 2>/dev/null || true
   fi
   if [ -n "${physical_sink:-}" ]; then
-    pactl set-default-sink "$physical_sink" 2>/dev/null || true
+    # A user-configured prism_default_sink wins over the recorded physical sink.
+    RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+    RESTORE="${RESTORE:-$physical_sink}"
+    pactl set-default-sink "$RESTORE" 2>/dev/null || true
   fi
   rm -f "$ASTATE"
 fi

@@ -65,12 +65,14 @@ if [ -f "$ASTATE" ]; then
     pactl unload-module "$loop_module" 2>/dev/null || true
   fi
   # If Sunshine's capture sink is still the default, hand the desktop back to
-  # the physical output.
+  # the configured prism_default_sink, falling back to the physical output.
   if [ -n "${physical_sink:-}" ]; then
     cur="$(pactl get-default-sink 2>/dev/null || true)"
     case "$cur" in
       prism-stream | sink-sunshine-*)
-        pactl set-default-sink "$physical_sink" 2>/dev/null || true ;;
+        RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+        RESTORE="${RESTORE:-$physical_sink}"
+        pactl set-default-sink "$RESTORE" 2>/dev/null || true ;;
     esac
   fi
   rm -f "$ASTATE"

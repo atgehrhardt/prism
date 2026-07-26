@@ -26,16 +26,21 @@ if [ "$ACTION" = "stop" ]; then
   exec >>"$LOG" 2>&1
   echo "=== mirror-audio stop $(date -Is) ==="
   pkill -f 'prism-mirror-audio.sh.*prism-mirror-watchdog' 2>/dev/null || true
+  PHYSICAL=""
   if [ -f "$STATE" ]; then
     # shellcheck source=/dev/null
     . "$STATE" 2>/dev/null || true
     if [ -n "${loop_module:-}" ]; then
       pactl unload-module "$loop_module" 2>/dev/null || true
     fi
-    if [ -n "${physical_sink:-}" ]; then
-      pactl set-default-sink "$physical_sink" 2>/dev/null || true
-    fi
+    PHYSICAL="${physical_sink:-}"
     rm -f "$STATE"
+  fi
+  # A user-configured prism_default_sink wins over the recorded physical sink.
+  RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+  RESTORE="${RESTORE:-$PHYSICAL}"
+  if [ -n "$RESTORE" ]; then
+    pactl set-default-sink "$RESTORE" 2>/dev/null || true
   fi
   exit 0
 fi
