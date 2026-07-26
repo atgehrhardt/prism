@@ -209,6 +209,9 @@ namespace proc {
     if (lower_name.find("virtual") != std::string::npos) {
       return {"virtual"s, false};
     }
+    if (lower_name.find("headless") != std::string::npos) {
+      return {"headless"s, prism_name_is_steam(app.name)};
+    }
     if (prism_name_is_steam(app.name)) {
       return {"headless"s, true};
     }
