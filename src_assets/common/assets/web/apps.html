@@ -137,7 +137,7 @@
                       v-model="captureMode" @change="captureModeTouched = true">
                 <option value="default">{{ $t('apps.capture_default') }}</option>
                 <option value="virtual">{{ $t('apps.capture_virtual') }}</option>
-                <option value="steamos">{{ $t('apps.capture_steamos') }}</option>
+                <option value="headless">{{ $t('apps.capture_headless') }}</option>
                 <option value="portal">{{ $t('apps.capture_portal') }}</option>
               </select>
               <input type="text" class="form-control monospace mt-2" v-if="captureMode === 'portal'"
@@ -726,14 +726,18 @@
           : action;
       },
       // Prism capture mode, mapped onto the raw "prism-capture" field:
-      // "default" | "virtual" | "steamos" | "portal:<output-name>"
+      // "default" | "virtual" | "headless" | "portal:<output-name>"
+      // (legacy "steamos" values are shown as "headless")
       captureMode: {
         get() {
-          const v = (this.editForm && this.editForm["prism-capture"]) || "";
+          let v = (this.editForm && this.editForm["prism-capture"]) || "";
+          if (v === "steamos") {
+            v = "headless";
+          }
           if (v.startsWith("portal:")) {
             return "portal";
           }
-          return ["default", "virtual", "steamos"].includes(v) ? v : "default";
+          return ["default", "virtual", "headless"].includes(v) ? v : "default";
         },
         set(mode) {
           if (mode === "portal") {
@@ -763,10 +767,12 @@
           return;
         }
         const n = (name || "").toLowerCase();
-        if (n === "desktop") {
-          this.captureMode = "default";
+        if (n.includes("virtual")) {
+          this.captureMode = "virtual";
         } else if (n.includes("steam")) {
-          this.captureMode = "steamos";
+          this.captureMode = "headless";
+        } else {
+          this.captureMode = "default";
         }
       },
     },

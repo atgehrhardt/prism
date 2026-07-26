@@ -73,7 +73,7 @@ namespace proc {
 
     std::string name;  ///< Human-readable name for this item.
     std::string cmd;  ///< Command line used to launch the application.
-    std::string prism_capture;  ///< Prism capture mode: empty/"default", "virtual", "steamos" or "portal:<output>".
+    std::string prism_capture;  ///< Prism capture mode: empty/"default", "virtual", "headless", legacy "steamos" or "portal:<output>".
     std::string working_dir;  ///< Working dir.
     std::string output;  ///< Captured output from the launched process.
     std::string image_path;  ///< Image path.

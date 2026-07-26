@@ -297,7 +297,9 @@ TEST_F(ProcessParseTest, Parse_PrismCaptureField) {
       {"name": "Desktop"},
       {"name": "Desktop (Virtual)", "prism-capture": "virtual"},
       {"name": "SteamOS (Headless)", "prism-capture": "steamos"},
-      {"name": "TV", "prism-capture": "portal:HDMI-A-1"}
+      {"name": "TV", "prism-capture": "portal:HDMI-A-1"},
+      {"name": "My Game", "prism-capture": "headless"},
+      {"name": "Steam Game", "prism-capture": "headless"}
     ]
   })json";
   file.close();
@@ -305,9 +307,11 @@ TEST_F(ProcessParseTest, Parse_PrismCaptureField) {
   auto proc_opt = proc::parse(test_file.string());
   ASSERT_TRUE(proc_opt.has_value());
   const auto &apps = proc_opt->get_apps();
-  ASSERT_EQ(apps.size(), 4);
+  ASSERT_EQ(apps.size(), 6);
   EXPECT_TRUE(apps[0].prism_capture.empty());
   EXPECT_EQ(apps[1].prism_capture, "virtual");
   EXPECT_EQ(apps[2].prism_capture, "steamos");
   EXPECT_EQ(apps[3].prism_capture, "portal:HDMI-A-1");
+  EXPECT_EQ(apps[4].prism_capture, "headless");
+  EXPECT_EQ(apps[5].prism_capture, "headless");
 }

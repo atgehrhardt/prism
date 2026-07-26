@@ -163,27 +163,74 @@ namespace proc {
   }
 
   /**
+   * @brief Effective Prism capture settings for an application.
+   */
+  struct prism_capture_mode_t {
+    std::string mode;  ///< Effective mode: "default", "virtual", "headless" or "portal:<output>".
+    bool steam;  ///< Whether a headless session should run Steam (SteamOS behavior).
+  };
+
+  /**
+   * @brief Check whether an app name indicates a Steam app.
+   * @param name Application name.
+   * @return True when the name contains "steam" (any case).
+   */
+  static bool prism_name_is_steam(const std::string &name) {
+    return boost::to_lower_copy(name).find("steam") != std::string::npos;
+  }
+
+  /**
    * @brief Resolve the effective Prism capture mode for an application.
    *
    * Uses the app's `prism-capture` value when set; otherwise falls back to a
-   * name-based default: a name of exactly "Desktop" (any case) mirrors the
-   * session, and names containing "steam" select the headless SteamOS session.
+   * name-based default: names containing "virtual" select a virtual display,
+   * names containing "steam" select a headless session with Steam behavior,
+   * and everything else (e.g. "Desktop") mirrors the session. Apps with no
+   * command launch nothing — mirror and virtual modes simply stream the
+   * (virtual) desktop. The legacy `steamos` field value is an alias for a
+   * headless session with Steam behavior; a plain `headless` field value only
+   * enables Steam behavior when the app name contains "steam".
    *
    * @param app Application context.
-   * @return Effective mode: "default", "virtual", "steamos" or "portal:<output>".
+   * @return Effective mode plus Steam flag for headless sessions.
    */
-  static std::string prism_resolve_capture_mode(const ctx_t &app) {
+  static prism_capture_mode_t prism_resolve_capture_mode(const ctx_t &app) {
     if (!app.prism_capture.empty()) {
-      return app.prism_capture;
+      if (app.prism_capture == "steamos"s) {
+        // Legacy alias: headless session with Steam behavior.
+        return {"headless"s, true};
+      }
+      if (app.prism_capture == "headless"s) {
+        return {"headless"s, prism_name_is_steam(app.name)};
+      }
+      return {app.prism_capture, false};
     }
-    std::string name = boost::to_lower_copy(app.name);
-    if (name == "desktop"s) {
-      return "default"s;
+    const std::string lower_name = boost::to_lower_copy(app.name);
+    if (lower_name.find("virtual") != std::string::npos) {
+      return {"virtual"s, false};
     }
-    if (name.find("steam") != std::string::npos) {
-      return "steamos"s;
+    if (prism_name_is_steam(app.name)) {
+      return {"headless"s, true};
     }
-    return "default"s;
+    return {"default"s, false};
+  }
+
+  /**
+   * @brief Read one KEY=VALUE entry from the headless session state file.
+   *
+   * @param key Key to look up (e.g. `wayland_display`).
+   * @return The value, or an empty string when the file or key is missing.
+   */
+  static std::string prism_headless_state_value(const std::string &key) {
+    std::ifstream state(prism_runtime_dir() + "/prism-headless.state");
+    const std::string prefix = key + "=";
+    std::string line;
+    while (std::getline(state, line)) {
+      if (line.rfind(prefix, 0) == 0) {
+        return line.substr(prefix.size());
+      }
+    }
+    return {};
   }
 
   /**
@@ -223,25 +270,49 @@ namespace proc {
   }
 
   int proc_t::prism_capture_begin() {
-    const std::string mode = prism_resolve_capture_mode(_app);
-    BOOST_LOG(info) << "[prism] Capture mode for app '"sv << _app.name << "': "sv << mode;
+    const auto resolved = prism_resolve_capture_mode(_app);
+    const std::string &mode = resolved.mode;
+    BOOST_LOG(info) << "[prism] Capture mode for app '"sv << _app.name << "': "sv << mode
+                    << (resolved.steam ? " (steam)"sv : ""sv);
 
-    if (mode == "steamos"sv || mode == "virtual"sv) {
-      const std::string script = mode == "steamos"sv ?
-                                   "prism-steamos-start.sh"s :
-                                   "prism-virtual-start.sh"s;
-      if (prism_run_session_script(script, _env, _pipe.get()) != 0) {
+    if (mode == "headless"sv) {
+      // PRISM_STEAM controls whether the session runs Steam (SteamOS behavior);
+      // export it for the start script only, then restore the previous state.
+      const bool had_prism_steam = _env.count("PRISM_STEAM") != 0;
+      const std::string old_prism_steam = had_prism_steam ? _env["PRISM_STEAM"].to_string() : std::string();
+      _env["PRISM_STEAM"] = resolved.steam ? "1" : "0";
+      const int rc = prism_run_session_script("prism-headless-start.sh"s, _env, _pipe.get());
+      if (had_prism_steam) {
+        _env["PRISM_STEAM"] = old_prism_steam;
+      } else {
+        _env.erase("PRISM_STEAM");
+      }
+      if (rc != 0) {
         return -1;
       }
-      if (mode == "steamos"sv && !_app.cmd.empty()) {
+      if (!_app.cmd.empty()) {
         // Run the app's own command inside the gamescope session that the
-        // start script launched in the headless compositor.
-        _env["WAYLAND_DISPLAY"] = "gamescope-0";
-        _env["DISPLAY"] = ":2";
+        // start script launched in the headless compositor. The script
+        // records the actual socket/display names in its state file.
+        std::string wayland_display = prism_headless_state_value("wayland_display"s);
+        std::string x_display = prism_headless_state_value("x_display"s);
+        if (wayland_display.empty()) {
+          wayland_display = "gamescope-0"s;
+        }
+        if (x_display.empty()) {
+          x_display = ":2"s;
+        }
+        _env["WAYLAND_DISPLAY"] = wayland_display;
+        _env["DISPLAY"] = x_display;
         _prism_env_overridden = true;
-        BOOST_LOG(info) << "[prism] App command will run inside the gamescope session (WAYLAND_DISPLAY=gamescope-0, DISPLAY=:2)"sv;
+        BOOST_LOG(info) << "[prism] App command will run inside the gamescope session (WAYLAND_DISPLAY="sv
+                        << wayland_display << ", DISPLAY="sv << x_display << ')';
       }
       return 0;
+    }
+
+    if (mode == "virtual"sv) {
+      return prism_run_session_script("prism-virtual-start.sh"s, _env, _pipe.get());
     }
 
     if (mode.rfind("portal:", 0) == 0) {
@@ -265,10 +336,10 @@ namespace proc {
   }
 
   void proc_t::prism_capture_end() {
-    const std::string mode = prism_resolve_capture_mode(_app);
+    const std::string mode = prism_resolve_capture_mode(_app).mode;
 
     // Restore the environment that prism_capture_begin() may have overridden
-    // for a SteamOS app command, so the next app launches on the desktop again.
+    // for a headless app command, so the next app launches on the desktop again.
     // _env is a copy made at parse time; the process environment still holds
     // the original values.
     if (_prism_env_overridden) {
@@ -283,11 +354,10 @@ namespace proc {
       }
     }
 
-    if (mode == "steamos"sv || mode == "virtual"sv) {
-      const std::string script = mode == "steamos"sv ?
-                                   "prism-steamos-stop.sh"s :
-                                   "prism-virtual-stop.sh"s;
-      prism_run_session_script(script, _env, _pipe.get());
+    if (mode == "headless"sv) {
+      prism_run_session_script("prism-headless-stop.sh"s, _env, _pipe.get());
+    } else if (mode == "virtual"sv) {
+      prism_run_session_script("prism-virtual-stop.sh"s, _env, _pipe.get());
     } else if (mode.rfind("portal:", 0) == 0) {
       const std::string override_path = prism_runtime_dir() + "/prism-capture-override";
       std::error_code ec;

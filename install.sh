@@ -72,9 +72,13 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
 
 # --- 5. Session stack ---------------------------------------------------------
 log "Installing Prism scripts and systemd user units"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/steamos-start.sh"   "$HOME/.local/bin/steamos-start.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/steamos-stop.sh"    "$HOME/.local/bin/steamos-stop.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/desktop-refresh.sh" "$HOME/.local/bin/desktop-refresh.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-start.sh"   "$HOME/.local/bin/prism-steamos-start.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-stop.sh"    "$HOME/.local/bin/prism-steamos-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-start.sh"  "$HOME/.local/bin/prism-headless-start.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-stop.sh"   "$HOME/.local/bin/prism-headless-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-start.sh"   "$HOME/.local/bin/prism-virtual-start.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-stop.sh"    "$HOME/.local/bin/prism-virtual-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-desktop-session.sh" "$HOME/.local/bin/prism-desktop-session.sh"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-labwc.service" \
   "$HOME/.config/systemd/user/prism-labwc.service"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism.service" \
