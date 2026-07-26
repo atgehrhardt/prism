@@ -20,13 +20,13 @@ flock -x -w 90 9 || echo "virtual-stop: lock timeout, proceeding anyway"
 # Disarm capture override first so any new stream uses the desktop.
 rm -f "$OVERRIDE_FILE"
 
-# Re-enable the physical output.
+# Re-enable the physical outputs we disabled.
 if [ -f "$STATE" ]; then
-  read -r PRIMARY < "$STATE"
-  if [ -n "$PRIMARY" ]; then
-    echo "re-enabling physical output $PRIMARY"
-    kscreen-doctor "output.$PRIMARY.enable" 2>/dev/null || true
-  fi
+  while read -r OUT; do
+    [ -z "$OUT" ] && continue
+    echo "re-enabling physical output $OUT"
+    kscreen-doctor "output.$OUT.enable" 2>/dev/null || true
+  done < "$STATE"
   rm -f "$STATE"
 fi
 

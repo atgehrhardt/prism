@@ -50,11 +50,17 @@ fi
 # Point this stream's portal capture at the virtual output.
 echo "portal:$VOUT" > "$OVERRIDE_FILE"
 
-# Disable the physical primary output (remember which one for undo).
-PRIMARY="$(kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/^Output:/{name=$3} /priority 1$/{print name; exit}')"
-if [ -n "$PRIMARY" ] && [ "$PRIMARY" != "$VOUT" ]; then
-  echo "$PRIMARY" > "$STATE"
-  echo "disabling physical output $PRIMARY"
-  kscreen-doctor "output.$PRIMARY.disable" 2>/dev/null || true
-fi
+# Disable every enabled output except the virtual one (KWin reshuffles
+# priorities when the virtual output appears, so don't rely on "priority 1").
+# Remember which ones we disabled so undo can re-enable exactly those.
+: > "$STATE"
+kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '
+  /^Output:/ {name=$3}
+  /^\tenabled$/ {if (name != "") print name}
+' | while read -r OUT; do
+  [ "$OUT" = "$VOUT" ] && continue
+  echo "$OUT" >> "$STATE"
+  echo "disabling physical output $OUT"
+  kscreen-doctor "output.$OUT.disable" 2>/dev/null || true
+done
 echo "virtual desktop ready: $VOUT ${W}x${H}"
