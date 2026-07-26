@@ -115,7 +115,9 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     # game apps): lightweight session — a plain background Steam client, no
     # Deck UI, no second Xwayland, no mangoapp. The app command
     # (prism-steam-game.sh) launches the game and exits with it.
-    SESSION_CMD=(steam -silent)
+    # STEAM_FRAME_FORCE_CLOSE keeps the Steam window closed; only the game
+    # should be visible in the session.
+    SESSION_CMD=(env STEAM_FRAME_FORCE_CLOSE=1 steam -silent)
   else
     # Deck UI flags (as used by gamescope-session-plus/Bazzite): -steamos3 /
     # -steampal / -steamdeck enable the full Deck interface including the QAM
