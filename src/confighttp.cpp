@@ -500,13 +500,13 @@ namespace confighttp {
    * @brief Get the favicon image.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
-   * @todo combine function with getSunshineLogoImage and possibly getNodeModules
+   * @todo combine function with getPrismLogoImage and possibly getNodeModules
    * @todo use mime_types map
    */
   void getFaviconImage(const resp_https_t &response, const req_https_t &request) {
     print_req(request);
 
-    std::ifstream in(WEB_DIR "images/sunshine.ico", std::ios::binary);
+    std::ifstream in(WEB_DIR "images/logo-prism.ico", std::ios::binary);
     SimpleWeb::CaseInsensitiveMultimap headers;
     headers.emplace("Content-Type", "image/x-icon");
     headers.emplace("X-Frame-Options", "DENY");
@@ -515,16 +515,16 @@ namespace confighttp {
   }
 
   /**
-   * @brief Get the Sunshine logo image.
+   * @brief Get the Prism logo image.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
    * @todo combine function with getFaviconImage and possibly getNodeModules
    * @todo use mime_types map
    */
-  void getSunshineLogoImage(const resp_https_t &response, const req_https_t &request) {
+  void getPrismLogoImage(const resp_https_t &response, const req_https_t &request) {
     print_req(request);
 
-    std::ifstream in(WEB_DIR "images/logo-sunshine-45.png", std::ios::binary);
+    std::ifstream in(WEB_DIR "images/logo-prism-45.png", std::ios::binary);
     SimpleWeb::CaseInsensitiveMultimap headers;
     headers.emplace("Content-Type", "image/png");
     headers.emplace("X-Frame-Options", "DENY");
@@ -1815,8 +1815,8 @@ namespace confighttp {
     server.resource["^/api/vigembus/install$"]["POST"] = installViGEmBus;
 
     // static/dynamic resources
-    server.resource["^/images/sunshine.ico$"]["GET"] = getFaviconImage;
-    server.resource["^/images/logo-sunshine-45.png$"]["GET"] = getSunshineLogoImage;
+    server.resource["^/images/logo-prism.ico$"]["GET"] = getFaviconImage;
+    server.resource["^/images/logo-prism-45.png$"]["GET"] = getPrismLogoImage;
     server.resource["^/assets\\/.+$"]["GET"] = getAsset;
 
     server.config.reuse_address = true;
