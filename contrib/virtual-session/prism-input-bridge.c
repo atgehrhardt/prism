@@ -91,8 +91,20 @@ static struct {
  * streams the devices must stay ungrabbed so the desktop compositor sees them.
  */
 static int override_active(void) {
-  struct stat st;
-  return stat(g.override_path, &st) == 0;
+  /* Only the headless wlroots override needs the grab+forward: when the
+   * override targets a portal output (virtual display mode), input must
+   * stay with the desktop session, which owns that output. */
+  FILE *f = fopen(g.override_path, "r");
+  if (!f) {
+    return 0;
+  }
+  char line[256] = {0};
+  char *got = fgets(line, sizeof(line), f);
+  fclose(f);
+  if (!got) {
+    return 0;
+  }
+  return strncmp(line, "portal:", 7) != 0;
 }
 
 /**
