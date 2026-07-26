@@ -21,7 +21,7 @@ sudo dnf install -y \
   libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
   numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
   wayland-devel libxkbcommon-devel python3-jinja2 \
-  gamescope labwc wlr-randr steam kscreen krfb
+  gamescope labwc wlr-randr steam kscreen krfb mangohud
 
 # --- 2. Source --------------------------------------------------------------
 if [ -d "$SRC_DIR/.git" ]; then

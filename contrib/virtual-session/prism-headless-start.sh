@@ -62,19 +62,26 @@ if command -v wlr-randr >/dev/null; then
 fi
 
 # 4. Launch gamescope inside the headless compositor.
-HDR_FLAGS=()
+GAMESCOPE_FLAGS=()
 if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
-  HDR_FLAGS+=(--hdr-enabled)
+  GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
 if [ "${PRISM_STEAM:-0}" = "1" ]; then
   SESSION_CMD=(steam -gamepadui -steamos)
+  # Steam's performance overlay setting drives mangoapp through gamescope's
+  # control interface; without --mangoapp the toggle has no effect.
+  if command -v mangoapp >/dev/null; then
+    GAMESCOPE_FLAGS+=(--mangoapp)
+  else
+    echo "mangoapp not found; Steam performance overlay will be unavailable"
+  fi
 else
   # Generic keepalive; the app's own command joins the session via the
   # gamescope wayland/X sockets (see state file).
   SESSION_CMD=(sleep infinity)
 fi
 setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland \
-  gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${HDR_FLAGS[@]}" \
+  gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${GAMESCOPE_FLAGS[@]}" \
   -- "${SESSION_CMD[@]}" >>"$LOG" 2>&1 9>&- &
 
 # 5. Discover the gamescope session sockets and record state for the app
@@ -105,4 +112,4 @@ done
   echo "wayland_display=$GSOCKET"
   echo "x_display=$XDISP"
 } > "$STATE"
-echo "launched gamescope ${W}x${H}@${FPS} hdr=${HDR_FLAGS[*]:-off} session=${SESSION_CMD[*]} socket=$GSOCKET x=$XDISP"
+echo "launched gamescope ${W}x${H}@${FPS} flags=${GAMESCOPE_FLAGS[*]:-none} session=${SESSION_CMD[*]} socket=$GSOCKET x=$XDISP"
