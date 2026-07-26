@@ -172,6 +172,21 @@ namespace proc {
     return boost::to_lower_copy(name).find("steam") != std::string::npos;
   }
 
+  /**
+   * @brief Check whether an app command launches a Steam game directly.
+   *
+   * Such apps always need Steam session behavior (desktop Steam handoff,
+   * session Steam client, launch wrapper) regardless of the app's name or how
+   * its capture mode was set — e.g. after a synced game was imported as an
+   * override with a plain "headless" mode.
+   *
+   * @param app Application context.
+   * @return True when the command is a Steam rungameid URL launch.
+   */
+  static bool prism_cmd_is_steam_game(const ctx_t &app) {
+    return app.cmd.rfind("steam steam://rungameid/"s, 0) == 0;
+  }
+
   prism_capture_mode_t prism_resolve_capture_mode(const ctx_t &app) {
     if (!app.prism_capture.empty()) {
       if (app.prism_capture == "steamos"s) {
@@ -179,16 +194,21 @@ namespace proc {
         return {"headless"s, true};
       }
       if (app.prism_capture == "headless"s) {
-        return {"headless"s, prism_name_is_steam(app.name)};
+        return {"headless"s, prism_name_is_steam(app.name) || prism_cmd_is_steam_game(app)};
       }
       return {app.prism_capture, false};
+    }
+    // A direct Steam game launch always needs a Steam headless session,
+    // regardless of name heuristics or the configured default.
+    if (prism_cmd_is_steam_game(app)) {
+      return {"headless"s, true};
     }
     const std::string lower_name = boost::to_lower_copy(app.name);
     if (lower_name.find("virtual") != std::string::npos) {
       return {"virtual"s, false};
     }
     if (lower_name.find("headless") != std::string::npos) {
-      return {"headless"s, prism_name_is_steam(app.name)};
+      return {"headless"s, prism_name_is_steam(app.name) || prism_cmd_is_steam_game(app)};
     }
     if (prism_name_is_steam(app.name)) {
       return {"headless"s, true};
