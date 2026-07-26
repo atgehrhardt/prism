@@ -37,7 +37,7 @@ output_state() {
     f && /^Output:/ {exit}
     f && /HDR:/ {hdr=$2}
     f && /Wide Color Gamut:/ {wcg=$4}
-    f && /Modes:/ {
+    f && /^[ \t]*Modes:/ {
       for (i=1; i<=NF; i++) {
         if ($i ~ /^[0-9]+:[0-9]+x[0-9]+@[0-9.]+\*$/) { split($i, b, ":"); cur=b[1] }
       }
@@ -52,7 +52,7 @@ best_mode() {
   kscreen-doctor -o 2>/dev/null | strip | awk -v out="$OUTPUT" -v ww="$want_w" -v wh="$want_h" -v fps="$fps" '
     $0 ~ "^Output:.* "out" " {f=1; next}
     f && /^Output:/ {exit}
-    f && /Modes:/ {
+    f && /^[ \t]*Modes:/ {
       exact=-1; exactd=1e9; any=-1; anyd=1e9
       # find the preferred (!) mode resolution, i.e. the panel native resolution
       for (i=1; i<=NF; i++) {
@@ -73,7 +73,7 @@ best_mode() {
         if (w==nw && h==nh && d<anyd) {anyd=d; any=id}
         if (w==ww && h==wh && d<exactd) {exactd=d; exact=id}
       }
-      print (exact >= 0 ? exact : any); exit
+      print (exact >= 0 ? exact " 1" : any " 0") " " any; exit
     }'
 }
 
@@ -91,11 +91,47 @@ apply_color() {
   echo "WARNING: could not apply hdr=$hdr on $out"
 }
 
+# Current mode id of the primary output (token marked '*').
+current_mode() {
+  kscreen-doctor -o 2>/dev/null | strip | awk -v out="$OUTPUT" '
+    $0 ~ "^Output:.* "out" " {f=1; next}
+    f && /^Output:/ {exit}
+    f && /^[ \t]*Modes:/ {
+      for (i=1; i<=NF; i++) {
+        if ($i ~ /^[0-9]+:[0-9]+x[0-9]+@[0-9.]+\*$/) { split($i, b, ":"); print b[1]; exit }
+      }
+    }'
+}
+
 case "${1:-}" in
   set)
     read -r HDR WCG CUR <<< "$(output_state)"
     [ -n "$CUR" ] && printf '%s %s %s %s\n' "$OUTPUT" "$CUR" "$HDR" "$WCG" > "$STATE"
-    MODE="$(best_mode)"
+    read -r MODE EXACT FALLBACK <<< "$(best_mode)"
+    if [ "${EXACT:-0}" = "1" ]; then
+      # Exact resolution match (EDID or previously-added custom mode).
+      echo "setting $OUTPUT mode $MODE (exact client resolution)"
+      kscreen-doctor "output.$OUTPUT.mode.$MODE" 2>/dev/null || true
+      sleep 1
+      if [ "$(current_mode)" != "$MODE" ]; then
+        echo "mode $MODE rejected by driver; falling back to native resolution + scaling"
+        MODE="$FALLBACK"
+      else
+        MODE=""
+      fi
+    elif [ -n "${SUNSHINE_CLIENT_WIDTH:-}" ] && command -v prism-kwin-mode >/dev/null; then
+      # Client resolution is not a known mode: try adding it as a KWin custom
+      # mode (works on most drivers; some reject compositor-generated
+      # modelines, e.g. NVIDIA + DSC panels — then we fall back to native res
+      # and Sunshine scales the capture instead).
+      MHZ=$(( ${SUNSHINE_CLIENT_FPS:-60} * 1000 ))
+      echo "attempting custom mode ${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}@$MHZ on $OUTPUT"
+      if prism-kwin-mode apply "$OUTPUT" "${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}@$MHZ" 2>&1; then
+        MODE=""
+      else
+        echo "custom mode rejected; falling back to native resolution + scaling"
+      fi
+    fi
     if [ -n "$MODE" ]; then
       echo "setting $OUTPUT mode $MODE"
       kscreen-doctor "output.$OUTPUT.mode.$MODE" 2>/dev/null || true

@@ -83,6 +83,7 @@ install -Dm644 "$SRC_DIR/contrib/virtual-session/prism.service" \
 # Build and install the uinput -> labwc virtual-input bridge (also installs
 # prism-input-bridge.service and runs systemctl --user daemon-reload).
 "$SRC_DIR/contrib/virtual-session/build-input-bridge.sh"
+"$SRC_DIR/contrib/virtual-session/build-kwin-mode.sh"
 
 # --- 6. apps.json (idempotent merge, with backup) ------------------------------
 APPS="$HOME/.config/sunshine/apps.json"
