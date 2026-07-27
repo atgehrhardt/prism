@@ -139,6 +139,11 @@ TEST_P(ExternalCommandTest, RunExternalCommand) {
 
 // Command strings
 constexpr auto SIMPLE_COMMAND = "which sh";
+const auto HEADLESS_HELPER_TEST = std::format(
+  "bash {}/tests/integration/test_headless_common.sh {}",
+  PRISM_SOURCE_DIR,
+  PRISM_SOURCE_DIR
+);
 
 #ifdef UDEVADM_EXECUTABLE
   #define UDEV_TESTS \
@@ -165,6 +170,12 @@ INSTANTIATE_TEST_SUITE_P(
         true,
         "Simple command test"
       },
+    ExternalCommandTestData {
+      HEADLESS_HELPER_TEST,
+      "linux",
+      true,
+      "Headless lifecycle helper tests"
+    },
     // Cross-platform failing test
     ExternalCommandTestData {
       "non_existent_command_12345",

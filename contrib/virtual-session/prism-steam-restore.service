@@ -1,0 +1,10 @@
+[Unit]
+Description=Prism delayed desktop Steam restoration
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/prism-steam-restore.sh
+KillMode=control-group
+TimeoutStopSec=15
+SendSIGKILL=yes
+Restart=no

@@ -93,6 +93,37 @@ namespace proc {
   };
 
   /**
+   * @brief Validated state published by a ready Prism headless session.
+   */
+  struct prism_headless_state_t {
+    int version;  ///< State format version.
+    std::string session_id;  ///< Launch-session identifier that owns the state.
+    std::string backend;  ///< Session ownership backend, currently `systemd`.
+    std::string unit;  ///< Backend unit that owns all headless processes.
+    std::string app_unit;  ///< Scope that owns the post-start application command.
+    bool steam;  ///< Whether the owned session runs Steam.
+    std::string wayland_display;  ///< Owned gamescope Wayland socket name.
+    std::string x_display;  ///< Owned gamescope Xwayland display.
+    std::string physical_sink;  ///< Desktop sink recorded before session startup.
+    std::string capture_sink_module;  ///< Capture sink module created by startup, if any.
+    std::string session_sink_module;  ///< Headless sink module created by startup.
+    std::string loop_module;  ///< Headless-to-capture loopback module.
+  };
+
+  /**
+   * @brief Read and validate an atomically published headless state file.
+   *
+   * @param path State file path.
+   * @param expected_session_id Launch-session identifier expected by the caller.
+   * @return Validated state, or `std::nullopt` when the file is incomplete,
+   *         unsupported, malformed, or belongs to another launch.
+   */
+  std::optional<prism_headless_state_t> prism_read_headless_state(
+    const std::filesystem::path &path,
+    const std::string &expected_session_id
+  );
+
+  /**
    * @brief Resolve the effective Prism capture mode for an application.
    *
    * Uses the app's `prism-capture` value when set; otherwise falls back to a
@@ -204,6 +235,8 @@ namespace proc {
 
     bool _prism_env_overridden = false;  ///< Whether prism_capture_begin() overrode WAYLAND_DISPLAY/DISPLAY in `_env`.
     std::string _prism_active_mode;  ///< Capture mode resolved by prism_capture_begin(); consumed by prism_capture_end() so teardown matches bring-up even if `_app` was since mutated.
+    bool _prism_had_pulse_prop = false;  ///< Whether `_env` contained PULSE_PROP before headless routing was applied.
+    std::string _prism_old_pulse_prop;  ///< PULSE_PROP value restored after the headless session.
 
     boost::process::v1::environment _env;
     std::vector<ctx_t> _apps;

@@ -5,6 +5,7 @@
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
 // standard includes
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -211,22 +212,86 @@ namespace proc {
     return {"default"s, false};
   }
 
-  /**
-   * @brief Read one KEY=VALUE entry from the headless session state file.
-   *
-   * @param key Key to look up (e.g. `wayland_display`).
-   * @return The value, or an empty string when the file or key is missing.
-   */
-  static std::string prism_headless_state_value(const std::string &key) {
-    std::ifstream state(prism_runtime_dir() + "/prism-headless.state");
-    const std::string prefix = key + "=";
+  std::optional<prism_headless_state_t> prism_read_headless_state(
+    const std::filesystem::path &path,
+    const std::string &expected_session_id
+  ) {
+    std::ifstream state_file(path);
+    if (!state_file) {
+      return std::nullopt;
+    }
+
+    std::unordered_map<std::string, std::string> values;
     std::string line;
-    while (std::getline(state, line)) {
-      if (line.rfind(prefix, 0) == 0) {
-        return line.substr(prefix.size());
+    while (std::getline(state_file, line)) {
+      const auto separator = line.find('=');
+      if (separator == std::string::npos || separator == 0) {
+        return std::nullopt;
+      }
+      auto [iter, inserted] = values.emplace(line.substr(0, separator), line.substr(separator + 1));
+      if (!inserted) {
+        return std::nullopt;
       }
     }
-    return {};
+
+    const auto required = [&values](const std::string &key) -> const std::string * {
+      const auto iter = values.find(key);
+      return iter == values.end() ? nullptr : &iter->second;
+    };
+    const auto *version = required("version"s);
+    const auto *session_id = required("session_id"s);
+    const auto *backend = required("backend"s);
+    const auto *unit = required("unit"s);
+    const auto *app_unit = required("app_unit"s);
+    const auto *steam = required("steam"s);
+    const auto *wayland_display = required("wayland_display"s);
+    const auto *x_display = required("x_display"s);
+    const auto *physical_sink = required("physical_sink"s);
+    const auto *capture_sink_module = required("capture_sink_module"s);
+    const auto *session_sink_module = required("session_sink_module"s);
+    const auto *loop_module = required("loop_module"s);
+    if (version == nullptr || session_id == nullptr || backend == nullptr || unit == nullptr || app_unit == nullptr ||
+        steam == nullptr || wayland_display == nullptr || x_display == nullptr ||
+        physical_sink == nullptr || capture_sink_module == nullptr ||
+        session_sink_module == nullptr || loop_module == nullptr) {
+      return std::nullopt;
+    }
+
+    const auto all_digits = [](const auto begin, const auto end) {
+      return begin != end && std::all_of(begin, end, [](const unsigned char character) {
+               return std::isdigit(character) != 0;
+             });
+    };
+    const bool valid_wayland_display = wayland_display->rfind("gamescope-", 0) == 0 &&
+                                       all_digits(wayland_display->begin() + 10, wayland_display->end());
+    const bool valid_x_display = x_display->size() > 1 && x_display->front() == ':' &&
+                                 all_digits(x_display->begin() + 1, x_display->end());
+    const bool valid_modules = all_digits(session_sink_module->begin(), session_sink_module->end()) &&
+                               all_digits(loop_module->begin(), loop_module->end()) &&
+                               (capture_sink_module->empty() ||
+                                all_digits(capture_sink_module->begin(), capture_sink_module->end()));
+    if (*version != "2"sv || *session_id != expected_session_id || expected_session_id.empty() ||
+        *backend != "systemd"sv || *unit != "prism-headless-session.service"sv ||
+        *app_unit != "prism-headless-app-"s + expected_session_id + ".scope"s ||
+        (*steam != "0"sv && *steam != "1"sv) ||
+        !valid_wayland_display || !valid_x_display || !valid_modules) {
+      return std::nullopt;
+    }
+
+    return prism_headless_state_t {
+      .version = 2,
+      .session_id = *session_id,
+      .backend = *backend,
+      .unit = *unit,
+      .app_unit = *app_unit,
+      .steam = *steam == "1"sv,
+      .wayland_display = *wayland_display,
+      .x_display = *x_display,
+      .physical_sink = *physical_sink,
+      .capture_sink_module = *capture_sink_module,
+      .session_sink_module = *session_sink_module,
+      .loop_module = *loop_module,
+    };
   }
 
   /**
@@ -327,26 +392,41 @@ namespace proc {
       if (rc != 0) {
         return -1;
       }
+      const std::string expected_session_id = _env["PRISM_SESSION_ID"].to_string();
+      const auto state = prism_read_headless_state(
+        prism_runtime_dir() + "/prism-headless.state",
+        expected_session_id
+      );
+      if (!state) {
+        BOOST_LOG(error) << "[prism] Headless session did not publish valid state for launch "sv
+                         << expected_session_id;
+        return -1;
+      }
+      _env["PRISM_HEADLESS_BACKEND"] = state->backend;
+      _env["PRISM_HEADLESS_UNIT"] = state->unit;
+      _env["PRISM_HEADLESS_APP_UNIT"] = state->app_unit;
+      _prism_had_pulse_prop = _env.count("PULSE_PROP") != 0;
+      _prism_old_pulse_prop = _prism_had_pulse_prop ? _env["PULSE_PROP"].to_string() : std::string();
+      _env["PULSE_PROP"] = (_prism_old_pulse_prop.empty() ? std::string() : _prism_old_pulse_prop + " "s) +
+                           "prism.session.id="s + state->session_id;
+      _prism_env_overridden = true;
       if (!_app.cmd.empty()) {
         // Run the app's own command inside the gamescope session that the
-        // start script launched in the headless compositor. The script
-        // records the actual socket/display names in its state file.
-        std::string wayland_display = prism_headless_state_value("wayland_display"s);
-        std::string x_display = prism_headless_state_value("x_display"s);
-        if (wayland_display.empty()) {
-          wayland_display = "gamescope-0"s;
-        }
-        if (x_display.empty()) {
-          x_display = ":2"s;
-        }
-        _env["WAYLAND_DISPLAY"] = wayland_display;
-        _env["DISPLAY"] = x_display;
+        // start script launched in the headless compositor. Only verified,
+        // session-owned socket names are accepted from its atomic state.
+        _env["WAYLAND_DISPLAY"] = state->wayland_display;
+        _env["DISPLAY"] = state->x_display;
         // Route the app's audio to the headless session's dedicated sink so
         // only session audio is captured (see prism-headless-audio.sh).
         _env["PULSE_SINK"] = "prism-headless"s;
-        _prism_env_overridden = true;
+        _env["PRISM_HEADLESS_APP_COMMAND"] = _app.cmd;
+        if (_app.working_dir.empty()) {
+          _app.working_dir = find_working_directory(_app.cmd, _env).string();
+        }
+        _app.cmd = "prism-headless-exec.sh"s;
         BOOST_LOG(info) << "[prism] App command will run inside the gamescope session (WAYLAND_DISPLAY="sv
-                        << wayland_display << ", DISPLAY="sv << x_display << ')';
+                        << state->wayland_display << ", DISPLAY="sv << state->x_display
+                        << ", session="sv << state->session_id << ')';
       }
       return 0;
     }
@@ -409,10 +489,22 @@ namespace proc {
           _env.erase(var);
         }
       }
+      _env.erase("PRISM_HEADLESS_BACKEND");
+      _env.erase("PRISM_HEADLESS_UNIT");
+      _env.erase("PRISM_HEADLESS_APP_UNIT");
+      _env.erase("PRISM_HEADLESS_APP_COMMAND");
+      if (_prism_had_pulse_prop) {
+        _env["PULSE_PROP"] = _prism_old_pulse_prop;
+      } else {
+        _env.erase("PULSE_PROP");
+      }
+      _prism_had_pulse_prop = false;
+      _prism_old_pulse_prop.clear();
     }
 
     if (mode == "headless"sv) {
       prism_run_session_script("prism-headless-stop.sh"s, _env, _pipe.get());
+      _env.erase("PRISM_SESSION_ID");
     } else if (mode == "virtual"sv) {
       prism_run_session_script("prism-virtual-stop.sh"s, _env, _pipe.get());
     } else {
@@ -452,6 +544,7 @@ namespace proc {
     // Add Stream-specific environment variables
     _env["PRISM_APP_ID"] = std::to_string(_app_id);
     _env["PRISM_APP_NAME"] = _app.name;
+    _env["PRISM_SESSION_ID"] = std::to_string(launch_session->id);
     _env["PRISM_CLIENT_WIDTH"] = std::to_string(launch_session->width);
     _env["PRISM_CLIENT_HEIGHT"] = std::to_string(launch_session->height);
     _env["PRISM_CLIENT_FPS"] = std::to_string(launch_session->fps);

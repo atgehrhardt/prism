@@ -33,12 +33,17 @@ Can't access the web UI?
 1. Check firewall rules.
 
 ### Controller works on Steam but not in games
-One trick might be to change Steam settings and check or uncheck the configuration to support Xbox/PlayStation
-controllers and leave only support for Generic controllers.
 
-Also, if you have many controllers already directly connected to the host, it might help to disable them so that the
-Prism-provided controller (connected to the guest) is the "first" one. In Linux this can be achieved on USB
-devices by finding the device in `/sys/bus/usb/devices/` and writing `0` to the `authorized` file.
+Headless Steam runs with existing physical controller device nodes hidden so the controller
+created for the streaming client receives the first game-controller slot. Check the headless
+log for the isolation line and confirm that `bwrap` is installed:
+
+```bash
+command -v bwrap
+grep 'isolating host controller' ~/.local/state/prism-headless.log | tail
+```
+
+Mirror and virtual-display modes continue to expose the host's normal controller devices.
 
 ### Network performance test
 
@@ -220,6 +225,36 @@ Then reload udev:
 ```bash
 sudo udevadm control --reload-rules && sudo udevadm trigger -s input
 ```
+
+### Headless session does not start
+
+Headless capture is desktop-environment independent, but currently requires an accessible
+systemd user manager in addition to labwc, gamescope, PipeWire, `pactl`, and `wlr-randr`.
+Steam headless mode additionally requires bubblewrap (`bwrap`) for controller-device isolation.
+Mirror capture and any otherwise-supported virtual-display mode remain available
+when that ownership backend is missing.
+
+Inspect the owned session and its private compositor with:
+
+```bash
+systemctl --user status prism-headless-session.service prism-labwc.service
+systemctl --user show prism-headless-session.service -p ActiveState -p ControlGroup
+cat "$XDG_RUNTIME_DIR/prism-headless.state"
+tail -n 200 ~/.local/state/prism-headless.log
+```
+
+Prism publishes `prism-headless.state` and the capture override only after gamescope's
+Wayland and Xwayland sockets have been verified as members of the owned service. If startup
+fails before that point, the transaction rolls back instead of silently capturing the host
+desktop.
+
+Teardown records that the private labwc compositor must be reset. The next headless
+startup performs that reset and waits for the input bridge to reconnect, so it is safe
+to launch a replacement stream immediately without waiting for desktop Steam.
+
+After a Steam headless stream, `prism-steam-restore.service` waits five seconds before
+returning Steam to the desktop. Starting another headless Steam stream during that grace
+period cancels the restore and avoids a shutdown/relaunch cycle.
 
 ### KMS Streaming fails
 KMS screencasting requires elevated privileges which are not allowed for Flatpak or AppImage packages.
