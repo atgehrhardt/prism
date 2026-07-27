@@ -360,9 +360,9 @@ namespace proc {
       // A generated Steam game app carries its launch target as
       // "steam steam://rungameid/<appid>". Hand the appid to the start script
       // (PRISM_STEAM_APP_ID), which brings up a lightweight (non-Deck-UI)
-      // session Steam, and replace the command with the launcher wrapper: it
-      // starts the game and exits with it, so closing the game ends the app
-      // and therefore the stream.
+      // session Steam with the game URL on its initial command line. Replace
+      // the app command with the lifecycle monitor, which exits with the game
+      // so closing the game ends the app and therefore the stream.
       const bool had_steam_app = _env.count("PRISM_STEAM_APP_ID") != 0;
       const std::string old_steam_app = had_steam_app ? _env["PRISM_STEAM_APP_ID"].to_string() : std::string();
       constexpr std::string_view rungameid_prefix = "steam steam://rungameid/"sv;

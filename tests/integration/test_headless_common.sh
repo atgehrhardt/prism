@@ -141,6 +141,165 @@ case " ${CONTROLLER_NODES[*]} " in
     ;;
 esac
 
+# The session command builder is safe to source and does not launch gamescope.
+# shellcheck source=/dev/null
+. "$SOURCE_DIR/contrib/virtual-session/prism-headless-session.sh"
+
+DIRECT_FLAGS=()
+DIRECT_CMD=()
+DIRECT_MANGO=0
+prism_build_headless_session_command \
+  1 2379780 /opt/prism true 1 DIRECT_FLAGS DIRECT_CMD DIRECT_MANGO
+[ "${DIRECT_CMD[0]}" = "/opt/prism/prism-headless-steam.sh" ]
+[ "${DIRECT_CMD[1]}" = "steam" ]
+[ "${DIRECT_CMD[2]}" = "steam://rungameid/2379780" ]
+[ "${#DIRECT_CMD[@]}" -eq 3 ]
+[ "$DIRECT_MANGO" = "0" ]
+case " ${DIRECT_FLAGS[*]} " in
+  *" --hdr-enabled "*) ;;
+  *) echo "Direct Steam command omitted HDR flag" >&2; exit 1 ;;
+esac
+case " ${DIRECT_FLAGS[*]} ${DIRECT_CMD[*]} " in
+  *" --mangoapp "* | *" -gamepadui "*)
+    echo "Direct Steam command incorrectly enabled the Deck UI" >&2
+    exit 1
+    ;;
+esac
+
+DECK_FLAGS=()
+DECK_CMD=()
+DECK_MANGO=0
+prism_build_headless_session_command \
+  1 "" /opt/prism false 1 DECK_FLAGS DECK_CMD DECK_MANGO
+case " ${DECK_FLAGS[*]} " in *" --mangoapp "*) ;; *) exit 1 ;; esac
+case " ${DECK_CMD[*]} " in
+  *" steam -gamepadui -steamos3 -steampal -steamdeck "*) ;;
+  *) echo "Steam Headless command lost Deck UI flags" >&2; exit 1 ;;
+esac
+[ "$DECK_MANGO" = "1" ]
+
+PLAIN_FLAGS=()
+PLAIN_CMD=()
+PLAIN_MANGO=0
+prism_build_headless_session_command \
+  0 "" /opt/prism false 1 PLAIN_FLAGS PLAIN_CMD PLAIN_MANGO
+[ "${PLAIN_CMD[*]}" = "sleep infinity" ]
+case " ${PLAIN_FLAGS[*]} " in
+  *" --xwayland-count "* | *" --mangoapp "*) exit 1 ;;
+esac
+[ "$PLAIN_MANGO" = "0" ]
+if prism_build_headless_session_command \
+  1 "not-an-appid" /opt/prism false 0 PLAIN_FLAGS PLAIN_CMD PLAIN_MANGO; then
+  echo "Invalid Steam app ID was accepted by the command builder" >&2
+  exit 1
+fi
+
+# Source the monitor so its process matching and lifecycle can be exercised
+# against synthetic process data without starting Steam.
+# shellcheck source=/dev/null
+. "$SOURCE_DIR/contrib/virtual-session/prism-steam-game.sh"
+
+MONITOR_ROOT="$TEST_ROOT/steam-monitor"
+export PRISM_PROC_ROOT="$MONITOR_ROOT/proc"
+mkdir -p "$PRISM_PROC_ROOT/701" "$PRISM_PROC_ROOT/702"
+printf '%s\0' 'reaper SteamLaunch AppId=44 Install=1 -- installer' \
+  > "$PRISM_PROC_ROOT/701/cmdline"
+printf '%s\0' 'reaper SteamLaunch AppId=44 -- game' \
+  > "$PRISM_PROC_ROOT/702/cmdline"
+prism_unit_pids() {
+  local path pid
+  for path in "$PRISM_PROC_ROOT"/[0-9]*/cmdline; do
+    [ -r "$path" ] || continue
+    pid="${path#"$PRISM_PROC_ROOT"/}"
+    printf '%s\n' "${pid%/cmdline}"
+  done
+}
+mapfile -t MATCHED_GAME_PIDS < <(
+  prism_session_game_pids prism-headless-session.service \
+    "SteamLaunch AppId=44 -- "
+)
+[ "${MATCHED_GAME_PIDS[*]}" = "702" ]
+rm -f "$PRISM_PROC_ROOT/701/cmdline" "$PRISM_PROC_ROOT/702/cmdline"
+
+mkdir -p "$MONITOR_ROOT/runtime" "$MONITOR_ROOT/home"
+STEAM_CALLS="$MONITOR_ROOT/steam-calls"
+MONITOR_SCENARIO=restart
+MONITOR_STEP=0
+touch "$MONITOR_ROOT/steam-present"
+prism_state_get() {
+  case "${2:?key required}" in
+    session_id) printf '%s\n' "test-session" ;;
+    unit) printf '%s\n' "prism-headless-session.service" ;;
+    *) return 1 ;;
+  esac
+}
+prism_unit_live() {
+  [ ! -f "$MONITOR_ROOT/unit-dead" ]
+}
+prism_unit_has_comm() {
+  [ -f "$MONITOR_ROOT/steam-present" ]
+}
+steam() {
+  printf '%s\n' "$*" >> "$STEAM_CALLS"
+}
+sleep() {
+  MONITOR_STEP=$((MONITOR_STEP + 1))
+  if [ "$MONITOR_SCENARIO" = "death" ]; then
+    touch "$MONITOR_ROOT/unit-dead"
+    return 0
+  fi
+  case "$MONITOR_STEP" in
+    1)
+      rm -f "$MONITOR_ROOT/steam-present"
+      ;;
+    2)
+      touch "$MONITOR_ROOT/steam-present"
+      mkdir -p "$PRISM_PROC_ROOT/801"
+      printf '%s\0' 'reaper SteamLaunch AppId=44 Install=1 -- installer' \
+        > "$PRISM_PROC_ROOT/801/cmdline"
+      ;;
+    3)
+      mkdir -p "$PRISM_PROC_ROOT/802"
+      printf '%s\0' 'reaper SteamLaunch AppId=44 -- game' \
+        > "$PRISM_PROC_ROOT/802/cmdline"
+      ;;
+    4)
+      rm -f "$PRISM_PROC_ROOT/802/cmdline"
+      ;;
+  esac
+}
+
+# The subshell contains prism_steam_game_main's persistent log redirection.
+# shellcheck disable=SC2030  # These test environment changes are intentionally local.
+(
+  export HOME="$MONITOR_ROOT/home"
+  export XDG_RUNTIME_DIR="$MONITOR_ROOT/runtime"
+  export PRISM_SESSION_ID=test-session
+  prism_steam_game_main 44
+)
+[ "$(cat "$STEAM_CALLS")" = "-shutdown" ]
+if grep -q "rungameid" "$STEAM_CALLS"; then
+  echo "Steam game monitor sent a duplicate rungameid request" >&2
+  exit 1
+fi
+
+rm -f "$MONITOR_ROOT/unit-dead" "$STEAM_CALLS"
+rm -f "$PRISM_PROC_ROOT"/8*/cmdline
+touch "$MONITOR_ROOT/steam-present"
+MONITOR_SCENARIO=death
+MONITOR_STEP=0
+# shellcheck disable=SC2031  # Recreate the intentionally subshell-local test environment.
+if (
+  export HOME="$MONITOR_ROOT/home"
+  export XDG_RUNTIME_DIR="$MONITOR_ROOT/runtime"
+  export PRISM_SESSION_ID=test-session
+  prism_steam_game_main 44
+); then
+  echo "Steam game monitor accepted loss of the owned session" >&2
+  exit 1
+fi
+[ ! -e "$STEAM_CALLS" ]
+
 for script in \
   prism-headless-common.sh \
   prism-headless-exec.sh \
