@@ -25,7 +25,7 @@ namespace nvhttp {
   /**
    * @brief The protocol version.
    * @details The version of the GameStream protocol we are mocking.
-   * @note The negative 4th number indicates to Moonlight that this is Sunshine.
+   * @note The negative 4th number indicates to Moonlight that this is Prism.
    */
   constexpr auto VERSION = "7.1.431.-1";
 
@@ -60,21 +60,21 @@ namespace nvhttp {
   void setup(const std::string &pkey, const std::string &cert);
 
   /**
-   * @brief Simple-Web-Server HTTPS backend configured for Sunshine certificate handling.
+   * @brief Simple-Web-Server HTTPS backend configured for Prism certificate handling.
    */
-  class SunshineHTTPS: public SimpleWeb::HTTPS {
+  class PrismHTTPS: public SimpleWeb::HTTPS {
   public:
     /**
-     * @brief Construct an HTTPS connection using Sunshine's TLS context.
+     * @brief Construct an HTTPS connection using Prism's TLS context.
      *
      * @param io_context Boost.Asio context used for network operations.
-     * @param ctx TLS context configured with Sunshine's certificate and key.
+     * @param ctx TLS context configured with Prism's certificate and key.
      */
-    SunshineHTTPS(boost::asio::io_context &io_context, boost::asio::ssl::context &ctx):
+    PrismHTTPS(boost::asio::io_context &io_context, boost::asio::ssl::context &ctx):
         SimpleWeb::HTTPS(io_context, ctx) {
     }
 
-    virtual ~SunshineHTTPS() {
+    virtual ~PrismHTTPS() {
       // Gracefully shutdown the TLS connection
       SimpleWeb::error_code ec;
       shutdown(ec);
@@ -85,11 +85,11 @@ namespace nvhttp {
    * @brief Enumerates supported pAIR PHASE options.
    */
   enum class PAIR_PHASE {
-    NONE,  ///< Sunshine is not in a pairing phase
-    GETSERVERCERT,  ///< Sunshine is in the get server certificate phase
-    CLIENTCHALLENGE,  ///< Sunshine is in the client challenge phase
-    SERVERCHALLENGERESP,  ///< Sunshine is in the server challenge response phase
-    CLIENTPAIRINGSECRET  ///< Sunshine is in the client pairing secret phase
+    NONE,  ///< Prism is not in a pairing phase
+    GETSERVERCERT,  ///< Prism is in the get server certificate phase
+    CLIENTCHALLENGE,  ///< Prism is in the client challenge phase
+    SERVERCHALLENGERESP,  ///< Prism is in the server challenge response phase
+    CLIENTPAIRINGSECRET  ///< Prism is in the client pairing secret phase
   };
 
   /**
@@ -111,7 +111,7 @@ namespace nvhttp {
     struct {
       util::Either<
         std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTP>::Response>,
-        std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>>
+        std::shared_ptr<typename SimpleWeb::ServerBase<PrismHTTPS>::Response>>
         response;
       std::string salt = {};
     } async_insert_pin;  ///< Async insert pin.

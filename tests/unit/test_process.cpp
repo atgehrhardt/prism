@@ -20,7 +20,7 @@ protected:
   void SetUp() override {
     BaseTest::SetUp();
     // Create test directory
-    test_dir = fs::temp_directory_path() / "sunshine_process_png_test";  // NOSONAR(cpp:S5443): safe for tests
+    test_dir = fs::temp_directory_path() / "prism_process_png_test";  // NOSONAR(cpp:S5443): safe for tests
     fs::create_directories(test_dir);
   }
 
@@ -123,13 +123,13 @@ TEST_F(ProcessPNGTest, CheckValidPNG_NonExistentFile) {
 }
 
 TEST_F(ProcessPNGTest, CheckValidPNG_RealFile) {
-  // Test with the actual sunshine.png from the project root
+  // Test with the actual prism.png from the project root
 
   // Only run this test if the file exists
-  if (const fs::path sunshine_png = fs::path(SUNSHINE_SOURCE_DIR) / "sunshine.png"; fs::exists(sunshine_png)) {
-    EXPECT_TRUE(proc::check_valid_png(sunshine_png));
+  if (const fs::path prism_png = fs::path(PRISM_SOURCE_DIR) / "prism.png"; fs::exists(prism_png)) {
+    EXPECT_TRUE(proc::check_valid_png(prism_png));
   } else {
-    GTEST_SKIP() << "sunshine.png not found in project root";
+    GTEST_SKIP() << "prism.png not found in project root";
   }
 }
 
@@ -271,7 +271,7 @@ TEST_F(ProcessPNGTest, ValidateAppImagePath_ValidPNG) {
 TEST_F(ProcessPNGTest, ValidateAppImagePath_OldSteamDefault) {
   // Test the special case for old steam image path
   const std::string result = proc::validate_app_image_path("./assets/steam.png");
-  EXPECT_EQ(result, SUNSHINE_ASSETS_DIR "/steam.png");
+  EXPECT_EQ(result, PRISM_ASSETS_DIR "/steam.png");
 }
 
 // Tests for parsing the Prism per-app capture mode from apps.json
@@ -281,7 +281,7 @@ protected:
     BaseTest::SetUp();
     // Steam game sync would otherwise append the host's real Steam library.
     setenv("PRISM_STEAM_SYNC", "0", 1);
-    test_file = fs::temp_directory_path() / "sunshine_process_parse_test_apps.json";  // NOSONAR(cpp:S5443): safe for tests
+    test_file = fs::temp_directory_path() / "prism_process_parse_test_apps.json";  // NOSONAR(cpp:S5443): safe for tests
   }
 
   void TearDown() override {

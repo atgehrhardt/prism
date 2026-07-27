@@ -3,7 +3,7 @@
 # prism-headless-start.sh and runs until the session's capture override is
 # removed.
 #
-# Sunshine switches the system DEFAULT sink to its capture sink when a stream
+# Prism switches the system DEFAULT sink to its capture sink when a stream
 # starts, which would pull every desktop app's audio into the headless stream.
 # This guard waits for that switch (or for the forced audio_sink to appear),
 # loops the headless session's dedicated sink into the capture sink, returns
@@ -25,11 +25,11 @@ echo "=== headless-audio $(date -Is) physical=${1:-?} ==="
 
 PHYSICAL="${1:-}"
 
-# The sink Sunshine captures from: a forced audio_sink in the config wins,
-# otherwise it is the sink-sunshine-* sink Sunshine switches the default to at
+# The sink Prism captures from: a forced audio_sink in the config wins,
+# otherwise it is the sink-prism-* sink Prism switches the default to at
 # stream start.
 CAPTURE_SINK=""
-CONFIG="$HOME/.config/sunshine/sunshine.conf"
+CONFIG="$HOME/.config/prism/prism.conf"
 if [ -f "$CONFIG" ]; then
   CAPTURE_SINK="$(sed -n 's/^audio_sink *= *//p' "$CONFIG" | tail -1)"
 fi
@@ -40,13 +40,13 @@ for _ in $(seq 1 240); do
   else
     cur="$(pactl get-default-sink 2>/dev/null || true)"
     case "$cur" in
-      sink-sunshine-*) CAPTURE_SINK="$cur"; break ;;
+      sink-prism-*) CAPTURE_SINK="$cur"; break ;;
     esac
   fi
   sleep 0.5
 done
 if [ -z "$CAPTURE_SINK" ]; then
-  echo "timed out waiting for the sunshine capture sink; audio not separated"
+  echo "timed out waiting for the prism capture sink; audio not separated"
   exit 1
 fi
 echo "capture sink: $CAPTURE_SINK"
@@ -75,12 +75,41 @@ fi
 # Routing watchdog: PULSE_SINK is not honored by every audio path (Proton,
 # some native engines), so actively move any stream whose process belongs to
 # the headless session (gamescope env) into the session sink. The reverse
-# direction matters just as much: Sunshine switches the default sink to its
+# direction matters just as much: Prism switches the default sink to its
 # capture sink at stream start, which strands desktop apps on it — move any
 # non-session stream sitting on the capture sink back to the physical output
 # so desktop audio never leaks into the headless stream. Runs until the
 # session's capture override is removed (teardown), then exits.
 while [ -f "$OVERRIDE_FILE" ]; do
+  # Prism switches the default sink to its capture sink at stream start (and on
+  # every stream restart), which can happen AFTER the one-time restore above.
+  # Keep forcing it back to the physical output or desktop audio goes silent.
+  if [ -n "$PHYSICAL" ]; then
+    cur_def="$(pactl get-default-sink 2>/dev/null || true)"
+    case "$cur_def" in
+      "$CAPTURE_SINK" | sink-prism-*)
+        if pactl set-default-sink "$PHYSICAL" 2>/dev/null; then
+          echo "default sink was $cur_def; restored $PHYSICAL"
+        fi ;;
+    esac
+  fi
+  # pipewire's stream-restore remembers where Prism's capture stream recorded
+  # from in earlier sessions and re-routes it there on every new stream (e.g.
+  # the physical monitor from before audio_sink was configured). Pin Prism's
+  # record stream to the capture sink's monitor.
+  cap_idx="$(pactl list short sources 2>/dev/null | awk -v n="$CAPTURE_SINK.monitor" '$2==n {print $1; exit}')"
+  if [ -n "$cap_idx" ]; then
+    pactl list source-outputs 2>/dev/null | awk '
+      /^Source Output #/ { idx = substr($3, 2) }
+      /^[[:space:]]*Source: / { src = $2 }
+      /application.name = "prism"/ { print idx, src }
+    ' | while read -r so_id so_src; do
+      if [ -n "$so_id" ] && [ "$so_src" != "$cap_idx" ] && \
+         pactl move-source-output "$so_id" "$cap_idx" 2>/dev/null; then
+        echo "moved prism capture source-output $so_id from source $so_src to $CAPTURE_SINK.monitor"
+      fi
+    done
+  fi
   pactl list sink-inputs 2>/dev/null | awk '
     /^Sink Input #/ { idx = substr($3, 2) }
     /^[[:space:]]*Sink: / { sink = $2 }

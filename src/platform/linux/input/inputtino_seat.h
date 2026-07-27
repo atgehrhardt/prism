@@ -9,7 +9,7 @@
 namespace platf::inputtino_seat {
 
   /**
-   * Determine the target seat for the current Sunshine instance.
+   * Determine the target seat for the current Prism instance.
    * Returns empty string if no seat could be determined.
    *
    * @return Seat name used for virtual input devices, or an empty string when unknown.

@@ -3,9 +3,9 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Sunshine"
+name = "prism"
 version = "0.0.0"
-description = "Python tooling for Sunshine"
+description = "Python tooling for Prism"
 requires-python = ">=3.14"
 license = {text = "GPL-3.0-only"}
 authors = [
@@ -29,9 +29,9 @@ flatpak = [
 ]
 
 [project.urls]
-Homepage = "https://app.lizardbyte.dev/Sunshine"
-Repository = "https://github.com/LizardByte/Sunshine"
-Issues = "https://github.com/LizardByte/Sunshine/issues"
+Homepage = "https://github.com/atgehrhardt/prism"
+Repository = "https://github.com/atgehrhardt/prism"
+Issues = "https://github.com/atgehrhardt/prism/issues"
 
 [tool.setuptools]
 py-modules = []

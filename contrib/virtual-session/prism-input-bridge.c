@@ -1,9 +1,9 @@
 /**
  * @file prism-input-bridge.c
- * @brief Forward Sunshine's uinput evdev devices into the headless labwc session.
+ * @brief Forward Prism's uinput evdev devices into the headless labwc session.
  *
  * labwc runs with WLR_BACKENDS=headless and has no libinput seat, so it cannot
- * read the "* passthrough" evdev devices that Sunshine (via inputtino) creates
+ * read the "* passthrough" evdev devices that Prism (via inputtino) creates
  * ("Keyboard passthrough", "Mouse passthrough", "Touch passthrough", ...).
  * labwc does, however, advertise zwlr_virtual_pointer_manager_v1 and
  * zwp_virtual_keyboard_manager_v1, so this bridge reads the evdev devices
@@ -85,7 +85,7 @@ static struct {
 /**
  * @brief Whether a headless (capture-override) stream is currently active.
  *
- * While active we exclusively grab Sunshine's evdev devices so events reach
+ * While active we exclusively grab Prism's evdev devices so events reach
  * only the headless compositor, not the desktop. During normal desktop
  * streams the devices must stay ungrabbed so the desktop compositor sees them.
  */
@@ -344,7 +344,7 @@ static bool test_bit(int bit, const unsigned long *array) {
 }
 
 /**
- * @brief Open one evdev device if it is a Sunshine keyboard/pointer source.
+ * @brief Open one evdev device if it is a Prism keyboard/pointer source.
  * @param index Device index (0..MAX_EVDEV-1).
  */
 static void try_open_source(int index) {
@@ -396,7 +396,7 @@ static void try_open_source(int index) {
 }
 
 /**
- * @brief Scan for new Sunshine evdev devices and prune dead fds.
+ * @brief Scan for new Prism evdev devices and prune dead fds.
  */
 static void rescan_sources(void) {
   int want_grab = override_active();
@@ -406,7 +406,7 @@ static void rescan_sources(void) {
   for (int i = 0; i < MAX_EVDEV; i++) {
     struct source *src = &g.sources[i];
     if (src->fd >= 0) {
-      /* uinput devices disappear when Sunshine tears them down; a read on a
+      /* uinput devices disappear when Prism tears them down; a read on a
        * revoked fd fails with ENODEV, handled in the poll loop. Also probe
        * here so a vanished device is dropped even if it goes quiet. */
       char name[1];

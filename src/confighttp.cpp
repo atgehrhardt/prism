@@ -22,13 +22,6 @@
 #include <Simple-Web-Server/crypto.hpp>
 #include <Simple-Web-Server/server_https.hpp>
 
-#ifdef _WIN32
-  #include "platform/windows/misc.h"
-
-  #include <vector>
-  #include <Windows.h>
-#endif
-
 // local includes
 #include "config.h"
 #include "confighttp.h"
@@ -53,7 +46,7 @@ namespace confighttp {
   namespace fs = std::filesystem;
 
   /**
-   * @brief HTTPS server type used for Sunshine's configuration UI.
+   * @brief HTTPS server type used for Prism's configuration UI.
    */
   using https_server_t = SimpleWeb::Server<SimpleWeb::HTTPS>;
 
@@ -156,7 +149,7 @@ namespace confighttp {
 
     const SimpleWeb::CaseInsensitiveMultimap headers {
       {"Content-Type", "application/json"},
-      {"WWW-Authenticate", R"(Basic realm="Sunshine Gamestream Host", charset="UTF-8")"},
+      {"WWW-Authenticate", R"(Basic realm="Prism Gamestream Host", charset="UTF-8")"},
       {"X-Frame-Options", "DENY"},
       {"Content-Security-Policy", "frame-ancestors 'none';"}
     };
@@ -197,7 +190,7 @@ namespace confighttp {
     }
 
     // If credentials are shown, redirect the user to a /welcome page
-    if (config::sunshine.username.empty()) {
+    if (config::prism.username.empty()) {
       send_redirect(response, request, "/welcome");
       return false;
     }
@@ -222,7 +215,7 @@ namespace confighttp {
     const auto username = authData.substr(0, index);
     const auto password = authData.substr(index + 1);
 
-    if (const auto hash = util::hex(crypto::hash(password + config::sunshine.salt)).to_string(); !boost::iequals(username, config::sunshine.username) || hash != config::sunshine.password) {
+    if (const auto hash = util::hex(crypto::hash(password + config::prism.salt)).to_string(); !boost::iequals(username, config::prism.username) || hash != config::prism.password) {
       return false;
     }
 
@@ -309,7 +302,7 @@ namespace confighttp {
    */
   std::string get_client_id(const req_https_t &request) {
     // Try to use the authenticated username as client ID
-    if (const auto auth = request->header.find("authorization"); !config::sunshine.username.empty() && auth != request->header.end()) {
+    if (const auto auth = request->header.find("authorization"); !config::prism.username.empty() && auth != request->header.end()) {
       if (const auto &rawAuth = auth->second; rawAuth.rfind("Basic "sv, 0) == 0) {
         auto authData = SimpleWeb::Crypto::Base64::decode(rawAuth.substr("Basic "sv.length()));
         if (const auto index = static_cast<int>(authData.find(':')); index < authData.size() - 1) {
@@ -391,7 +384,7 @@ namespace confighttp {
   bool validate_csrf_token(const resp_https_t &response, const req_https_t &request, const std::string &client_id) {
     // Helper function to check if a URL starts with any allowed origin
     auto is_allowed_origin = [](const std::string_view url) {
-      return std::ranges::any_of(config::sunshine.csrf_allowed_origins, [&url](const std::string &allowed_origin) {
+      return std::ranges::any_of(config::prism.csrf_allowed_origins, [&url](const std::string &allowed_origin) {
         // Ensure exact prefix match (with ":" or "/" after to prevent malicious.com matching allowed.com)
         if (url.rfind(allowed_origin, 0) != 0) {  // rfind with pos=0 checks if the url starts with allowed_origin
           return false;
@@ -435,7 +428,7 @@ namespace confighttp {
       if (query_it == query_params.end()) {
         auto address = net::addr_to_normalized_string(request->remote_endpoint().address());
         BOOST_LOG(error) << "Web UI: ["sv << address << "] -- CSRF protection blocked request from origin: "sv << blocked_origin;
-        BOOST_LOG(error) << "Web UI: To allow this origin, add it to the 'csrf_allowed_origins' option in your Sunshine configuration"sv;
+        BOOST_LOG(error) << "Web UI: To allow this origin, add it to the 'csrf_allowed_origins' option in your Prism configuration"sv;
         bad_request(response, request, "Missing CSRF token");
         return false;
       }
@@ -476,7 +469,7 @@ namespace confighttp {
    */
   void getPage(const resp_https_t &response, const req_https_t &request, const char *html_file, const bool require_auth, const bool redirect_if_username) {
     // Special handling for welcome page: redirect if the username is already set
-    if (redirect_if_username && !config::sunshine.username.empty()) {
+    if (redirect_if_username && !config::prism.username.empty()) {
       send_redirect(response, request, "/");
       return;
     }
@@ -1113,10 +1106,10 @@ namespace confighttp {
 
     nlohmann::json output_tree;
     output_tree["status"] = true;
-    output_tree["platform"] = SUNSHINE_PLATFORM;
+    output_tree["platform"] = PRISM_PLATFORM;
     output_tree["version"] = PROJECT_VERSION;
 
-    auto vars = config::parse_config(file_handler::read_file(config::sunshine.config_file.c_str()));
+    auto vars = config::parse_config(file_handler::read_file(config::prism.config_file.c_str()));
 
     for (auto &[name, value] : vars) {
       output_tree[name] = std::move(value);
@@ -1139,7 +1132,7 @@ namespace confighttp {
 
     nlohmann::json output_tree;
     output_tree["status"] = true;
-    output_tree["locale"] = config::sunshine.locale;
+    output_tree["locale"] = config::prism.locale;
     send_response(response, output_tree);
   }
 
@@ -1189,7 +1182,7 @@ namespace confighttp {
         // we should migrate the config file to straight JSON and get rid of all this nonsense
         config_stream << k << " = " << (v.is_string() ? v.get<std::string>() : v.dump()) << std::endl;
       }
-      file_handler::write_file(config::sunshine.config_file.c_str(), config_stream.str());
+      file_handler::write_file(config::prism.config_file.c_str(), config_stream.str());
       output_tree["status"] = true;
       send_response(response, output_tree);
     } catch (std::exception &e) {
@@ -1360,7 +1353,7 @@ namespace confighttp {
 
     print_req(request);
 
-    std::string content = file_handler::read_file(config::sunshine.log_file.c_str());
+    std::string content = file_handler::read_file(config::prism.log_file.c_str());
     SimpleWeb::CaseInsensitiveMultimap headers;
     headers.emplace("Content-Type", "text/plain");
     headers.emplace("X-Frame-Options", "DENY");
@@ -1445,7 +1438,7 @@ namespace confighttp {
     if (!check_content_type(response, request, "application/json")) {
       return;
     }
-    if (!config::sunshine.username.empty() && !authenticate(response, request)) {
+    if (!config::prism.username.empty() && !authenticate(response, request)) {
       return;
     }
 
@@ -1475,13 +1468,13 @@ namespace confighttp {
       if (newUsername.empty()) {
         errors.emplace_back("Invalid Username");
       } else {
-        auto hash = util::hex(crypto::hash(password + config::sunshine.salt)).to_string();
-        if (config::sunshine.username.empty() || (boost::iequals(username, config::sunshine.username) && hash == config::sunshine.password)) {
+        auto hash = util::hex(crypto::hash(password + config::prism.salt)).to_string();
+        if (config::prism.username.empty() || (boost::iequals(username, config::prism.username) && hash == config::prism.password)) {
           if (newPassword.empty() || newPassword != confirmPassword) {
             errors.emplace_back("Password Mismatch");
           } else {
-            http::save_user_creds(config::sunshine.credentials_file, newUsername, newPassword);
-            http::reload_user_creds(config::sunshine.credentials_file);
+            http::save_user_creds(config::prism.credentials_file, newUsername, newPassword);
+            http::reload_user_creds(config::prism.credentials_file);
             output_tree["status"] = true;
           }
         } else {
@@ -1581,7 +1574,7 @@ namespace confighttp {
   }
 
   /**
-   * @brief Authenticate a Web UI request and restart the Sunshine process.
+   * @brief Authenticate a Web UI request and restart the Prism process.
    *
    * @param response HTTP response used for authentication or CSRF failures.
    * @param request HTTP request carrying the client identity and CSRF token.
@@ -1620,44 +1613,11 @@ namespace confighttp {
 
     nlohmann::json output_tree;
 
-#ifdef _WIN32
-    std::string version_str;
-    bool installed = false;
-    bool version_compatible = false;
-
-    // Check if ViGEmBus driver exists
-    std::filesystem::path driver_path = std::filesystem::path(std::getenv("SystemRoot") ? std::getenv("SystemRoot") : "C:\\Windows") / "System32" / "drivers" / "ViGEmBus.sys";
-
-    if (std::filesystem::exists(driver_path)) {
-      installed = platf::getFileVersionInfo(driver_path, version_str);
-      if (installed) {
-        // Parse version string to check compatibility (>= 1.17.0.0)
-        std::vector<std::string> version_parts;
-        std::stringstream ss(version_str);
-        std::string part;
-        while (std::getline(ss, part, '.')) {
-          version_parts.push_back(part);
-        }
-
-        if (version_parts.size() >= 2) {
-          int major = std::stoi(version_parts[0]);
-          int minor = std::stoi(version_parts[1]);
-          version_compatible = (major > 1) || (major == 1 && minor >= 17);
-        }
-      }
-    }
-
-    output_tree["installed"] = installed;
-    output_tree["version"] = version_str;
-    output_tree["version_compatible"] = version_compatible;
-    output_tree["packaged_version"] = VIGEMBUS_PACKAGED_VERSION;
-#else
     output_tree["error"] = "ViGEmBus is only available on Windows";
     output_tree["installed"] = false;
     output_tree["version"] = "";
     output_tree["version_compatible"] = false;
     output_tree["packaged_version"] = "";
-#endif
 
     send_response(response, output_tree);
   }
@@ -1683,51 +1643,8 @@ namespace confighttp {
 
     nlohmann::json output_tree;
 
-#ifdef _WIN32
-    // Get the path to the packaged ViGEmBus installer.
-    const std::filesystem::path installer_path = platf::appdata().parent_path() / "third-party" / "vigembus_installer.exe";
-
-    if (!std::filesystem::exists(installer_path)) {
-      output_tree["status"] = false;
-      output_tree["error"] = "ViGEmBus installer not found";
-      send_response(response, output_tree);
-      return;
-    }
-
-    // Run the installer with elevated permissions
-    std::error_code ec;
-    boost::filesystem::path working_dir = boost::filesystem::path(installer_path.string()).parent_path();
-    boost::process::v1::environment env = boost::this_process::environment();
-
-    // Run with elevated permissions, non-interactive
-    const std::string install_cmd = std::format("{} /quiet", installer_path.string());
-    auto child = platf::run_command(true, false, install_cmd, working_dir, env, nullptr, ec, nullptr);
-
-    if (ec) {
-      output_tree["status"] = false;
-      output_tree["error"] = "Failed to start installer: " + ec.message();
-      send_response(response, output_tree);
-      return;
-    }
-
-    // Wait for the installer to complete
-    child.wait(ec);
-
-    if (ec) {
-      output_tree["status"] = false;
-      output_tree["error"] = "Installer failed: " + ec.message();
-    } else {
-      int exit_code = child.exit_code();
-      output_tree["status"] = (exit_code == 0);
-      output_tree["exit_code"] = exit_code;
-      if (exit_code != 0) {
-        output_tree["error"] = std::format("Installer exited with code {}", exit_code);
-      }
-    }
-#else
     output_tree["status"] = false;
     output_tree["error"] = "ViGEmBus installation is only available on Windows";
-#endif
 
     send_response(response, output_tree);
   }
@@ -1739,40 +1656,11 @@ namespace confighttp {
    * @return True if the file should be included in an executable-type listing.
    */
   bool is_browsable_executable([[maybe_unused]] const fs::directory_entry &entry, [[maybe_unused]] const fs::file_status &status) {
-#ifdef _WIN32
-    auto ext = entry.path().extension().string();
-    boost::algorithm::to_lower(ext);
-    return ext == ".exe" || ext == ".bat" || ext == ".cmd" || ext == ".com" || ext == ".ps1";
-#else
     const auto perms = status.permissions();
     return (perms & fs::perms::owner_exec) != fs::perms::none ||
            (perms & fs::perms::group_exec) != fs::perms::none ||
            (perms & fs::perms::others_exec) != fs::perms::none;
-#endif
   }
-
-#ifdef _WIN32
-  /**
-   * @brief Builds a JSON array of available Windows drive letters.
-   * @return JSON array of drive-letter entries.
-   */
-  nlohmann::json get_windows_drives() {
-    nlohmann::json entries = nlohmann::json::array();
-    const DWORD drives = GetLogicalDrives();
-    for (int i = 0; i < 26; ++i) {
-      if (drives & (1 << i)) {
-        const auto drive_letter = static_cast<char>('A' + i);
-        const auto drive_path = std::string(1, drive_letter) + ":\\";
-        nlohmann::json entry;
-        entry["name"] = drive_path;
-        entry["type"] = "directory";
-        entry["path"] = drive_path;
-        entries.push_back(entry);
-      }
-    }
-    return entries;
-  }
-#endif
 
   /**
    * @brief Lists, filters, and sorts the entries of a directory for the browse API.
@@ -1838,8 +1726,7 @@ namespace confighttp {
    * @brief Browse the server filesystem.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
-   * @note On Windows, an empty or root path returns the list of available drive letters.
-   * @note On non-Windows, an empty path defaults to the filesystem root ("/").
+   * @note An empty path defaults to the filesystem root ("/").
    *
    * @api_examples{/api/browse?path=/home/user&type=directory| GET| null}
    */
@@ -1865,21 +1752,10 @@ namespace confighttp {
 
       nlohmann::json output_tree;
 
-#ifdef _WIN32
-      // On Windows with an empty or root path, return the list of available drive letters
-      if (path_str.empty() || path_str == "/" || path_str == "\\") {
-        output_tree["path"] = "";
-        output_tree["parent"] = "";
-        output_tree["entries"] = get_windows_drives();
-        send_response(response, output_tree);
-        return;
-      }
-#else
-      // On non-Windows, default an empty path to the filesystem root
+      // Default an empty path to the filesystem root
       if (path_str.empty()) {
         path_str = "/";
       }
-#endif
 
       // Normalize the path
       fs::path dir_path = fs::weakly_canonical(fs::path(path_str));
@@ -1904,12 +1780,7 @@ namespace confighttp {
 
       // Determine the parent path for the "Up" navigation
       const fs::path parent = dir_path.parent_path();
-#ifdef _WIN32
-      // At a drive root (e.g., C:\) the parent equals itself; signal the drive list with an empty string
-      output_tree["parent"] = (parent == dir_path) ? "" : parent.string();
-#else
       output_tree["parent"] = parent.string();
-#endif
 
       output_tree["entries"] = build_browse_entries(dir_path, type_str);
       send_response(response, output_tree);
@@ -1927,7 +1798,7 @@ namespace confighttp {
     const auto shutdown_event = mail::man->event<bool>(mail::shutdown);
 
     const auto port_https = net::map_port(PORT_HTTPS);
-    const auto address_family = net::af_from_enum_string(config::sunshine.address_family);
+    const auto address_family = net::af_from_enum_string(config::prism.address_family);
 
     https_server_t server {config::nvhttp.cert, config::nvhttp.pkey};
 
@@ -2001,7 +1872,7 @@ namespace confighttp {
 
     // Store bind address for logging, use "localhost" as fallback for wildcard addresses
     const auto bind_addr = server.config.address;
-    const auto display_addr = config::sunshine.bind_address.empty() ? "localhost"sv : std::string_view {bind_addr};
+    const auto display_addr = config::prism.bind_address.empty() ? "localhost"sv : std::string_view {bind_addr};
 
     auto accept_and_run = [&](auto *server) {
       try {

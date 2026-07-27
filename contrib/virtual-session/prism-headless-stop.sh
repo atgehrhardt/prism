@@ -72,7 +72,7 @@ pactl list short modules 2>/dev/null | grep 'sink_name=prism-headless' | cut -f1
 # Hand the desktop back to the configured prism_default_sink, falling back to
 # the recorded physical output. PipeWire/WirePlumber can move the default
 # while the session sink is being torn down, so retry and verify.
-RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
 RESTORE="${RESTORE:-${physical_sink:-}}"
 if [ -n "$RESTORE" ]; then
   echo "restoring default sink: $RESTORE"

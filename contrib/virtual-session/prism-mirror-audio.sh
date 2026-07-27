@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Prism: audio router for mirror (default) and portal-output streams.
 #
-# Sunshine is pointed at a dedicated "prism-stream" capture sink (audio_sink in
-# sunshine.conf) so headless sessions can keep desktop audio out of the stream.
+# Prism is pointed at a dedicated "prism-stream" capture sink (audio_sink in
+# prism.conf) so headless sessions can keep desktop audio out of the stream.
 # For mirror streams the desktop IS the content, so this script loops the
 # physical sink's monitor into the capture sink — preserving stock behavior
 # (audio on both the stream and the host speakers) — and returns the default
-# sink to the physical output after Sunshine's stream-start switch.
+# sink to the physical output after Prism's stream-start switch.
 #
 # Invoked by process.cpp via prism_run_session_script with PRISM_AUDIO_ACTION:
 #   start — set up routing (self-backgrounds a watchdog) and record state
@@ -37,7 +37,7 @@ if [ "$ACTION" = "stop" ]; then
     rm -f "$STATE"
   fi
   # A user-configured prism_default_sink wins over the recorded physical sink.
-  RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+  RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
   RESTORE="${RESTORE:-$PHYSICAL}"
   if [ -n "$RESTORE" ]; then
     # PipeWire/WirePlumber can move the default while the loopback is being
@@ -60,12 +60,26 @@ if [ "${1:-}" = "prism-mirror-watchdog" ]; then
   exec >>"$LOG" 2>&1
   PHYSICAL="${2:-}"
   # Keep the desktop default on the physical output while the stream runs;
-  # Sunshine switches it to the capture sink at stream start.
+  # Prism switches it to the capture sink at stream start.
   for _ in $(seq 1 720); do
     [ -f "$STATE" ] || break
     cur="$(pactl get-default-sink 2>/dev/null || true)"
     if [ -n "$PHYSICAL" ] && [ "$cur" != "$PHYSICAL" ]; then
       pactl set-default-sink "$PHYSICAL" 2>/dev/null || true
+    fi
+    # pipewire's stream-restore can re-route Prism's capture stream to a monitor
+    # it used in earlier sessions; keep it pinned to the capture sink's monitor.
+    cap_idx="$(pactl list short sources 2>/dev/null | awk -v n="prism-stream.monitor" '$2==n {print $1; exit}')"
+    if [ -n "$cap_idx" ]; then
+      pactl list source-outputs 2>/dev/null | awk '
+        /^Source Output #/ { idx = substr($3, 2) }
+        /^[[:space:]]*Source: / { src = $2 }
+        /application.name = "prism"/ { print idx, src }
+      ' | while read -r so_id so_src; do
+        if [ -n "$so_id" ] && [ "$so_src" != "$cap_idx" ]; then
+          pactl move-source-output "$so_id" "$cap_idx" 2>/dev/null || true
+        fi
+      done
     fi
     sleep 5
   done
@@ -79,7 +93,7 @@ echo "=== mirror-audio start $(date -Is) ==="
 PHYSICAL="$(pactl get-default-sink 2>/dev/null || true)"
 echo "physical sink: ${PHYSICAL:-none}"
 
-# Make sure the capture sink exists before Sunshine's audio init looks for it.
+# Make sure the capture sink exists before Prism's audio init looks for it.
 if ! pactl list short sinks 2>/dev/null | grep -q '^[0-9]*[[:space:]]prism-stream[[:space:]]'; then
   pactl load-module module-null-sink sink_name=prism-stream \
     sink_properties=device.description="Prism Stream Capture" >/dev/null 2>&1 || true

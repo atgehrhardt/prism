@@ -1,6 +1,6 @@
 # Getting Started
 
-The recommended method for running Sunshine is to use the [binaries](#binaries) included in the
+The recommended method for running Prism is to use the [binaries](#binaries) included in the
 [latest release][latest-release], unless otherwise specified.
 
 [Pre-releases](https://github.com/LizardByte/Sunshine/releases) are also available. These should be considered beta,
@@ -8,7 +8,7 @@ and release artifacts may be missing when merging changes on a faster cadence.
 
 ## Binaries
 
-Binaries of Sunshine are created for each release. They are available for FreeBSD, Linux, macOS, and Windows.
+Binaries of Prism are created for each release. They are available for Linux only.
 Binaries can be found in the [latest release][latest-release].
 
 > [!NOTE]
@@ -27,26 +27,6 @@ Docker images are available on [Dockerhub.io](https://hub.docker.com/repository/
 and [ghcr.io](https://github.com/orgs/LizardByte/packages?repo_name=sunshine).
 
 See [Docker](../DOCKER_README.md) for more information.
-
-### FreeBSD
-
-#### Install
-1. Download the appropriate package for your architecture
-
-   | Architecture  | Package                                                                                                                                |
-   |---------------|----------------------------------------------------------------------------------------------------------------------------------------|
-   | amd64/x86_64  | [Sunshine-FreeBSD-14.4-amd64.pkg](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-FreeBSD-14.3-amd64.pkg)     |
-   | arm64/aarch64 | [Sunshine-FreeBSD-14.4-aarch64.pkg](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-FreeBSD-14.3-aarch64.pkg) |
-
-2. Open terminal and run the following command.
-   ```sh
-   sudo pkg install ./Sunshine-FreeBSD-14.4-{arch}.pkg
-   ```
-
-#### Uninstall
-```sh
-sudo pkg delete Sunshine
-```
 
 ### Linux
 
@@ -71,28 +51,28 @@ CUDA is used for NVFBC capture.
         <td rowspan="8">13.1.1</td>
         <td rowspan="8">590.48.01</td>
         <td rowspan="8">50;52;60;61;62;70;72;75;80;86;87;89;90;100;101;103;120;121</td>
-        <td>sunshine.AppImage</td>
+        <td>prism.AppImage</td>
     </tr>
     <tr>
-        <td>sunshine-ubuntu-22.04-{arch}.deb</td>
+        <td>prism-ubuntu-22.04-{arch}.deb</td>
     </tr>
     <tr>
-        <td>sunshine-ubuntu-24.04-{arch}.deb</td>
+        <td>prism-ubuntu-24.04-{arch}.deb</td>
     </tr>
     <tr>
-        <td>sunshine-debian-trixie-{arch}.deb</td>
+        <td>prism-debian-trixie-{arch}.deb</td>
     </tr>
     <tr>
-        <td>sunshine_{arch}.flatpak</td>
+        <td>prism_{arch}.flatpak</td>
     </tr>
     <tr>
-        <td>Sunshine (copr - Fedora)</td>
+        <td>Prism (copr - Fedora)</td>
     </tr>
     <tr>
-        <td>Sunshine (copr - OpenSUSE)</td>
+        <td>Prism (copr - OpenSUSE)</td>
     </tr>
     <tr>
-        <td>sunshine.pkg.tar.zst</td>
+        <td>prism.pkg.tar.zst</td>
     </tr>
 </table>
 
@@ -106,7 +86,7 @@ CUDA is used for NVFBC capture.
 > The AppImage is built on Ubuntu 22.04, which requires `glibc 2.35` or newer and `libstdc++ 3.4.11` or newer.
 
 ##### Install
-1. Download [sunshine.AppImage](https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine.AppImage)
+1. Download [prism.AppImage](https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine.AppImage)
    into your home directory.
    ```bash
    cd ~
@@ -114,17 +94,17 @@ CUDA is used for NVFBC capture.
    ```
 2. Open terminal and run the following command.
    ```bash
-   ./sunshine.AppImage --install
+   ./prism.AppImage --install
    ```
 
 ##### Run
 ```bash
-./sunshine.AppImage --install && ./sunshine.AppImage
+./prism.AppImage --install && ./prism.AppImage
 ```
 
 ##### Uninstall
 ```bash
-./sunshine.AppImage --remove
+./prism.AppImage --remove
 ```
 
 #### ArchLinux
@@ -136,15 +116,15 @@ CUDA is used for NVFBC capture.
 Follow the instructions at LizardByte's [pacman-repo](https://github.com/LizardByte/pacman-repo) to add
 the repository. Then run the following command.
 ```bash
-pacman -S sunshine
+pacman -S prism
 ```
 
 ##### Install PKGBUILD Archive
 Open terminal and run the following command.
 ```bash
 wget https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine.pkg.tar.gz
-tar -xvf sunshine.pkg.tar.gz
-cd sunshine
+tar -xvf prism.pkg.tar.gz
+cd prism
 
 # install optional dependencies
 pacman -S cuda  # Nvidia GPU encoding support
@@ -155,15 +135,15 @@ makepkg -si
 
 ##### Uninstall
 ```bash
-pacman -R sunshine
+pacman -R prism
 ```
 
 #### Debian/Ubuntu
 
 ##### Install
-Download `sunshine-{distro}-{distro-version}-{arch}.deb` and run the following command.
+Download `prism-{distro}-{distro-version}-{arch}.deb` and run the following command.
 ```bash
-sudo dpkg -i ./sunshine-{distro}-{distro-version}-{arch}.deb
+sudo dpkg -i ./prism-{distro}-{distro-version}-{arch}.deb
 ```
 
 > [!NOTE]
@@ -175,7 +155,7 @@ sudo dpkg -i ./sunshine-{distro}-{distro-version}-{arch}.deb
 
 ##### Uninstall
 ```bash
-sudo apt remove sunshine
+sudo apt remove prism
 ```
 
 #### Fedora/OpenSUSE
@@ -184,9 +164,9 @@ sudo apt remove sunshine
 > The package name is case-sensitive.
 
 ##### Install (GitHub releases)
-Download `Sunshine-{version}.{distro+version}.{arch}.rpm` and run the following command.
+Download `Prism-{version}.{distro+version}.{arch}.rpm` and run the following command.
 ```bash
-sudo dnf install ./Sunshine-{version}.{distro}.{arch}.rpm
+sudo dnf install ./Prism-{version}.{distro}.{arch}.rpm
 ```
 
 > [!NOTE]
@@ -198,13 +178,13 @@ sudo dnf install ./Sunshine-{version}.{distro}.{arch}.rpm
 
 ##### Uninstall
 ```bash
-sudo dnf remove sunshine
+sudo dnf remove prism
 ```
 
 ##### Install (Copr)
 
 > [!IMPORTANT]
-> Stable builds are only available if the Sunshine release was made after the Fedora version release.
+> Stable builds are only available if the Prism release was made after the Fedora version release.
 > Because of this, it is often recommended to use the beta copr; however, you do not need to regularly update.
 > This could lead to annoyances in rare cases where there may be a breaking change.
 
@@ -220,12 +200,12 @@ sudo dnf remove sunshine
 
 2. Install the package.
    ```bash
-   sudo dnf install Sunshine
+   sudo dnf install Prism
    ```
 
 ##### Uninstall
 ```bash
-sudo dnf remove Sunshine
+sudo dnf remove Prism
 ```
 
 #### Flatpak
@@ -237,7 +217,7 @@ sudo dnf remove Sunshine
 Using this package requires that you have [Flatpak](https://flatpak.org/setup) installed.
 
 ##### Download (local option)
-1. Download `sunshine_{arch}.flatpak` and run the following command.
+1. Download `prism_{arch}.flatpak` and run the following command.
 
    > [!NOTE]
    > Replace `{arch}` with your system architecture.
@@ -250,7 +230,7 @@ flatpak install --system flathub dev.lizardbyte.app.Sunshine
 
 **Local**
 ```bash
-flatpak install --system ./sunshine_{arch}.flatpak
+flatpak install --system ./prism_{arch}.flatpak
 ```
 
 ##### Install (user level)
@@ -261,7 +241,7 @@ flatpak install --user flathub dev.lizardbyte.app.Sunshine
 
 **Local**
 ```bash
-flatpak install --user ./sunshine_{arch}.flatpak
+flatpak install --user ./prism_{arch}.flatpak
 ```
 
 ##### Additional installation (required)
@@ -303,144 +283,10 @@ brew uninstall sunshine
 > [!TIP]
 > For beta you can replace `sunshine` with `sunshine-beta` in the above commands.
 
-### macOS
-
-> [!IMPORTANT]
-> Sunshine on macOS is experimental. Gamepads do not work.
-
-#### DMG
-
-##### Install
-
-1. Download and install based on your architecture:
-
-   | Architecture          | Package                                                                                                                |
-   |-----------------------|------------------------------------------------------------------------------------------------------------------------|
-   | arm64 (Apple Silicon) | [Sunshine-macOS-arm64.dmg](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-macOS-arm64.dmg)   |
-   | x86_64 (Intel)        | [Sunshine-macOS-x86_64.dmg](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-macOS-x86_64.dmg) |
-
-2. Open the downloaded `.dmg` file.
-3. Drag `Sunshine.app` into the `Applications` folder.
-4. Eject the disk image.
-
-##### Uninstall
-1. Quit Sunshine if it is running.
-2. Open `Finder`, navigate to `Applications`, and drag `Sunshine.app` to the Trash.
-
-#### Homebrew
-This package requires that you have [Homebrew](https://docs.brew.sh/Installation) installed.
-
-##### Install
-```bash
-brew update
-brew upgrade
-brew tap LizardByte/homebrew
-brew install sunshine
-```
-
-##### Uninstall
-```bash
-brew uninstall sunshine
-```
-
-> [!TIP]
-> For beta you can replace `sunshine` with `sunshine-beta` in the above commands.
-
-### Windows
-
-> [!NOTE]
-> Sunshine supports ARM64 on Windows; however, this should be considered experimental. This version does not properly
-> support GPU scheduling and any hardware acceleration.
-
-#### Installer (recommended)
-
-> [!CAUTION]
-> The msi installer is preferred moving forward. Before using a different type of installer, you should manually
-> uninstall the previous installation.
-
-1. Download and install based on your architecture:
-
-   | Architecture          | Installer                                                                                                                                    |
-   |-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-   | AMD64/x64 (Intel/AMD) | [Sunshine-Windows-AMD64-installer.msi](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-Windows-AMD64-installer.msi) |
-   | ARM64                 | [Sunshine-Windows-ARM64-installer.msi](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-Windows-ARM64-installer.msi) |
-
-> [!TIP]
-> Installer logs can be found in the following directory:
-> `%%TEMP%/Sunshine/logs/install/`
-
-> [!CAUTION]
-> You should carefully select or unselect the options you want to install. Do not blindly install or
-> enable features.
-
-To uninstall, find Sunshine in the list <a href="ms-settings:installed-apps">here</a> and select "Uninstall" from the
-overflow menu. Different versions of Windows may provide slightly different steps for uninstall.
-
-#### Standalone (lite version)
-
-> [!WARNING]
-> By using this package instead of the installer, performance will be reduced. This package is not
-> recommended for most users. No support will be provided!
-
-1. Download and extract based on your architecture:
-
-   | Architecture          | Installer                                                                                                                          |
-   |-----------------------|------------------------------------------------------------------------------------------------------------------------------------|
-   | AMD64/x64 (Intel/AMD) | [Sunshine-Windows-AMD64-lite.zip](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-Windows-AMD64-lite.zip) |
-   | ARM64                 | [Sunshine-Windows-ARM64-lite.zip](https://github.com/LizardByte/Sunshine/releases/latest/download/Sunshine-Windows-ARM64lite.zip)  |
-
-2. Open command prompt as administrator
-3. Firewall rules
-
-   Install:
-   ```bash
-   cd /d {path to extracted directory}
-   scripts/add-firewall-rule.bat
-   ```
-
-   Uninstall:
-   ```bash
-   cd /d {path to extracted directory}
-   scripts/delete-firewall-rule.bat
-   ```
-
-4. Windows service
-
-   Install:
-   ```bash
-   cd /d {path to extracted directory}
-   scripts/install-service.bat
-   scripts/autostart-service.bat
-   ```
-
-   Uninstall:
-   ```bash
-   cd /d {path to extracted directory}
-   scripts/uninstall-service.bat
-   ```
-
 ## Initial Setup
 After installation, some initial setup is required.
 
-### FreeBSD
-
-#### Virtual Input Devices
-
-> [!IMPORTANT]
-> To use virtual input devices (keyboard, mouse, gamepads), you must add your user to the `input` group.
-
-The installation process creates the `input` group and configures permissions for `/dev/uinput`.
-To allow your user to create virtual input devices, run:
-
-```bash
-pw groupmod input -m $USER
-```
-
-After adding yourself to the group, log out and log back in for the changes to take effect.
-
-### Linux
-
-#### Services
+### Services
 
 **Start once**
 ```bash
@@ -454,49 +300,24 @@ systemctl --user --now enable app-dev.lizardbyte.app.Sunshine
 
 > [!NOTE]
 > The service has been renamed to "app-dev.lizardbyte.app.Sunshine" in order to increase compatibility with
-> XDG Desktop Portal, but it is also aliased to "sunshine.service" for convenience.
-
-### macOS
-The first time you start Sunshine, you will be asked to grant access to screen recording and your microphone.
-
-Sunshine supports native system audio capture on macOS 14.0 (Sonoma) and newer via Apple’s Audio Tap API.
-To use it, simply leave the **Audio Sink** setting blank.
-
-If you prefer to manage your own loopback device, you can still use
-[Soundflower](https://github.com/mattingalls/Soundflower) or
-[BlackHole](https://github.com/ExistentialAudio/BlackHole)
-and enter its device name in the [audio_sink](configuration.md#audio_sink) field.
-
-> [!NOTE]
-> Command Keys are not forwarded by Moonlight. Right Option-Key is mapped to CMD-Key.
-
-> [!CAUTION]
-> Gamepads are not currently supported.
-
-### Windows
-In order for virtual gamepads to work, you must install ViGEmBus. You can do this from the troubleshooting tab
-in the web UI, as long as you are running Sunshine as a service or as an administrator. After installation, it is
-recommended to restart your computer.
-
-![ViGEmBus Installation](images/vigembus-installer.png)
+> XDG Desktop Portal, but it is also aliased to "prism.service" for convenience.
 
 ## Usage
 
 ### Basic usage
-If Sunshine is not installed/running as a service, then start Sunshine with the following command, unless a start
+If Prism is not installed/running as a service, then start Prism with the following command, unless a start
 command is listed in the specified package [install](#install) instructions above.
 
 > [!NOTE]
-> A service is a process that runs in the background. This is the default when installing Sunshine from the
-> Windows installer. Running multiple instances of Sunshine is not advised.
+> A service is a process that runs in the background. Running multiple instances of Prism is not advised.
 
 ```bash
-sunshine
+prism
 ```
 
 ### Specify config file
 ```bash
-sunshine <directory of conf file>/sunshine.conf
+prism <directory of conf file>/prism.conf
 ```
 
 > [!NOTE]
@@ -504,19 +325,19 @@ sunshine <directory of conf file>/sunshine.conf
 > If no config file is entered, the default location will be used.
 > The configuration file specified will be created if it doesn't exist.
 
-### Start Sunshine over SSH (Linux/X11)
+### Start Prism over SSH (X11)
 Assuming you are already logged into the host, you can use this command
 
 ```bash
-ssh <user>@<ip_address> 'export DISPLAY=:0; sunshine'
+ssh <user>@<ip_address> 'export DISPLAY=:0; prism'
 ```
 
 If you are logged into the host with only a tty (teletypewriter), you can use `startx` to start the X server prior to
-executing Sunshine. You nay need to add `sleep` between `startx` and `sunshine` to allow more time for the display to
+executing Prism. You nay need to add `sleep` between `startx` and `prism` to allow more time for the display to
 be ready.
 
 ```bash
-ssh <user>@<ip_address> 'startx &; export DISPLAY=:0; sunshine'
+ssh <user>@<ip_address> 'startx &; export DISPLAY=:0; prism'
 ```
 
 > [!TIP]
@@ -527,7 +348,7 @@ on how to set up a headless streaming server without autologin and dummy plugs (
 
 ### Configuration
 
-Sunshine is configured via the web ui, which is available on [https://localhost:47990](https://localhost:47990)
+Prism is configured via the web ui, which is available on [https://localhost:47990](https://localhost:47990)
 by default. You may replace *localhost* with your internal ip address.
 
 > [!NOTE]
@@ -561,13 +382,13 @@ To get a list of available arguments, run the following command.
 
 @tabs{
    @tab{ General | ```bash
-      sunshine --help
+      prism --help
       ```}
    @tab{ AppImage | ```bash
-      ./sunshine.AppImage --help
+      ./prism.AppImage --help
       ```}
    @tab{ Flatpak | ```bash
-      flatpak run --command=sunshine dev.lizardbyte.app.Sunshine --help
+      flatpak run --command=prism dev.lizardbyte.app.Sunshine --help
       ```}
 }
 
@@ -583,13 +404,10 @@ All shortcuts start with `Ctrl+Alt+Shift`, just like Moonlight.
 * You can use Environment variables in place of values
 * `$(HOME)` will be replaced by the value of `$HOME`
 * `$$` will be replaced by `$`, e.g. `$$(HOME)` will be become `$(HOME)`
-* `env` - Adds or overwrites Environment variables for the commands/applications run by Sunshine.
+* `env` - Adds or overwrites Environment variables for the commands/applications run by Prism.
   This can only be changed by modifying the `apps.json` file directly.
 
 ### Considerations
-* On Windows, Sunshine uses the Desktop Duplication API which only supports capturing from the GPU used for display.
-  If you want to capture and encode on the eGPU, connect a display or HDMI dummy display dongle to it and run the games
-  on that display.
 * When an application is started, if there is an application already running, it will be terminated.
 * If any of the prep-commands fail, starting the application is aborted.
 * When the application has been shutdown, the stream shuts down as well.
@@ -601,20 +419,12 @@ All shortcuts start with `Ctrl+Alt+Shift`, just like Moonlight.
 * The "Desktop" app works the same as any other application except it has no commands. It does not start an application,
   instead it simply starts a stream. If you removed it and would like to get it back, just add a new application with
   the name "Desktop" and "desktop.png" as the image path.
-* For the Linux flatpak you must prepend commands with `flatpak-spawn --host`.
-* If inputs (mouse, keyboard, gamepads...) aren't working after connecting:
-
-  * On FreeBSD/Linux, add the user running sunshine to the `input` group.
-
-* The FreeBSD version of Sunshine is missing some features that are present on Linux.
-  The following are known limitations.
-
-  * Only X11 and Wayland capture are supported
-  * DualSense/DS5 emulation is not available due to missing uhid features
-
+* For the flatpak you must prepend commands with `flatpak-spawn --host`.
+* If inputs (mouse, keyboard, gamepads...) aren't working after connecting, add the user running prism to the
+  `input` group.
 
 ### HDR Support
-Streaming HDR content is officially supported on Windows hosts and experimentally supported for Linux hosts.
+Streaming HDR content is experimentally supported on Linux hosts.
 
 * General HDR support information and requirements:
 
@@ -631,22 +441,12 @@ Streaming HDR content is officially supported on Windows hosts and experimentall
 
 Additional information:
 
-@tabs{
-  @tab{ Windows |
-  - HDR streaming is supported for Intel, AMD, and NVIDIA GPUs that support encoding HEVC Main 10 or AV1 10-bit profiles.
-  - We recommend calibrating the display by streaming the Windows HDR Calibration app to your client device and saving an HDR calibration profile to use while streaming.
-  - Older games that use NVIDIA-specific NVAPI HDR rather than native Windows HDR support may not display properly in HDR.
-  }
+- HDR streaming is supported for Intel and AMD GPUs that support encoding HEVC Main 10 or AV1 10-bit profiles using VAAPI.
+- The KMS capture backend is required for HDR capture. Other capture methods, like NvFBC or X11, do not support HDR.
+- You will need a desktop environment with a compositor that supports HDR rendering, such as Gamescope or KDE Plasma 6.
 
-@tab{ Linux |
-  - HDR streaming is supported for Intel and AMD GPUs that support encoding HEVC Main 10 or AV1 10-bit profiles using VAAPI.
-  - The KMS capture backend is required for HDR capture. Other capture methods, like NvFBC or X11, do not support HDR.
-  - You will need a desktop environment with a compositor that supports HDR rendering, such as Gamescope or KDE Plasma 6.
-
-  @seealso{[Arch wiki on HDR Support for Linux](https://wiki.archlinux.org/title/HDR_monitor_support) and
-  [Reddit Guide for HDR Support for AMD GPUs](https://www.reddit.com/r/linux_gaming/comments/10m2gyx/guide_alpha_test_hdr_on_linux)}
-  }
-}
+@seealso{[Arch wiki on HDR Support for Linux](https://wiki.archlinux.org/title/HDR_monitor_support) and
+[Reddit Guide for HDR Support for AMD GPUs](https://www.reddit.com/r/linux_gaming/comments/10m2gyx/guide_alpha_test_hdr_on_linux)}
 
 ### Tutorials and Guides
 Tutorial videos are available [here](https://www.youtube.com/playlist?list=PLMYr5_xSeuXAbhxYHz86hA1eCDugoxXY0).

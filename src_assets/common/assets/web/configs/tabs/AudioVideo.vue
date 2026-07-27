@@ -96,13 +96,6 @@ onMounted(async () => {
           <div class="form-text">{{ $t('config.virtual_sink_desc') }}</div>
         </div>
 
-        <!-- Install Steam Audio Drivers -->
-        <Checkbox class="mb-3"
-                  id="install_steam_audio_drivers"
-                  locale-prefix="config"
-                  v-model="config.install_steam_audio_drivers"
-                  default="true"
-        ></Checkbox>
       </template>
     </PlatformLayout>
 

@@ -4,7 +4,7 @@
 Starting with v0.18.0, tag names have changed. You may no longer use `latest`, `master`, `vX.X.X`.
 
 ## Build your own containers
-This image provides a method for you to easily use the latest Sunshine release in your own docker projects. It is not
+This image provides a method for you to easily use the latest Prism release in your own docker projects. It is not
 intended to use as a standalone container at this point, and should be considered experimental.
 
 ```dockerfile
@@ -22,7 +22,7 @@ ENTRYPOINT steam && sunshine
 - commit hash
 
 ### SUNSHINE_OS
-Sunshine images are available with the following tag suffixes, based on their respective base images.
+Prism images are available with the following tag suffixes, based on their respective base images.
 
 - `debian-bookworm`
 - `ubuntu-22.04`
@@ -36,7 +36,7 @@ See all our available tags on [docker hub](https://hub.docker.com/r/lizardbyte/s
 [ghcr](https://github.com/LizardByte/Sunshine/pkgs/container/sunshine/versions) for more info.
 
 ## Where used
-This is a list of docker projects using Sunshine. Something missing? Let us know about it!
+This is a list of docker projects using Prism. Something missing? Let us know about it!
 
 - [Games on Whales](https://games-on-whales.github.io)
 

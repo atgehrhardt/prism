@@ -12,9 +12,7 @@
 #include "src/video.h"
 
 // platform includes
-#if !defined(__FreeBSD__)
-  #include <sys/capability.h>
-#endif
+#include <sys/capability.h>
 
 extern "C" {
 #include <libavutil/pixdesc.h>
@@ -40,12 +38,12 @@ extern "C" {
  */
 #define DRM_FORMAT_MOD_INVALID fourcc_mod_code(0, ((1ULL << 56) - 1))
 
-#if !defined(SUNSHINE_SHADERS_DIR)  // for testing this needs to be defined in cmake as we don't do an install
+#if !defined(PRISM_SHADERS_DIR)  // for testing this needs to be defined in cmake as we don't do an install
   /**
-   * @def SUNSHINE_SHADERS_DIR
-   * @brief Macro for SUNSHINE SHADERS DIR.
+   * @def PRISM_SHADERS_DIR
+   * @brief Macro for PRISM SHADERS DIR.
    */
-  #define SUNSHINE_SHADERS_DIR SUNSHINE_ASSETS_DIR "/shaders/opengl"
+  #define PRISM_SHADERS_DIR PRISM_ASSETS_DIR "/shaders/opengl"
 #endif
 
 using namespace std::literals;
@@ -421,7 +419,6 @@ namespace egl {
    */
   std::optional<ctx_t> make_ctx(display_t::pointer display) {
     bool nice_warning = false;
-#if !defined(__FreeBSD__)
     cap_t caps = cap_get_proc();
 
     cap_value_t sys_nice = CAP_SYS_NICE;
@@ -430,7 +427,6 @@ namespace egl {
       nice_warning = true;
     }
     cap_free(caps);
-#endif
 
     constexpr int conf_attr[] {
       EGL_RENDERABLE_TYPE,
@@ -520,13 +516,11 @@ namespace egl {
 
     gl::ctx.PixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-#if !defined(__FreeBSD__)
     caps = cap_get_proc();
     if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &sys_nice, CAP_CLEAR) || cap_set_proc(caps)) {
       BOOST_LOG(debug) << "Failed to drop CAP_SYS_NICE"sv;
     }
     cap_free(caps);
-#endif
 
     return ctx;
   }
@@ -932,7 +926,7 @@ namespace egl {
     return yuv444;
   }
 
-  void sws_t::apply_colorspace(const video::sunshine_colorspace_t &colorspace, bool is_yuv444) {
+  void sws_t::apply_colorspace(const video::prism_colorspace_t &colorspace, bool is_yuv444) {
     auto color_p = video::color_vectors_from_colorspace(colorspace, true);
 
     std::string_view members[] {
@@ -1021,11 +1015,11 @@ namespace egl {
 
     {
       constexpr std::array<const char *, 5> sources {{
-        SUNSHINE_SHADERS_DIR "/ConvertUV.frag",
-        SUNSHINE_SHADERS_DIR "/ConvertUV.vert",
-        SUNSHINE_SHADERS_DIR "/ConvertY.frag",
-        SUNSHINE_SHADERS_DIR "/Scene.vert",
-        SUNSHINE_SHADERS_DIR "/Scene.frag",
+        PRISM_SHADERS_DIR "/ConvertUV.frag",
+        PRISM_SHADERS_DIR "/ConvertUV.vert",
+        PRISM_SHADERS_DIR "/ConvertY.frag",
+        PRISM_SHADERS_DIR "/Scene.vert",
+        PRISM_SHADERS_DIR "/Scene.frag",
       }};
 
       constexpr std::array<GLenum, 2> shader_type {{
@@ -1125,11 +1119,11 @@ namespace egl {
 
     {
       constexpr std::array<const char *, 5> sources {{
-        SUNSHINE_SHADERS_DIR "/Scene.vert",
-        SUNSHINE_SHADERS_DIR "/ConvertV.frag",
-        SUNSHINE_SHADERS_DIR "/ConvertU.frag",
-        SUNSHINE_SHADERS_DIR "/ConvertY.frag",
-        SUNSHINE_SHADERS_DIR "/Scene.frag",
+        PRISM_SHADERS_DIR "/Scene.vert",
+        PRISM_SHADERS_DIR "/ConvertV.frag",
+        PRISM_SHADERS_DIR "/ConvertU.frag",
+        PRISM_SHADERS_DIR "/ConvertY.frag",
+        PRISM_SHADERS_DIR "/Scene.frag",
       }};
 
       constexpr std::array<GLenum, 2> shader_type {{

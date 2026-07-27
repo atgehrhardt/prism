@@ -20,7 +20,7 @@
  * @def WEB_DIR
  * @brief Macro for WEB DIR.
  */
-#define WEB_DIR SUNSHINE_ASSETS_DIR "/web/"
+#define WEB_DIR PRISM_ASSETS_DIR "/web/"
 
 namespace confighttp {
   constexpr auto PORT_HTTPS = 1;  ///< GameStream port offset for port https.
@@ -91,14 +91,6 @@ namespace confighttp {
    * @return Sorted JSON array of entry objects with name/type/path fields.
    */
   nlohmann::json build_browse_entries(const std::filesystem::path &dir_path, const std::string &type_str);
-
-#ifdef _WIN32
-  /**
-   * @brief Builds a JSON array of available Windows drive letters.
-   * @return JSON array of drive-letter entries.
-   */
-  nlohmann::json get_windows_drives();
-#endif
 }  // namespace confighttp
 
 // mime types map

@@ -5,7 +5,7 @@
 # happens when PRISM_STEAM=1 is set in the environment.
 #
 # Env in:  PRISM_STEAM=0|1 (default 0)
-#          SUNSHINE_CLIENT_WIDTH / HEIGHT / FPS / ENABLE_HDR (set by Sunshine)
+#          PRISM_CLIENT_WIDTH / HEIGHT / FPS / HDR (set by Prism)
 # State out: $XDG_RUNTIME_DIR/prism-headless.state  (KEY=VALUE lines:
 #          steam, wayland_display, x_display)
 set -u
@@ -17,7 +17,7 @@ SOCKET="wayland-prism"
 LOG="$HOME/.local/state/prism-headless.log"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
-echo "=== headless-start $(date -Is) steam=${PRISM_STEAM:-0} client=${SUNSHINE_CLIENT_WIDTH:-?}x${SUNSHINE_CLIENT_HEIGHT:-?}@${SUNSHINE_CLIENT_FPS:-?} ==="
+echo "=== headless-start $(date -Is) steam=${PRISM_STEAM:-0} client=${PRISM_CLIENT_WIDTH:-?}x${PRISM_CLIENT_HEIGHT:-?}@${PRISM_CLIENT_FPS:-?} ==="
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
@@ -25,7 +25,7 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 exec 9>"$RUNTIME/prism-headless.lock"
 flock -x 9
 
-# 0. Recover from a previous session that was never torn down (e.g. sunshine
+# 0. Recover from a previous session that was never torn down (e.g. prism
 # crashed): a leftover gamescope would fight the new one for the session.
 if [ -f "$STATE" ]; then
   echo "found stale state file; tearing down previous headless session"
@@ -73,6 +73,21 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     pgrep -x steamwebhelper >/dev/null && sleep 0.5 && continue
     break
   done
+  # Graceful shutdown can lose the race against a desktop steam that is still
+  # initializing (e.g. just relaunched by the stop script) or a pile of helper
+  # processes: escalate to a hard kill so the session steam never inherits the
+  # single-instance lock or fossilize shader-cache state (games would then hang
+  # at "Processing Vulkan shaders").
+  if pgrep -x steam >/dev/null || pgrep -x steamwebhelper >/dev/null; then
+    echo "desktop steam survived graceful shutdown; force killing"
+    pkill -9 -x steam 2>/dev/null || true
+    pkill -9 -x steamwebhelper 2>/dev/null || true
+    for _ in $(seq 1 20); do
+      pgrep -x steam >/dev/null && sleep 0.5 && continue
+      pgrep -x steamwebhelper >/dev/null && sleep 0.5 && continue
+      break
+    done
+  fi
   pgrep -x steam >/dev/null && echo "WARNING: desktop steam still running; session launch may misroute"
 fi
 
@@ -87,9 +102,9 @@ if [ ! -S "$RUNTIME/$SOCKET" ]; then
 fi
 
 # 3. Size the headless output to the client's requested mode.
-W="${SUNSHINE_CLIENT_WIDTH:-1920}"
-H="${SUNSHINE_CLIENT_HEIGHT:-1080}"
-FPS="${SUNSHINE_CLIENT_FPS:-60}"
+W="${PRISM_CLIENT_WIDTH:-1920}"
+H="${PRISM_CLIENT_HEIGHT:-1080}"
+FPS="${PRISM_CLIENT_FPS:-60}"
 export WAYLAND_DISPLAY="$SOCKET"
 for _ in $(seq 1 40); do
   [ -S "$RUNTIME/$SOCKET" ] && break
@@ -99,9 +114,9 @@ if command -v wlr-randr >/dev/null; then
   wlr-randr --output HEADLESS-1 --custom-mode "${W}x${H}@${FPS}" 2>/dev/null || true
 fi
 
-# 3a. Dedicated capture sink Sunshine is pointed at (audio_sink=prism-stream).
-# Sunshine captures this sink's monitor; each capture mode routes the right
-# audio into it. Create it up front so it exists before Sunshine's audio init.
+# 3a. Dedicated capture sink Prism is pointed at (audio_sink=prism-stream).
+# Prism captures this sink's monitor; each capture mode routes the right
+# audio into it. Create it up front so it exists before Prism's audio init.
 if ! pactl list short sinks 2>/dev/null | grep -q '^[0-9]*[[:space:]]prism-stream[[:space:]]'; then
   pactl load-module module-null-sink sink_name=prism-stream \
     sink_properties=device.description="Prism Stream Capture" >/dev/null 2>&1 || true
@@ -109,8 +124,8 @@ fi
 
 # 3b. Dedicated audio sink for the headless session. Session apps get
 # PULSE_SINK=prism-headless so only their audio is captured; the background
-# guard loops this sink into Sunshine's capture sink and keeps the desktop's
-# default sink on the physical output (Sunshine switches it at stream start).
+# guard loops this sink into Prism's capture sink and keeps the desktop's
+# default sink on the physical output (Prism switches it at stream start).
 PHYSICAL_SINK="$(pactl get-default-sink 2>/dev/null || true)"
 pactl load-module module-null-sink sink_name=prism-headless \
   sink_properties=device.description="Prism Headless Session" >/dev/null 2>&1 || true
@@ -123,13 +138,16 @@ setsid "$(dirname "$0")/prism-headless-audio.sh" "$PHYSICAL_SINK" >>"$LOG" 2>&1 
 # --rt asks for realtime scheduling, which reduces frame-pacing jitter on the
 # compositor thread; gamescope degrades gracefully when rtkit/CAP_SYS_NICE is
 # unavailable, so this is safe everywhere.
+# -w/-h (internal/game resolution) must match -W/-H (output): without them
+# gamescope renders at its 1280x720/1080p default and merely upscales, so
+# Steam and games report 1080p even though the stream captures 1440p.
 GAMESCOPE_FLAGS=(--adaptive-sync --rt)
-if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
+if [ "${PRISM_CLIENT_HDR:-false}" = "true" ]; then
   GAMESCOPE_FLAGS+=(--hdr-enabled)
 fi
 if [ "${PRISM_STEAM:-0}" = "1" ]; then
   if [ -n "${PRISM_STEAM_APP_ID:-}" ]; then
-    # Direct game launch (PRISM_STEAM_APP_ID, set by Sunshine for synced Steam
+    # Direct game launch (PRISM_STEAM_APP_ID, set by Prism for synced Steam
     # game apps): lightweight session — a plain Steam client (visible, per user
     # preference; no Deck UI flags), no mangoapp. The app command
     # (prism-steam-game.sh) launches the game and exits with it.
@@ -175,7 +193,7 @@ fi
 GS_BEFORE="$(find "$RUNTIME" -maxdepth 1 -name 'gamescope-*' -printf '%f ' 2>/dev/null)"
 X_BEFORE="$(find /tmp/.X11-unix -maxdepth 1 -name 'X*' -printf '%f ' 2>/dev/null | tr -d 'X')"
 setsid env WAYLAND_DISPLAY="$SOCKET" XDG_SESSION_TYPE=wayland PULSE_SINK=prism-headless \
-  gamescope -W "$W" -H "$H" -r "$FPS" -e -f "${GAMESCOPE_FLAGS[@]}" \
+  gamescope -w "$W" -h "$H" -W "$W" -H "$H" -r "$FPS" -e -f "${GAMESCOPE_FLAGS[@]}" \
   -- "${SESSION_CMD[@]}" >>"$LOG" 2>&1 9>&- &
 
 # 5. Discover the gamescope session sockets and record state for the app

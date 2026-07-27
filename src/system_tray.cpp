@@ -3,50 +3,28 @@
  * @brief Definitions for the system tray icon and notification system.
  */
 // macros
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+#if defined PRISM_TRAY && PRISM_TRAY >= 1
 
-  #if defined(_WIN32)
-    /**
-     * @def WIN32_LEAN_AND_MEAN
-     * @brief Macro for WIN32 LEAN AND MEAN.
-     */
-    #define WIN32_LEAN_AND_MEAN
-    #include <accctrl.h>
-    #include <aclapi.h>
-    /**
-     * @def TRAY_ICON
-     * @brief Macro for TRAY ICON.
-     */
-    #define TRAY_ICON WEB_DIR "images/logo-prism.ico"
-    /**
-     * @def TRAY_ICON_PLAYING
-     * @brief Macro for TRAY ICON PLAYING.
-     */
-    #define TRAY_ICON_PLAYING WEB_DIR "images/prism-playing.ico"
-    /**
-     * @def TRAY_ICON_PAUSING
-     * @brief Macro for TRAY ICON PAUSING.
-     */
-    #define TRAY_ICON_PAUSING WEB_DIR "images/prism-pausing.ico"
-    /**
-     * @def TRAY_ICON_LOCKED
-     * @brief Macro for TRAY ICON LOCKED.
-     */
-    #define TRAY_ICON_LOCKED WEB_DIR "images/prism-locked.ico"
-  #elif defined(__linux__) || defined(linux) || defined(__linux) || defined(__FreeBSD__)
-    #define TRAY_ICON WEB_DIR "images/logo-prism.svg"
-    #define TRAY_ICON_PLAYING WEB_DIR "images/prism-playing.svg"
-    #define TRAY_ICON_PAUSING WEB_DIR "images/prism-pausing.svg"
-    #define TRAY_ICON_LOCKED WEB_DIR "images/prism-locked.svg"
-  #elif defined(__APPLE__) || defined(__MACH__)
-    #define TRAY_ICON WEB_DIR "images/logo-sunshine-16.png"
-    #define TRAY_ICON_PLAYING WEB_DIR "images/sunshine-playing-16.png"
-    #define TRAY_ICON_PAUSING WEB_DIR "images/sunshine-pausing-16.png"
-    #define TRAY_ICON_LOCKED WEB_DIR "images/sunshine-locked-16.png"
-    #include <CoreFoundation/CoreFoundation.h>
-    #include <dispatch/dispatch.h>
-    #include <unordered_map>
-  #endif
+  /**
+   * @def TRAY_ICON
+   * @brief Macro for TRAY ICON.
+   */
+  #define TRAY_ICON WEB_DIR "images/logo-prism.svg"
+  /**
+   * @def TRAY_ICON_PLAYING
+   * @brief Macro for TRAY ICON PLAYING.
+   */
+  #define TRAY_ICON_PLAYING WEB_DIR "images/prism-playing.svg"
+  /**
+   * @def TRAY_ICON_PAUSING
+   * @brief Macro for TRAY ICON PAUSING.
+   */
+  #define TRAY_ICON_PAUSING WEB_DIR "images/prism-pausing.svg"
+  /**
+   * @def TRAY_ICON_LOCKED
+   * @brief Macro for TRAY ICON LOCKED.
+   */
+  #define TRAY_ICON_LOCKED WEB_DIR "images/prism-locked.svg"
 
   // standard includes
   #include <atomic>
@@ -92,9 +70,8 @@ namespace system_tray {
     platf::open_url("https://www.paypal.com/paypalme/ReenigneArcher");
   }
 
-  #if defined(__linux__) || defined(linux) || defined(__linux) || defined(__FreeBSD__)
   /**
-   * @brief Forwards Qt log messages to Sunshine's BOOST_LOG logger.
+   * @brief Forwards Qt log messages to Prism's BOOST_LOG logger.
    * @param level Log level: 0=debug, 1=info, 2=warning, 3=error.
    * @param msg The message string from Qt.
    */
@@ -117,7 +94,6 @@ namespace system_tray {
         break;
     }
   }
-  #endif
 
   void tray_reset_display_device_config_cb([[maybe_unused]] struct tray_menu *item) {
     BOOST_LOG(info) << "Resetting display device config from system tray"sv;
@@ -134,16 +110,7 @@ namespace system_tray {
   void tray_quit_cb([[maybe_unused]] struct tray_menu *item) {
     BOOST_LOG(info) << "Quitting from system tray"sv;
 
-  #ifdef _WIN32
-    // If we're running in a service, return a special status to
-    // tell it to terminate too, otherwise it will just respawn us.
-    if (GetConsoleWindow() == nullptr) {
-      lifetime::exit_sunshine(ERROR_SHUTDOWN_IN_PROGRESS, true);
-      return;
-    }
-  #endif
-
-    lifetime::exit_sunshine(0, true);
+    lifetime::exit_prism(0, true);
   }
 
   // Tray menu
@@ -164,10 +131,6 @@ namespace system_tray {
              {.text = nullptr}
            }},
         {.text = "-"},
-  // Currently display device settings are only supported on Windows
-  #ifdef _WIN32
-        {.text = "Reset Display Device Config", .cb = tray_reset_display_device_config_cb},
-  #endif
         {.text = "Restart", .cb = tray_restart_cb},
         {.text = "Quit", .cb = tray_quit_cb},
         {.text = nullptr}
@@ -176,140 +139,8 @@ namespace system_tray {
     .allIconPaths = {TRAY_ICON, TRAY_ICON_LOCKED, TRAY_ICON_PLAYING, TRAY_ICON_PAUSING},
   };
 
-  /**
-   * @brief Get resource path.
-   *
-   * @param relativePath Relative path.
-   * @return Absolute path to the resource file for the current platform bundle layout.
-   */
-  const char *GetResourcePath(const char *relativePath) {
-  #ifdef __APPLE__
-    if (!relativePath || !*relativePath) {
-      return nullptr;
-    }
-
-    // Simple cache ensures our string pointers live forever
-    static std::unordered_map<std::string, std::string> g_cache;
-    auto search = g_cache.find(relativePath);
-    if (search != g_cache.end()) {
-      return search->second.c_str();
-    }
-
-    // If we're running from an .app bundle, get the internal Resources dir
-    CFBundleRef bundle = CFBundleGetMainBundle();
-    if (!bundle) {
-      return relativePath;
-    }
-
-    CFURLRef resourcesURL = CFBundleCopyResourcesDirectoryURL(bundle);
-    if (!resourcesURL) {
-      return relativePath;
-    }
-
-    char resourcesPath[PATH_MAX];
-    bool ok = CFURLGetFileSystemRepresentation(
-      resourcesURL,
-      true,
-      reinterpret_cast<UInt8 *>(resourcesPath),
-      sizeof(resourcesPath)
-    );
-    CFRelease(resourcesURL);
-    if (!ok) {
-      return relativePath;
-    }
-
-    std::string full;
-    if (relativePath && relativePath[0] == '/') {
-      full = relativePath;
-    } else {
-      full = std::string(resourcesPath) + "/" + relativePath;
-    }
-
-    BOOST_LOG(debug) << "System Tray: using " << full << " for icon path";
-
-    auto [it, inserted] = g_cache.emplace(relativePath, std::move(full));
-    return it->second.c_str();
-  #else
-    return relativePath;
-  #endif
-  }
-
   int init_tray() {
-  #ifdef _WIN32
-    // If we're running as SYSTEM, Explorer.exe will not have permission to open our thread handle
-    // to monitor for thread termination. If Explorer fails to open our thread, our tray icon
-    // will persist forever if we terminate unexpectedly. To avoid this, we will modify our thread
-    // DACL to add an ACE that allows SYNCHRONIZE access to Everyone.
-    {
-      PACL old_dacl;
-      PSECURITY_DESCRIPTOR sd;
-      auto error = GetSecurityInfo(GetCurrentThread(), SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, &old_dacl, nullptr, &sd);
-      if (error != ERROR_SUCCESS) {
-        BOOST_LOG(warning) << "GetSecurityInfo() failed: "sv << error;
-        return 1;
-      }
-
-      auto free_sd = util::fail_guard([sd]() {
-        LocalFree(sd);
-      });
-
-      SID_IDENTIFIER_AUTHORITY sid_authority = SECURITY_WORLD_SID_AUTHORITY;
-      PSID world_sid;
-      if (!AllocateAndInitializeSid(&sid_authority, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, &world_sid)) {
-        error = GetLastError();
-        BOOST_LOG(warning) << "AllocateAndInitializeSid() failed: "sv << error;
-        return 1;
-      }
-
-      auto free_sid = util::fail_guard([world_sid]() {
-        FreeSid(world_sid);
-      });
-
-      EXPLICIT_ACCESS ea {};
-      ea.grfAccessPermissions = SYNCHRONIZE;
-      ea.grfAccessMode = GRANT_ACCESS;
-      ea.grfInheritance = NO_INHERITANCE;
-      ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-      ea.Trustee.ptstrName = (LPSTR) world_sid;
-
-      PACL new_dacl;
-      error = SetEntriesInAcl(1, &ea, old_dacl, &new_dacl);
-      if (error != ERROR_SUCCESS) {
-        BOOST_LOG(warning) << "SetEntriesInAcl() failed: "sv << error;
-        return 1;
-      }
-
-      auto free_new_dacl = util::fail_guard([new_dacl]() {
-        LocalFree(new_dacl);
-      });
-
-      error = SetSecurityInfo(GetCurrentThread(), SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION, nullptr, nullptr, new_dacl, nullptr);
-      if (error != ERROR_SUCCESS) {
-        BOOST_LOG(warning) << "SetSecurityInfo() failed: "sv << error;
-        return 1;
-      }
-    }
-
-    // Wait for the shell to be initialized before registering the tray icon.
-    // This ensures the tray icon works reliably after a logoff/logon cycle.
-    while (GetShellWindow() == nullptr) {
-      Sleep(1000);
-    }
-  #endif
-
-  #ifdef __APPLE__
-    // if these icon paths are relative, resolve to internal .app Resources path
-    tray.allIconPaths[0] = GetResourcePath(TRAY_ICON);
-    tray.allIconPaths[1] = GetResourcePath(TRAY_ICON_LOCKED);
-    tray.allIconPaths[2] = GetResourcePath(TRAY_ICON_PLAYING);
-    tray.allIconPaths[3] = GetResourcePath(TRAY_ICON_PAUSING);
-
-    tray.icon = tray.allIconPaths[0];
-  #endif
-
-  #if defined(__linux__) || defined(linux) || defined(__linux) || defined(__FreeBSD__)
     tray_set_log_callback(qt_log_to_boost);
-  #endif
 
     tray_set_app_info(PROJECT_NAME, PROJECT_NAME, PROJECT_FQDN);
 

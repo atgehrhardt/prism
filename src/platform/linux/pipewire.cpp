@@ -30,13 +30,13 @@ constexpr int SPA_VIDEO_TRANSFER_SMPTE2084 = 14;  ///< Protocol or platform cons
 
 #if PW_CHECK_VERSION(0, 3, 75)
 // Runtime linked library version checks are available. Check for pipewire 0.3.64 which documented object serial support and deprecated node id.
-const bool SUNSHINE_USE_PIPEWIRE_OBJECT_SERIAL = pw_check_library_version(0, 3, 64);
+const bool PRISM_USE_PIPEWIRE_OBJECT_SERIAL = pw_check_library_version(0, 3, 64);
 #elifdef PW_KEY_TARGET_OBJECT
 // Runtime linked library version checks are UNAVAILABLE but necessary PW_KEY_TARGET_OBJECT for object serial support is available.
-constexpr bool SUNSHINE_USE_PIPEWIRE_OBJECT_SERIAL = true;
+constexpr bool PRISM_USE_PIPEWIRE_OBJECT_SERIAL = true;
 #else
 // Pipewire object serials are unsupported without PW_KEY_TARGET_OBJECT (we define it here so compilation won't break but don't use it).
-constexpr bool SUNSHINE_USE_PIPEWIRE_OBJECT_SERIAL = false;  ///< Whether PipeWire object serials should be used for matching.
+constexpr bool PRISM_USE_PIPEWIRE_OBJECT_SERIAL = false;  ///< Whether PipeWire object serials should be used for matching.
   /**
    * @def PW_KEY_TARGET_OBJECT
    * @brief Macro for PW KEY TARGET OBJECT.
@@ -56,7 +56,7 @@ using namespace std::literals;
 
 namespace pipewire {
   /**
-   * @brief PipeWire SPA format mapped to Sunshine pixel format.
+   * @brief PipeWire SPA format mapped to Prism pixel format.
    */
   struct format_map_t {
     uint64_t fourcc;  ///< DRM fourcc pixel format.
@@ -292,7 +292,7 @@ namespace pipewire {
         struct pw_properties *props = pw_properties_new(PW_KEY_MEDIA_TYPE, "Video", PW_KEY_MEDIA_CATEGORY, "Capture", PW_KEY_MEDIA_ROLE, "Screen", nullptr);
 
         BOOST_LOG(debug) << "[pipewire] Create PW stream"sv;
-        stream_data.stream = pw_stream_new(core, "Sunshine Video Capture", props);
+        stream_data.stream = pw_stream_new(core, "Prism Video Capture", props);
         pw_stream_add_listener(stream_data.stream, &stream_data.stream_listener, &stream_events, &stream_data);
 
         std::array<uint8_t, SPA_POD_BUFFER_SIZE> buffer;
@@ -324,7 +324,7 @@ namespace pipewire {
         }
 
         // Connection via pipewire object serial if it is supported and the serial is valid (lower 32-bits != SPA_ID_INVALID, see also PW_KEY_OBJECT_SERIAL docs)
-        if (SUNSHINE_USE_PIPEWIRE_OBJECT_SERIAL && (object_serial & SPA_ID_INVALID) != SPA_ID_INVALID) {
+        if (PRISM_USE_PIPEWIRE_OBJECT_SERIAL && (object_serial & SPA_ID_INVALID) != SPA_ID_INVALID) {
           pw_properties_setf(props, PW_KEY_TARGET_OBJECT, "%" PRIu64, object_serial);
           BOOST_LOG(debug) << "[pipewire] Connect PW stream - fd: "sv << fd << " object serial: "sv << object_serial;
           result = pw_stream_connect(stream_data.stream, PW_DIRECTION_INPUT, PW_ID_ANY, (enum pw_stream_flags)(PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS), params.data(), n_params);
@@ -361,7 +361,7 @@ namespace pipewire {
     }
 
     /**
-     * @brief Copy PipeWire metadata into the Sunshine image descriptor.
+     * @brief Copy PipeWire metadata into the Prism image descriptor.
      *
      * @param img_descriptor Image descriptor receiving timestamps, sequence, and damage flags.
      * @param buf Raw byte buffer used for serialization.
@@ -388,7 +388,7 @@ namespace pipewire {
     }
 
     /**
-     * @brief Populate a Sunshine image descriptor from PipeWire DMA-BUF planes.
+     * @brief Populate a Prism image descriptor from PipeWire DMA-BUF planes.
      *
      * @param img_descriptor Image descriptor receiving duplicated fds and plane layout.
      * @param buf Raw byte buffer used for serialization.
@@ -407,7 +407,7 @@ namespace pipewire {
     }
 
     /**
-     * @brief Copy the latest PipeWire frame into Sunshine's image buffer.
+     * @brief Copy the latest PipeWire frame into Prism's image buffer.
      *
      * @param img Image or frame object to read from or populate.
      */
@@ -1022,23 +1022,23 @@ namespace pipewire {
     /**
      * @brief Create AVCodec encode device.
      *
-     * @param pix_fmt Sunshine pixel format to convert or allocate for.
+     * @param pix_fmt Prism pixel format to convert or allocate for.
      * @return Constructed AVCodec encode device object.
      */
     std::unique_ptr<platf::avcodec_encode_device_t> make_avcodec_encode_device(platf::pix_fmt_e pix_fmt) override {
-#ifdef SUNSHINE_BUILD_VAAPI
+#ifdef PRISM_BUILD_VAAPI
       if (mem_type == platf::mem_type_e::vaapi) {
         return va::make_avcodec_encode_device(width, height, n_dmabuf_infos > 0);
       }
 #endif
 
-#ifdef SUNSHINE_BUILD_VULKAN
+#ifdef PRISM_BUILD_VULKAN
       if (mem_type == platf::mem_type_e::vulkan && n_dmabuf_infos > 0) {
         return vk::make_avcodec_encode_device_vram(width, height, 0, 0);
       }
 #endif
 
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
       if (mem_type == platf::mem_type_e::cuda) {
         if (display_is_nvidia && n_dmabuf_infos > 0) {
           // Display GPU is NVIDIA - can use DMA-BUF directly

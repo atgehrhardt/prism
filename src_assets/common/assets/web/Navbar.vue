@@ -1,6 +1,6 @@
 <template>
   <div>
-    <nav class="navbar navbar-expand-lg navbar-sunshine">
+    <nav class="navbar navbar-expand-lg navbar-prism">
       <div class="container-fluid">
         <a class="navbar-brand" href="./" title="Prism">
           <img src="/images/logo-prism-45.png" height="45" alt="Prism">
@@ -98,7 +98,7 @@ export default {
   },
   mounted() {
     const currentPath = globalThis.location.pathname.replace(/\/$/, '') || '/'
-    const links = document.querySelectorAll('.navbar-sunshine a[href]')
+    const links = document.querySelectorAll('.navbar-prism a[href]')
 
     for (const link of links) {
       const href = link.getAttribute('href')
@@ -123,7 +123,7 @@ export default {
         globalThis.location.replace(logoutPageUrl.toString())
       }
 
-      request.open('GET', '/', true, 'sunshine-logout', cacheBuster)
+      request.open('GET', '/', true, 'prism-logout', cacheBuster)
       request.setRequestHeader('Cache-Control', 'no-store')
       request.onload = finish
       request.onerror = finish
@@ -137,7 +137,7 @@ export default {
 
 <style>
 /* Navbar toggler icon for dark text on light background */
-.navbar-sunshine .navbar-toggler-icon {
+.navbar-prism .navbar-toggler-icon {
   --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
 }
 </style>

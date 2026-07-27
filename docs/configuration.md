@@ -8,14 +8,14 @@ By providing the host authority (URI + port), you can easily open each configura
 @endhtmlonly
 }
 
-Sunshine will work with the default settings for most users. In some cases you may want to configure Sunshine further.
+Prism will work with the default settings for most users. In some cases you may want to configure Prism further.
 
 The default location for the configuration file is listed below. You can use another location if you
-choose, by passing in the full configuration file path as the first argument when you start Sunshine.
+choose, by passing in the full configuration file path as the first argument when you start Prism.
 
 **Example**
 ```bash
-sunshine ~/sunshine_config.conf
+prism ~/prism_config.conf
 ```
 
 The default location of the `apps.json` is the same as the configuration file. You can use a custom
@@ -23,15 +23,12 @@ location by modifying the configuration file.
 
 **Default Config Directory**
 
-| OS      | Location                                        |
-|---------|-------------------------------------------------|
-| Docker  | @code{}/config@endcode                          |
-| FreeBSD | @code{}~/.config/sunshine@endcode               |
-| Linux   | @code{}~/.config/sunshine@endcode               |
-| macOS   | @code{}~/.config/sunshine@endcode               |
-| Windows | @code{}%ProgramFiles%\\Sunshine\\config@endcode |
+| OS     | Location                       |
+|--------|--------------------------------|
+| Docker | @code{}/config@endcode         |
+| Linux  | @code{}~/.config/prism@endcode |
 
-Although it is recommended to use the configuration UI, it is possible manually configure Sunshine by
+Although it is recommended to use the configuration UI, it is possible manually configure Prism by
 editing the `conf` file in a text editor. Use the examples as reference.
 
 ## General
@@ -42,7 +39,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            The locale used for Sunshine's user interface.
+            The locale used for Prism's user interface.
         </td>
     </tr>
     <tr>
@@ -178,7 +175,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
-### sunshine_name
+### prism_name
 
 <table>
     <tr>
@@ -194,7 +191,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            sunshine_name = Sunshine
+            prism_name = Prism
             @endcode</td>
     </tr>
 </table>
@@ -283,7 +280,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Whether to be notified of new pre-release versions of Sunshine.
+            Whether to be notified of new pre-release versions of Prism.
         </td>
     </tr>
     <tr>
@@ -370,30 +367,19 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="6">Choices</td>
-        <td>ds4</td>
-        <td>DualShock 4 controller (PS4)
-            @note{This option applies to Windows only.}</td>
-    </tr>
-    <tr>
         <td>ds5</td>
         <td>DualShock 5 controller (PS5)
-            @note{This option applies to FreeBSD and Linux only.}</td>
+            @note{This option applies to Linux only.}</td>
     </tr>
     <tr>
         <td>switch</td>
         <td>Switch Pro controller
-            @note{This option applies to FreeBSD and Linux only.}</td>
-    </tr>
-    <tr>
-        <td>x360</td>
-        <td>Xbox 360 controller
-            @note{This option applies to Windows only.}</td>
+            @note{This option applies to Linux only.}</td>
     </tr>
     <tr>
         <td>xone</td>
         <td>Xbox One controller
-            @note{This option applies to FreeBSD and Linux only.}</td>
+            @note{This option applies to Linux only.}</td>
     </tr>
 </table>
 
@@ -598,44 +584,13 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
-### always_send_scancodes
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Sending scancodes enhances compatibility with games and apps but may result in incorrect keyboard input
-            from certain clients that aren't using a US English keyboard layout.
-            <br>
-            <br>
-            Enable if keyboard input is not working at all in certain applications.
-            <br>
-            <br>
-            Disable if keys on the client are generating the wrong input on the host.
-            @caution{Applies to Windows only.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            enabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            always_send_scancodes = enabled
-            @endcode</td>
-    </tr>
-</table>
-
 ### key_rightalt_to_key_win
 
 <table>
     <tr>
         <td>Description</td>
         <td colspan="2">It may be possible that you cannot send the Windows Key from Moonlight directly. In those cases it may be useful to
-            make Sunshine think the Right Alt key is the Windows key.
+            make Prism think the Right Alt key is the Windows key.
             </td>
     </tr>
     <tr>
@@ -658,7 +613,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">Moonlight on Android sends the Escape key when the back button is pressed. When enabled,
-            Sunshine will press the Guide button on the first allocated virtual gamepad instead of sending Escape
+            Prism will press the Guide button on the first allocated virtual gamepad instead of sending Escape
             to the host. If no gamepad is allocated, Escape is sent normally.
             </td>
     </tr>
@@ -705,7 +660,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            When enabled, Sunshine will pass through high resolution scroll events from Moonlight clients.
+            When enabled, Prism will pass through high resolution scroll events from Moonlight clients.
             <br>
             This can be useful to disable for older applications that scroll too fast with high resolution scroll
             events.
@@ -731,7 +686,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            When enabled, Sunshine will pass through native pen/touch events from Moonlight clients.
+            When enabled, Prism will pass through native pen/touch events from Moonlight clients.
             <br>
             This can be useful to disable for older applications without native pen/touch support.
         </td>
@@ -798,37 +753,20 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @tip{To find the name of the audio sink follow these instructions.
             <br>
             <br>
-            **FreeBSD/Linux + pulseaudio:**
+            **Linux + pulseaudio:**
             <br>
             @code{}
             pacmd list-sinks | grep "name:"
             @endcode
             <br>
             <br>
-            **FreeBSD/Linux + pipewire:**
+            **Linux + pipewire:**
             <br>
             @code{}
             pactl info | grep Source
             # in some causes you'd need to use the `Sink` device, if `Source` doesn't work, so try:
             pactl info | grep Sink
             @endcode
-            <br>
-            <br>
-            **macOS:**
-            <br>
-            Sunshine can only access microphones on macOS due to system limitations.
-            To stream system audio use
-            [Soundflower](https://github.com/mattingalls/Soundflower) or
-            [BlackHole](https://github.com/ExistentialAudio/BlackHole).
-            <br>
-            <br>
-            **Windows:**
-            <br>
-            Enter the following command in command prompt or PowerShell.
-            @code{}
-            %ProgramFiles%\Sunshine\tools\audio-info.exe
-            @endcode
-            If you have multiple audio devices with identical names, use the Device ID instead.
             }
             @attention{If you want to mute the host speakers, use
             [virtual_sink](#virtual_sink) instead.}
@@ -836,24 +774,12 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>Default</td>
-        <td colspan="2">Sunshine will select the default audio device.</td>
+        <td colspan="2">Prism will select the default audio device.</td>
     </tr>
     <tr>
-        <td>Example (FreeBSD/Linux)</td>
+        <td>Example (Linux)</td>
         <td colspan="2">@code{}
             audio_sink = alsa_output.pci-0000_09_00.3.analog-stereo
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example (macOS)</td>
-        <td colspan="2">@code{}
-            audio_sink = BlackHole 2ch
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example (Windows)</td>
-        <td colspan="2">@code{}
-            audio_sink = Speakers (High Definition Audio Device)
             @endcode</td>
     </tr>
 </table>
@@ -864,15 +790,13 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            The audio device that's virtual, like Steam Streaming Speakers. This allows Sunshine to stream audio,
+            The audio device that's virtual, like Steam Streaming Speakers. This allows Prism to stream audio,
             while muting the speakers.
             @tip{See [audio_sink](#audio_sink)!}
             @tip{These are some options for virtual sound devices.
-            * Stream Streaming Speakers (Linux, macOS, Windows)
+            * Steam Streaming Speakers (Linux)
               * Steam must be installed.
-              * Enable [install_steam_audio_drivers](#install_steam_audio_drivers)
-                or use Steam Remote Play at least once to install the drivers.
-            * [Virtual Audio Cable](https://vb-audio.com/Cable) (macOS, Windows)
+              * Use Steam Remote Play at least once to install the drivers.
             }
         </td>
     </tr>
@@ -935,31 +859,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
-### install_steam_audio_drivers
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Installs the Steam Streaming Speakers driver (if Steam is installed) to support surround sound and muting
-            host audio.
-            @note{This option is only supported on Windows.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            enabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            install_steam_audio_drivers = enabled
-            @endcode</td>
-    </tr>
-</table>
-
 ### adapter_name
 
 <table>
@@ -970,7 +869,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @tip{To find the appropriate values follow these instructions.
             <br>
             <br>
-            **FreeBSD/Linux + VA-API:**
+            **Linux + VA-API:**
             <br>
             Unlike with *amdvce* and *nvenc*, it doesn't matter if video encoding is done on a different GPU.
             @code{}
@@ -979,36 +878,19 @@ editing the `conf` file in a text editor. Use the examples as reference.
             vainfo --display drm --device /dev/dri/renderD129 | \
               grep -E "((VAProfileH264High|VAProfileHEVCMain|VAProfileHEVCMain10).*VAEntrypointEncSlice)|Driver version"
             @endcode
-            To be supported by Sunshine, it needs to have at the very minimum:
+            To be supported by Prism, it needs to have at the very minimum:
             `VAProfileH264High   : VAEntrypointEncSlice`
-            <br>
-            <br>
-            **Windows:**
-            <br>
-            Enter the following command in command prompt or PowerShell.
-            @code{}
-            %ProgramFiles%\Sunshine\tools\dxgi-info.exe
-            @endcode
-            For hybrid graphics systems, DXGI reports the outputs are connected to whichever graphics
-            adapter that the application is configured to use, so it's not a reliable indicator of how the
-            display is physically connected.
             }
         </td>
     </tr>
     <tr>
         <td>Default</td>
-        <td colspan="2">Sunshine will select the default video card.</td>
+        <td colspan="2">Prism will select the default video card.</td>
     </tr>
     <tr>
-        <td>Example (FreeBSD/Linux)</td>
+        <td>Example (Linux)</td>
         <td colspan="2">@code{}
             adapter_name = /dev/dri/renderD128
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example (Windows)</td>
-        <td colspan="2">@code{}
-            adapter_name = Radeon RX 580 Series
             @endcode</td>
     </tr>
 </table>
@@ -1023,9 +905,9 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @tip{To find the appropriate values follow these instructions.
             <br>
             <br>
-            **FreeBSD/Linux:**
+            **Linux:**
             <br>
-            During Sunshine startup, you should see the list of detected displays:
+            During Prism startup, you should see the list of detected displays:
             @code{}
             Info: Detecting displays
             Info: Detected display: DVI-D-0 (id: 0) connected: false
@@ -1036,94 +918,17 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode
             It is recommended to use the stable display connector name (text right before the parenthesis, e.g. DP-0) for this value.
             For wlgrab/x11grab and kmsgrab the numeric id value can also be used.
-            <br>
-            <br>
-            **macOS:**
-            <br>
-            During Sunshine startup, you should see the list of detected displays:
-            @code{}
-            Info: Detecting displays
-            Info: Detected display: Monitor-0 (id: 3) connected: true
-            Info: Detected display: Monitor-1 (id: 2) connected: true
-            @endcode
-            You need to use the id value inside the parenthesis, e.g. `3`.
-            <br>
-            <br>
-            **Windows:**
-            <br>
-            During Sunshine startup, you should see the list of detected displays:
-            @code{}
-            Info: Currently available display devices:
-            [
-              {
-                "device_id": "{64243705-4020-5895-b923-adc862c3457e}",
-                "display_name": "",
-                "friendly_name": "IDD HDR",
-                "info": null
-              },
-              {
-                "device_id": "{77f67f3e-754f-5d31-af64-ee037e18100a}",
-                "display_name": "",
-                "friendly_name": "SunshineHDR",
-                "info": null
-              },
-              {
-                "device_id": "{daeac860-f4db-5208-b1f5-cf59444fb768}",
-                "display_name": "\\\\.\\DISPLAY1",
-                "friendly_name": "ROG PG279Q",
-                "info": {
-                  "hdr_state": null,
-                  "origin_point": {
-                    "x": 0,
-                    "y": 0
-                  },
-                  "primary": true,
-                  "refresh_rate": {
-                    "type": "rational",
-                    "value": {
-                      "denominator": 1000,
-                      "numerator": 119998
-                    }
-                  },
-                  "resolution": {
-                    "height": 1440,
-                    "width": 2560
-                  },
-                  "resolution_scale": {
-                    "type": "rational",
-                    "value": {
-                      "denominator": 100,
-                      "numerator": 100
-                    }
-                  }
-                }
-              }
-            ]
-            @endcode
-            You need to use the `device_id` value.
             }
         </td>
     </tr>
     <tr>
         <td>Default</td>
-        <td colspan="2">Sunshine will select the default display.</td>
+        <td colspan="2">Prism will select the default display.</td>
     </tr>
     <tr>
-        <td>Example (FreeBSD/Linux)</td>
+        <td>Example (Linux)</td>
         <td colspan="2">@code{}
             output_name = 0
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example (macOS)</td>
-        <td colspan="2">@code{}
-            output_name = 3
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example (Windows)</td>
-        <td colspan="2">@code{}
-            output_name = {daeac860-f4db-5208-b1f5-cf59444fb768}
             @endcode</td>
     </tr>
 </table>
@@ -1135,7 +940,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Description</td>
         <td colspan="2">
             Perform mandatory verification and additional configuration for the display device.
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1181,7 +985,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td colspan="2">
             Perform additional resolution configuration for the display device.
             @note{"Optimize game settings" must be enabled in Moonlight for this option to work.}
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1217,7 +1020,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td colspan="2">
             Specify manual resolution to be used.
             @note{[dd_resolution_option](#dd_resolution_option) must be set to `manual`}
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1239,7 +1041,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Description</td>
         <td colspan="2">
             Perform additional refresh rate configuration for the display device.
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1275,7 +1076,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td colspan="2">
             Specify manual refresh rate to be used.
             @note{[dd_refresh_rate_option](#dd_refresh_rate_option) must be set to `manual`}
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1285,8 +1085,8 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            dd_manual_resolution = 120
-            dd_manual_resolution = 59.95
+            dd_manual_refresh_rate = 120
+            dd_manual_refresh_rate = 59.95
             @endcode</td>
     </tr>
 </table>
@@ -1298,7 +1098,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Description</td>
         <td colspan="2">
             Perform additional HDR configuration for the display device.
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1328,11 +1127,10 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            When using virtual display device (VDD) for streaming, it might incorrectly display HDR color. Sunshine can try to mitigate this issue, by turning HDR off and then on again.<br>
-            If the value is set to 0, the workaround is disabled (default). If the value is between 0 and 3000 milliseconds, Sunshine will turn off HDR, wait for the specified amount of time and then turn HDR on again. The recommended delay time is around 500 milliseconds in most cases.<br>
+            When using a virtual display for streaming, it might incorrectly display HDR color. Prism can try to mitigate this issue, by turning HDR off and then on again.<br>
+            If the value is set to 0, the workaround is disabled (default). If the value is between 0 and 3000 milliseconds, Prism will turn off HDR, wait for the specified amount of time and then turn HDR on again. The recommended delay time is around 500 milliseconds in most cases.<br>
             DO NOT use this workaround unless you actually have issues with HDR as it directly impacts stream start time!
             @note{This option works independently of [dd_hdr_option](#dd_hdr_option)}
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1357,7 +1155,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td colspan="2">
             Additional delay in milliseconds to wait before reverting configuration when the app has been closed or the last session terminated.
             Main purpose is to provide a smoother transition when quickly switching between apps.
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1372,7 +1169,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
-
 ### dd_config_revert_on_disconnect
 
 <table>
@@ -1382,7 +1178,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
             When enabled, display configuration is reverted upon disconnect of all clients instead of app close or last session termination.
             This can be useful for returning to physical usage of the host machine without closing the active app.
             @warning{Some applications may not function properly when display configuration is changed while active.}
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1434,7 +1229,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @note{First entry to be matched in the list is the one that will be used.}
             @tip{`requested_resolution` and `final_resolution` can be omitted for `refresh_rate_only` group.}
             @tip{`requested_fps` and `final_refresh_rate` can be omitted for `resolution_only` group.}
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -1489,7 +1283,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            The maximum bitrate (in Kbps) that Sunshine will encode the stream at. If set to 0, it will always use the bitrate requested by Moonlight.
+            The maximum bitrate (in Kbps) that Prism will encode the stream at. If set to 0, it will always use the bitrate requested by Moonlight.
         </td>
     </tr>
     <tr>
@@ -1512,7 +1306,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Sunshine tries to save bandwidth when content on screen is static or a low framerate. Because many clients expect a constant stream of video frames, a certain amount of duplicate frames are sent when this happens. This setting controls the lowest effective framerate a stream can reach.
+            Prism tries to save bandwidth when content on screen is static or a low framerate. Because many clients expect a constant stream of video frames, a certain amount of duplicate frames are sent when this happens. This setting controls the lowest effective framerate a stream can reach.
         </td>
     </tr>
     <tr>
@@ -1540,7 +1334,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Sunshine will attempt to open ports for streaming over the internet.
+            Prism will attempt to open ports for streaming over the internet.
         </td>
     </tr>
     <tr>
@@ -1563,7 +1357,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Set the address family that Sunshine will use.
+            Set the address family that Prism will use.
         </td>
     </tr>
     <tr>
@@ -1595,8 +1389,8 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Set the IP address to bind Sunshine to. This is useful when you have multiple network interfaces
-            and want to restrict Sunshine to a specific one. If not set, Sunshine will bind to all available
+            Set the IP address to bind Prism to. This is useful when you have multiple network interfaces
+            and want to restrict Prism to a specific one. If not set, Prism will bind to all available
             interfaces (0.0.0.0 for IPv4 or :: for IPv6).
             <br><br>
             <strong>Note:</strong> The address must be valid for the system and must match the address family
@@ -1635,7 +1429,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Set the family of ports used by Sunshine.
+            Set the family of ports used by Prism.
             Changing this value will offset other ports as shown in config UI.
         </td>
     </tr>
@@ -1728,7 +1522,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            If no external IP address is given, Sunshine will attempt to automatically detect external ip-address.
+            If no external IP address is given, Prism will attempt to automatically detect external ip-address.
         </td>
     </tr>
     <tr>
@@ -1939,13 +1733,13 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Default</td>
         <td colspan="2">@code{}
-            sunshine_state.json
+            prism_state.json
             @endcode</td>
     </tr>
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            credentials_file = sunshine_state.json
+            credentials_file = prism_state.json
             @endcode</td>
     </tr>
 </table>
@@ -1956,19 +1750,19 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            The path where the Sunshine log is stored.
+            The path where the Prism log is stored.
         </td>
     </tr>
     <tr>
         <td>Default</td>
         <td colspan="2">@code{}
-            sunshine.log
+            prism.log
             @endcode</td>
     </tr>
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            log_path = sunshine.log
+            log_path = prism.log
             @endcode</td>
     </tr>
 </table>
@@ -2029,19 +1823,19 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            The file where current state of Sunshine is stored.
+            The file where current state of Prism is stored.
         </td>
     </tr>
     <tr>
         <td>Default</td>
         <td colspan="2">@code{}
-            sunshine_state.json
+            prism_state.json
             @endcode</td>
     </tr>
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            file_state = sunshine_state.json
+            file_state = prism_state.json
             @endcode</td>
     </tr>
 </table>
@@ -2223,7 +2017,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Default</td>
         <td colspan="2">Automatic.
-            Sunshine will use the first capture method available in the order of the table above.</td>
+            Prism will use the first capture method available in the order of the table above.</td>
     </tr>
     <tr>
         <td>Example</td>
@@ -2232,7 +2026,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="6">Choices</td>
+        <td rowspan="5">Choices</td>
         <td>nvfbc</td>
         <td>Use NVIDIA Frame Buffer Capture to capture direct to GPU memory. This is usually the fastest method for
             NVIDIA cards. NvFBC does not have native Wayland support and does not work with XWayland.
@@ -2246,7 +2040,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>kms</td>
-        <td>DRM/KMS screen capture from the kernel. This requires that Sunshine has `cap_sys_admin` capability.
+        <td>DRM/KMS screen capture from the kernel. This requires that Prism has `cap_sys_admin` capability.
             @note{Applies to Linux only.}</td>
     </tr>
     <tr>
@@ -2257,18 +2051,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>x11</td>
         <td>Uses XCB. This is the slowest and most CPU intensive so should be avoided if possible.
-            @note{Applies to FreeBSD and Linux only.}</td>
-    </tr>
-    <tr>
-        <td>ddx</td>
-        <td>Use DirectX Desktop Duplication API to capture the display. This is well-supported on Windows machines.
-            @note{Applies to Windows only.}</td>
-    </tr>
-    <tr>
-        <td>wgc</td>
-        <td>(beta feature) Use Windows.Graphics.Capture to capture the display.
-            @note{Applies to Windows only.}
-            @attention{This capture method is not compatible with the Sunshine service.}</td>
+            @note{Applies to Linux only.}</td>
     </tr>
 </table>
 
@@ -2283,7 +2066,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>Default</td>
-        <td colspan="2">Sunshine will use the first encoder that is available.</td>
+        <td colspan="2">Prism will use the first encoder that is available.</td>
     </tr>
     <tr>
         <td>Example</td>
@@ -2450,7 +2233,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Description</td>
         <td colspan="2">
             Single-frame VBV/HRD percentage increase.
-            By default Sunshine uses single-frame VBV/HRD, which means any encoded video frame size is not expected to
+            By default Prism uses single-frame VBV/HRD, which means any encoded video frame size is not expected to
             exceed requested bitrate divided by requested frame rate. Relaxing this restriction can be beneficial and
             act as low-latency variable bitrate, but may also lead to packet loss if the network doesn't have buffer
             headroom to handle bitrate spikes. Maximum accepted value is 400, which corresponds to 5x increased
@@ -2477,34 +2260,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
-### nvenc_realtime_hags
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Use realtime gpu scheduling priority in NVENC when hardware accelerated gpu scheduling (HAGS) is enabled
-            in Windows. Currently, NVIDIA drivers may freeze in encoder when HAGS is enabled, realtime priority is used
-            and VRAM utilization is close to maximum. Disabling this option lowers the priority to high, sidestepping
-            the freeze at the cost of reduced capture performance when the GPU is heavily loaded.
-            @note{This option only applies when using NVENC [encoder](#encoder).}
-            @note{Applies to Windows only.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            enabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            nvenc_realtime_hags = enabled
-            @endcode</td>
-    </tr>
-</table>
-
 ### nvenc_split_encode
 
 <table>
@@ -2515,7 +2270,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
             Significantly reduces encoding latency with a marginal compression efficiency penalty.
             This option is ignored if your GPU has a singular NVENC unit.
             @note{This option only applies when using NVENC [encoder](#encoder) with HEVC or AV1.}
-            @note{Applies to Windows only.}
         </td>
     </tr>
     <tr>
@@ -2542,60 +2296,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>enabled</td>
         <td>Enabled</td>
-    </tr>
-</table>
-
-### nvenc_latency_over_power
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Adaptive P-State algorithm which NVIDIA drivers employ doesn't work well with low latency streaming,
-            so Sunshine requests high power mode explicitly.
-            @note{This option only applies when using NVENC [encoder](#encoder).}
-            @warning{Disabling this is not recommended since this can lead to significantly increased encoding latency.}
-            @note{Applies to Windows only.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            enabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            nvenc_latency_over_power = enabled
-            @endcode</td>
-    </tr>
-</table>
-
-### nvenc_opengl_vulkan_on_dxgi
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Sunshine can't capture fullscreen OpenGL and Vulkan programs at full frame rate unless they present on
-            top of DXGI. With this option enabled Sunshine changes global Vulkan/OpenGL present method to
-            "Prefer layered on DXGI Swapchain". This is system-wide setting that is reverted on Sunshine program exit.
-            @note{This option only applies when using NVENC [encoder](#encoder).}
-            @note{Applies to Windows only.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            enabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            nvenc_opengl_vulkan_on_dxgi = enabled
-            @endcode</td>
     </tr>
 </table>
 
@@ -2740,353 +2440,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Example</td>
         <td colspan="2">@code{}
             qsv_slow_hevc = disabled
-            @endcode</td>
-    </tr>
-</table>
-
-## AMD AMF Encoder
-
-### amd_usage
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            The encoder usage profile is used to set the base set of encoding parameters.
-            @note{This option only applies when using amdvce [encoder](#encoder).}
-            @note{The other AMF options that follow will override a subset of the settings applied by your usage
-            profile, but there are hidden parameters set in usage profiles that cannot be overridden elsewhere.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            ultralowlatency
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            amd_usage = ultralowlatency
-            @endcode</td>
-    </tr>
-    <tr>
-        <td rowspan="5">Choices</td>
-        <td>transcoding</td>
-        <td>transcoding (slowest)</td>
-    </tr>
-    <tr>
-        <td>webcam</td>
-        <td>webcam (slow)</td>
-    </tr>
-    <tr>
-        <td>lowlatency_high_quality</td>
-        <td>low latency, high quality (fast)</td>
-    </tr>
-    <tr>
-        <td>lowlatency</td>
-        <td>low latency (faster)</td>
-    </tr>
-    <tr>
-        <td>ultralowlatency</td>
-        <td>ultra low latency (fastest)</td>
-    </tr>
-</table>
-
-### amd_rc
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            The encoder rate control.
-            @note{This option only applies when using amdvce [encoder](#encoder).}
-            @warning{The `vbr_latency` option generally works best, but some bitrate overshoots may still occur.
-            Enabling HRD allows all bitrate based rate controls to better constrain peak bitrate, but may result in
-            encoding artifacts depending on your card.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            vbr_latency
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            amd_rc = vbr_latency
-            @endcode</td>
-    </tr>
-    <tr>
-        <td rowspan="4">Choices</td>
-        <td>cqp</td>
-        <td>constant qp mode</td>
-    </tr>
-    <tr>
-        <td>cbr</td>
-        <td>constant bitrate</td>
-    </tr>
-    <tr>
-        <td>vbr_latency</td>
-        <td>variable bitrate, latency constrained</td>
-    </tr>
-    <tr>
-        <td>vbr_peak</td>
-        <td>variable bitrate, peak constrained</td>
-    </tr>
-</table>
-
-### amd_enforce_hrd
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Enable Hypothetical Reference Decoder (HRD) enforcement to help constrain the target bitrate.
-            @note{This option only applies when using amdvce [encoder](#encoder).}
-            @warning{HRD is known to cause encoding artifacts or negatively affect encoding quality on certain cards.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            disabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            amd_enforce_hrd = disabled
-            @endcode</td>
-    </tr>
-</table>
-
-### amd_quality
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            The quality profile controls the tradeoff between speed and quality of encoding.
-            @note{This option only applies when using amdvce [encoder](#encoder).}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            balanced
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            amd_quality = balanced
-            @endcode</td>
-    </tr>
-    <tr>
-        <td rowspan="3">Choices</td>
-        <td>speed</td>
-        <td>prefer speed</td>
-    </tr>
-    <tr>
-        <td>balanced</td>
-        <td>balanced</td>
-    </tr>
-    <tr>
-        <td>quality</td>
-        <td>prefer quality</td>
-    </tr>
-</table>
-
-### amd_preanalysis
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Preanalysis can increase encoding quality at the cost of latency.
-            @note{This option only applies when using amdvce [encoder](#encoder).}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            disabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            amd_preanalysis = disabled
-            @endcode</td>
-    </tr>
-</table>
-
-### amd_vbaq
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Variance Based Adaptive Quantization (VBAQ) can increase subjective visual quality by prioritizing
-            allocation of more bits to smooth areas compared to more textured areas.
-            @note{This option only applies when using amdvce [encoder](#encoder).}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            enabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            amd_vbaq = enabled
-            @endcode</td>
-    </tr>
-</table>
-
-### amd_coder
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            The entropy encoding to use.
-            @note{This option only applies when using H.264 with the amdvce
-            [encoder](#encoder).}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            auto
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            amd_coder = auto
-            @endcode</td>
-    </tr>
-    <tr>
-        <td rowspan="3">Choices</td>
-        <td>auto</td>
-        <td>let ffmpeg decide</td>
-    </tr>
-    <tr>
-        <td>cabac</td>
-        <td>context adaptive binary arithmetic coding - faster decode</td>
-    </tr>
-    <tr>
-        <td>cavlc</td>
-        <td>context adaptive variable-length coding - higher quality</td>
-    </tr>
-</table>
-
-## VideoToolbox Encoder
-
-### vt_coder
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            The entropy encoding to use.
-            @note{This option only applies when using macOS.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            auto
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            vt_coder = auto
-            @endcode</td>
-    </tr>
-    <tr>
-        <td rowspan="3">Choices</td>
-        <td>auto</td>
-        <td>let ffmpeg decide</td>
-    </tr>
-    <tr>
-        <td>cabac</td>
-        <td>context adaptive binary arithmetic coding - faster decode</td>
-    </tr>
-    <tr>
-        <td>cavlc</td>
-        <td>context adaptive variable-length coding - higher quality</td>
-    </tr>
-</table>
-
-### vt_software
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Force Video Toolbox to use software encoding.
-            @note{This option only applies when using macOS.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            auto
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            vt_software = auto
-            @endcode</td>
-    </tr>
-    <tr>
-        <td rowspan="4">Choices</td>
-        <td>auto</td>
-        <td>let ffmpeg decide</td>
-    </tr>
-    <tr>
-        <td>disabled</td>
-        <td>disable software encoding</td>
-    </tr>
-    <tr>
-        <td>allowed</td>
-        <td>allow software encoding</td>
-    </tr>
-    <tr>
-        <td>forced</td>
-        <td>force software encoding</td>
-    </tr>
-</table>
-
-### vt_realtime
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Realtime encoding.
-            @note{This option only applies when using macOS.}
-            @warning{Disabling realtime encoding might result in a delayed frame encoding or frame drop.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            enabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            vt_realtime = enabled
             @endcode</td>
     </tr>
 </table>
@@ -3433,7 +2786,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="6">Choices</td>
+        <td rowspan="4">Choices</td>
         <td>film</td>
         <td>use for high quality movie content; lowers deblocking</td>
     </tr>

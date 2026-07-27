@@ -1,4 +1,4 @@
-# Prism: give the session user read access to Sunshine's inputtino evdev nodes
+# Prism: give the session user read access to Prism's inputtino evdev nodes
 # ("Keyboard passthrough", "Mouse passthrough", ...) so prism-input-bridge can
 # forward them into the headless compositor.
 SUBSYSTEMS=="input", ATTRS{name}=="*passthrough*", TAG+="uaccess"

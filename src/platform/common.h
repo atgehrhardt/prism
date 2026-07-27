@@ -12,11 +12,9 @@
 #include <string>
 
 // lib includes
+#include <boost/asio.hpp>
 #include <boost/core/noncopyable.hpp>
-#ifndef _WIN32
-  #include <boost/asio.hpp>
-  #include <boost/process/v1.hpp>
-#endif
+#include <boost/process/v1.hpp>
 
 // local includes
 #include "src/config.h"
@@ -38,32 +36,6 @@ struct AVHWFramesContext;
 struct AVCodecContext;
 struct AVDictionary;
 
-#ifdef _WIN32
-// Forward declarations of boost classes to avoid having to include boost headers
-// here, which results in issues with Windows.h and WinSock2.h include order.
-namespace boost {
-  namespace asio {
-    namespace ip {
-      class address;
-    }  // namespace ip
-  }  // namespace asio
-
-  namespace filesystem {
-    class path;
-  }
-
-  namespace process::v1 {
-    class child;
-    class group;
-    template<typename Char>
-    class basic_environment;
-    /**
-     * @brief Map of environment variable names to values.
-     */
-    typedef basic_environment<char> environment;
-  }  // namespace process::v1
-}  // namespace boost
-#endif
 namespace video {
   struct config_t;
 }  // namespace video
@@ -119,7 +91,7 @@ namespace platf {
   };
 
   /**
-   * @brief Feedback command sent from Sunshine to a virtual gamepad.
+   * @brief Feedback command sent from Prism to a virtual gamepad.
    */
   struct gamepad_feedback_msg_t {
     /**
@@ -326,9 +298,9 @@ namespace platf {
   };
 
   /**
-   * @brief Convert a Sunshine pixel format enum to its string name.
+   * @brief Convert a Prism pixel format enum to its string name.
    *
-   * @param pix_fmt Sunshine pixel format to convert or allocate for.
+   * @param pix_fmt Prism pixel format to convert or allocate for.
    * @return Value converted from pix fmt.
    */
   inline std::string_view from_pix_fmt(pix_fmt_e pix_fmt) {
@@ -529,8 +501,6 @@ namespace platf {
     // Play on host PC
     std::string host;  ///< Host playback sink name.
 
-    // On macOS and Windows, it is not possible to create a virtual sink
-    // Therefore, it is optional
     /**
      * @brief Optional virtual sink names for each supported channel layout.
      */
@@ -557,7 +527,7 @@ namespace platf {
      */
     virtual int convert(platf::img_t &img) = 0;
 
-    video::sunshine_colorspace_t colorspace;  ///< Colorspace metadata expected by the encoder.
+    video::prism_colorspace_t colorspace;  ///< Colorspace metadata expected by the encoder.
   };
 
   /**
@@ -636,7 +606,7 @@ namespace platf {
      * @param colorspace Colorimetry information used for conversion or encoding.
      * @return True when the backend successfully completes the requested action.
      */
-    virtual bool init_encoder(const video::config_t &client_config, const video::sunshine_colorspace_t &colorspace) = 0;
+    virtual bool init_encoder(const video::config_t &client_config, const video::prism_colorspace_t &colorspace) = 0;
 
     nvenc::nvenc_base *nvenc = nullptr;  ///< NVENC encoder instance owned by the encode device.
   };
@@ -709,7 +679,7 @@ namespace platf {
     /**
      * @brief Create AVCodec encode device.
      *
-     * @param pix_fmt Sunshine pixel format to convert or allocate for.
+     * @param pix_fmt Prism pixel format to convert or allocate for.
      * @return Constructed AVCodec encode device object.
      */
     virtual std::unique_ptr<avcodec_encode_device_t> make_avcodec_encode_device(pix_fmt_e pix_fmt) {
@@ -719,7 +689,7 @@ namespace platf {
     /**
      * @brief Create NVENC encode device.
      *
-     * @param pix_fmt Sunshine pixel format to convert or allocate for.
+     * @param pix_fmt Prism pixel format to convert or allocate for.
      * @return Constructed NVENC encode device object.
      */
     virtual std::unique_ptr<nvenc_encode_device_t> make_nvenc_encode_device(pix_fmt_e pix_fmt) {
@@ -781,7 +751,7 @@ namespace platf {
   class mic_t {
   public:
     /**
-     * @brief Deliver a captured audio sample to Sunshine's audio pipeline.
+     * @brief Deliver a captured audio sample to Prism's audio pipeline.
      *
      * @param frame_buffer Destination for captured floating-point PCM samples.
      * @return Capture status reported to the streaming pipeline.
@@ -825,7 +795,7 @@ namespace platf {
     virtual bool is_sink_available(const std::string &sink) = 0;
 
     /**
-     * @brief Query host and virtual sink names available to Sunshine.
+     * @brief Query host and virtual sink names available to Prism.
      *
      * @return Host and virtual sink names when the backend can report them.
      */
@@ -1240,7 +1210,7 @@ namespace platf {
    */
   platform_caps::caps_t get_capabilities();
 
-  constexpr auto SERVICE_NAME = "Sunshine";  ///< mDNS service instance name advertised for GameStream discovery.
+  constexpr auto SERVICE_NAME = "Prism";  ///< mDNS service instance name advertised for GameStream discovery.
   constexpr auto SERVICE_TYPE = "_nvstream._tcp";  ///< mDNS service type advertised for GameStream discovery.
 
   namespace publish {
@@ -1265,7 +1235,7 @@ namespace platf {
    * @details If `config::video.adapter_name` is set, returns that.
    *          Otherwise, auto-detects the GPU with a connected display via `find_render_node_with_display()`.
    *          Falls back to `/dev/dri/renderD128` if detection fails.
-   * @return Resolved render device path (may be empty on non-Linux platforms).
+   * @return Resolved render device path.
    */
   std::string resolve_render_device();
 

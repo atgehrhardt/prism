@@ -1110,7 +1110,7 @@ namespace util {
   };
 
   /**
-   * @brief Compare two Sunshine unique pointers by their stored addresses.
+   * @brief Compare two Prism unique pointers by their stored addresses.
    *
    * @param x Left-hand pointer or value being compared.
    * @param y Right-hand pointer or value being compared.
@@ -1122,7 +1122,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare two Sunshine unique pointers by their stored addresses.
+   * @brief Compare two Prism unique pointers by their stored addresses.
    *
    * @param x Left-hand pointer or value being compared.
    * @param y Right-hand pointer or value being compared.
@@ -1134,7 +1134,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare a standard unique pointer with a Sunshine unique pointer.
+   * @brief Compare a standard unique pointer with a Prism unique pointer.
    *
    * @param x Left-hand pointer or value being compared.
    * @param y Right-hand pointer or value being compared.
@@ -1146,7 +1146,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare a standard unique pointer with a Sunshine unique pointer.
+   * @brief Compare a standard unique pointer with a Prism unique pointer.
    *
    * @param x Left-hand pointer or value being compared.
    * @param y Right-hand pointer or value being compared.
@@ -1158,7 +1158,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare a Sunshine unique pointer with a standard unique pointer.
+   * @brief Compare a Prism unique pointer with a standard unique pointer.
    *
    * @param x Left-hand pointer or value being compared.
    * @param y Right-hand pointer or value being compared.
@@ -1170,7 +1170,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare a Sunshine unique pointer with a standard unique pointer.
+   * @brief Compare a Prism unique pointer with a standard unique pointer.
    *
    * @param x Left-hand pointer or value being compared.
    * @param y Right-hand pointer or value being compared.
@@ -1182,7 +1182,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare a Sunshine unique pointer with null.
+   * @brief Compare a Prism unique pointer with null.
    *
    * @param x Left-hand pointer or value being compared.
    * @return True when the wrapper does not own a pointer.
@@ -1193,7 +1193,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare a Sunshine unique pointer with null.
+   * @brief Compare a Prism unique pointer with null.
    *
    * @param x Left-hand pointer or value being compared.
    * @return True when the wrapper owns a pointer.
@@ -1204,7 +1204,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare null with a Sunshine unique pointer.
+   * @brief Compare null with a Prism unique pointer.
    *
    * @param y Right-hand pointer or value being compared.
    * @return True when the wrapper does not own a pointer.
@@ -1215,7 +1215,7 @@ namespace util {
   }
 
   /**
-   * @brief Compare null with a Sunshine unique pointer.
+   * @brief Compare null with a Prism unique pointer.
    *
    * @param y Right-hand pointer or value being compared.
    * @return True when the wrapper owns a pointer.
@@ -1755,8 +1755,7 @@ namespace util {
   defined(__ARMEL__) || \
   defined(__THUMBEL__) || \
   defined(__AARCH64EL__) || \
-  defined(_MIPSEL) || defined(__MIPSEL) || defined(__MIPSEL__) || \
-  defined(_WIN32)
+  defined(_MIPSEL) || defined(__MIPSEL) || defined(__MIPSEL__)
         little = true,  ///< little-endian target architecture
 #else
   #error "Unknown Endianness"

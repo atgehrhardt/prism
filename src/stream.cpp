@@ -63,10 +63,10 @@ static const short packetTypes[] = {
   0x0302,  // IDR frame
   0x0001,  // fully encrypted
   0x010e,  // HDR mode
-  0x5500,  // Rumble triggers (Sunshine protocol extension)
-  0x5501,  // Set motion event (Sunshine protocol extension)
-  0x5502,  // Set RGB LED (Sunshine protocol extension)
-  0x5503,  // Set Adaptive triggers (Sunshine protocol extension)
+  0x5500,  // Rumble triggers (Prism protocol extension)
+  0x5501,  // Set motion event (Prism protocol extension)
+  0x5502,  // Set RGB LED (Prism protocol extension)
+  0x5503,  // Set Adaptive triggers (Prism protocol extension)
 };
 
 namespace asio = boost::asio;
@@ -104,7 +104,7 @@ namespace stream {
 
     std::uint8_t headerType;  ///< Always 0x01 for short headers.
 
-    // Sunshine extension
+    // Prism extension
     // Frame processing latency, in 1/10 ms units
     //     zero when the frame is repeated or there is no backend implementation
     boost::endian::little_uint16_at frame_processing_latency;  ///< Frame processing latency.
@@ -117,7 +117,7 @@ namespace stream {
     std::uint8_t frameType;  ///< Frame type.
 
     // Length of the final packet payload for codecs that cannot handle
-    // zero padding, such as AV1 (Sunshine extension).
+    // zero padding, such as AV1 (Prism extension).
     boost::endian::little_uint16_at lastPayloadLen;  ///< Last payload len.
 
     std::uint8_t unknown[2];  ///< Reserved bytes with no known client-visible meaning.
@@ -265,7 +265,7 @@ namespace stream {
 
     std::uint8_t enabled;  ///< Nonzero when HDR should be enabled.
 
-    // Sunshine protocol extension
+    // Prism protocol extension
     SS_HDR_METADATA metadata;  ///< HDR10 metadata sent with the control message.
   };
 
@@ -1903,7 +1903,7 @@ namespace stream {
    * @brief Bind the GameStream UDP and control sockets used for a streaming session.
    */
   int start_broadcast(broadcast_ctx_t &ctx) {
-    auto address_family = net::af_from_enum_string(config::sunshine.address_family);
+    auto address_family = net::af_from_enum_string(config::prism.address_family);
     auto protocol = address_family == net::IPV4 ? udp::v4() : udp::v6();
     auto control_port = net::map_port(CONTROL_PORT);
     auto video_port = net::map_port(VIDEO_STREAM_PORT);
@@ -2161,7 +2161,7 @@ namespace stream {
     void join(session_t &session) {
       // Current Nvidia drivers have a bug where NVENC can deadlock the encoder thread with hardware-accelerated
       // GPU scheduling enabled. If this happens, we will terminate ourselves and the service can restart.
-      // The alternative is that Sunshine can never start another session until it's manually restarted.
+      // The alternative is that Prism can never start another session until it's manually restarted.
       auto task = []() {
         BOOST_LOG(fatal) << "Hang detected! Session failed to terminate in 10 seconds."sv;
         logging::log_flush();
@@ -2187,7 +2187,7 @@ namespace stream {
       if (--running_sessions == 0) {
         bool revert_display_config {config::video.dd.config_revert_on_disconnect};
         if (proc::proc.running()) {
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+#if defined PRISM_TRAY && PRISM_TRAY >= 1
           system_tray::update_tray_pausing(proc::proc.get_last_run_app_name());
 #endif
         } else {
@@ -2242,7 +2242,7 @@ namespace stream {
       // If this is the first session, invoke the platform callbacks
       if (++running_sessions == 1) {
         platf::streaming_will_start();
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+#if defined PRISM_TRAY && PRISM_TRAY >= 1
         system_tray::update_tray_playing(proc::proc.get_last_run_app_name());
 #endif
       }

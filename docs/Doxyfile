@@ -22,18 +22,18 @@
 # doxygen -x_noenv [configFile]
 
 # project metadata
-DOCSET_BUNDLE_ID = dev.lizardbyte.Sunshine
-DOCSET_PUBLISHER_ID = dev.lizardbyte.Sunshine.documentation
+DOCSET_BUNDLE_ID = dev.lizardbyte.Prism
+DOCSET_PUBLISHER_ID = dev.lizardbyte.Prism.documentation
 PROJECT_BRIEF = "Self-hosted game stream host for Moonlight."
-PROJECT_ICON = ../sunshine.ico
-PROJECT_LOGO = ../sunshine.svg
-PROJECT_NAME = Sunshine
+PROJECT_ICON = ../prism.ico
+PROJECT_LOGO = ../prism.svg
+PROJECT_NAME = Prism
 
 # project specific settings
 DOT_GRAPH_MAX_NODES = 60
 IMAGE_PATH = ../docs/images
-PREDEFINED += SUNSHINE_BUILD_WAYLAND
-PREDEFINED += SUNSHINE_TRAY=1
+PREDEFINED += PRISM_BUILD_WAYLAND
+PREDEFINED += PRISM_TRAY=1
 
 # files and directories to process
 USE_MDFILE_AS_MAINPAGE = ../README.md

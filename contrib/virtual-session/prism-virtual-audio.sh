@@ -5,7 +5,7 @@
 #
 # The physical outputs are disabled for the duration of a virtual-display
 # stream, so everything the user does belongs on the stream. This guard waits
-# for Sunshine's capture sink, creates a dedicated "prism-virtual" null sink,
+# for Prism's capture sink, creates a dedicated "prism-virtual" null sink,
 # selects it as the system default (moving existing streams onto it), and loops
 # it into the capture sink so all session audio is heard on the stream. On
 # teardown the default sink is returned to the physical output recorded at
@@ -26,11 +26,11 @@ echo "=== virtual-audio $(date -Is) physical=${1:-?} ==="
 
 PHYSICAL="${1:-}"
 
-# The sink Sunshine captures from: a forced audio_sink in the config wins,
-# otherwise it is the sink-sunshine-* sink Sunshine switches the default to at
+# The sink Prism captures from: a forced audio_sink in the config wins,
+# otherwise it is the sink-prism-* sink Prism switches the default to at
 # stream start.
 CAPTURE_SINK=""
-CONFIG="$HOME/.config/sunshine/sunshine.conf"
+CONFIG="$HOME/.config/prism/prism.conf"
 if [ -f "$CONFIG" ]; then
   CAPTURE_SINK="$(sed -n 's/^audio_sink *= *//p' "$CONFIG" | tail -1)"
 fi
@@ -41,13 +41,13 @@ for _ in $(seq 1 240); do
   else
     cur="$(pactl get-default-sink 2>/dev/null || true)"
     case "$cur" in
-      sink-sunshine-*) CAPTURE_SINK="$cur"; break ;;
+      sink-prism-*) CAPTURE_SINK="$cur"; break ;;
     esac
   fi
   sleep 0.5
 done
 if [ -z "$CAPTURE_SINK" ]; then
-  echo "timed out waiting for the sunshine capture sink; audio not routed"
+  echo "timed out waiting for the prism capture sink; audio not routed"
   exit 1
 fi
 echo "capture sink: $CAPTURE_SINK"
@@ -81,7 +81,7 @@ pactl suspend-source "$SESSION_SINK.monitor" 0 2>/dev/null || true
   echo "physical_sink=$PHYSICAL"
 } > "$STATE"
 
-# Watchdog: Sunshine may switch the default sink to its capture sink at stream
+# Watchdog: Prism may switch the default sink to its capture sink at stream
 # start (after the moves above); keep putting the default back on the session
 # sink and moving stray streams onto it. Runs until teardown removes the
 # capture override, then exits.

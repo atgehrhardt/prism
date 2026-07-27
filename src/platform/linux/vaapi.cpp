@@ -139,7 +139,7 @@ namespace va {
   using display_t = util::safe_ptr_v2<void, VAStatus, vaTerminate>;
 
   /**
-   * @brief Create an FFmpeg VA-API hardware device context from a Sunshine encode device.
+   * @brief Create an FFmpeg VA-API hardware device context from a Prism encode device.
    *
    * @param encode_device Encode device.
    * @param hw_device_buf Output FFmpeg hardware device buffer.

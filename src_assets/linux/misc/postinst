@@ -4,14 +4,14 @@
 echo "Loading uhid kernel module for DS5 emulation."
 modprobe uhid
 
-# Ensure Sunshine can grab images from KMS
+# Ensure Prism can grab images from KMS
 path_to_setcap=$(which setcap)
-path_to_sunshine=$(readlink -f "$(which sunshine)")
+path_to_prism=$(readlink -f "$(which prism)")
 if [ -x "$path_to_setcap" ] ; then
-  echo "Setting CAP_SYS_ADMIN, CAP_SYS_NICE capabilities on Sunshine binary."
-  echo "$path_to_setcap cap_sys_admin,cap_sys_nice+p $path_to_sunshine"
-  $path_to_setcap cap_sys_admin,cap_sys_nice+p $path_to_sunshine
-  echo "CAP_SYS_ADMIN, CAP_SYS_NICE capabilities set on Sunshine binary."
+  echo "Setting CAP_SYS_ADMIN, CAP_SYS_NICE capabilities on Prism binary."
+  echo "$path_to_setcap cap_sys_admin,cap_sys_nice+p $path_to_prism"
+  $path_to_setcap cap_sys_admin,cap_sys_nice+p $path_to_prism
+  echo "CAP_SYS_ADMIN, CAP_SYS_NICE capabilities set on Prism binary."
 else
   echo "error: setcap not found or not executable."
 fi

@@ -9,7 +9,7 @@
 #include <boost/log/sinks.hpp>
 
 /**
- * @brief Boost.Log asynchronous text sink used by Sunshine logging.
+ * @brief Boost.Log asynchronous text sink used by Prism logging.
  */
 using text_sink = boost::log::sinks::asynchronous_sink<boost::log::sinks::text_ostream_backend>;
 
@@ -19,7 +19,7 @@ extern boost::log::sources::severity_logger<int> info;  ///< Info.
 extern boost::log::sources::severity_logger<int> warning;  ///< Warning.
 extern boost::log::sources::severity_logger<int> error;  ///< Error.
 extern boost::log::sources::severity_logger<int> fatal;  ///< Fatal.
-#ifdef SUNSHINE_TESTS
+#ifdef PRISM_TESTS
 extern boost::log::sources::severity_logger<int> tests;
 #endif
 
@@ -50,7 +50,7 @@ namespace logging {
   void deinit();
 
   /**
-   * @brief Format a Boost.Log record for Sunshine log output.
+   * @brief Format a Boost.Log record for Prism log output.
    *
    * @param view Boost.Log record view being formatted.
    * @param os Boost.Log output stream receiving formatted text.
@@ -63,7 +63,7 @@ namespace logging {
    * @param log_file The log file to write to.
    * @return An object that will deinitialize the logging system when it goes out of scope.
    * @examples
-   * log_init(2, "sunshine.log");
+   * log_init(2, "prism.log");
    * @examples_end
    */
   [[nodiscard]] std::unique_ptr<deinit_t> init(int min_log_level, const std::string &log_file);
@@ -92,7 +92,7 @@ namespace logging {
    * @brief Print help to stdout.
    * @param name The name of the program.
    * @examples
-   * print_help("sunshine");
+   * print_help("prism");
    * @examples_end
    */
   void print_help(const char *name);
@@ -126,7 +126,7 @@ namespace logging {
         message(message),
         units(units),
         interval(interval_in_seconds),
-        enabled(config::sunshine.min_log_level <= severity.default_severity()) {
+        enabled(config::prism.min_log_level <= severity.default_severity()) {
     }
 
     /**

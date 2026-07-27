@@ -2,10 +2,10 @@
  * @file src/platform/linux/kwingrab.cpp
  * @brief KWin direct ScreenCast capture via zkde_screencast_unstable_v1 Wayland protocol.
  *
- * Bypasses xdg-desktop-portal entirely. Sunshine connects directly to KWin's
+ * Bypasses xdg-desktop-portal entirely. Prism connects directly to KWin's
  * Wayland protocol to obtain a PipeWire node_id, then streams frames via PipeWire.
  *
- * Chain: KWin -> Wayland kde_screencast -> PipeWire -> Sunshine
+ * Chain: KWin -> Wayland kde_screencast -> PipeWire -> Prism
  */
 // standard includes
 #include <algorithm>
@@ -69,7 +69,7 @@ namespace kwin {
       auto filenameprefix = std::format("{}.kwin", PROJECT_FQDN);
       auto executablepath = get_executable_full_path();
 
-      // System: Check system XDG applications for permission (usually installed with Sunshine)
+      // System: Check system XDG applications for permission (usually installed with Prism)
       if (check_kwin_system_permissions(filenameprefix, executablepath)) {
         create_file = false;
         initialized = true;
@@ -111,7 +111,7 @@ namespace kwin {
             continue;
           }
           if (!entry_executablepath.empty() && std::filesystem::exists(entry_executablepath)) {
-            // This entry is for another sunshine executable that still exists
+            // This entry is for another prism executable that still exists
             BOOST_LOG(debug) << "[kwingrab] Ignoring other valid temporary KWin wayland permission file: "sv << entry;
             continue;
           }
@@ -134,7 +134,7 @@ namespace kwin {
                      << "X-KDE-Wayland-Interfaces=zkde_screencast_unstable_v1" << std::endl
                      << "Type=Application" << std::endl
                      << "Name="sv << PROJECT_FQDN << "-kwin-wayland-permission" << std::endl
-                     << "Comment=Sunshine KWin screencast permission" << std::endl
+                     << "Comment=Prism KWin screencast permission" << std::endl
                      << "NoDisplay=true" << std::endl;
           filestream.close();
           // Give KWin time to catch up to the new desktop file
@@ -167,7 +167,7 @@ namespace kwin {
         return homedir;
       }
       // Fall back to home directory from NSS passwd
-      // Note: This should be thread-safe as we're always accessing the same entry for Sunshine
+      // Note: This should be thread-safe as we're always accessing the same entry for Prism
       return getpwuid(geteuid())->pw_dir;
     }
 
@@ -423,10 +423,10 @@ namespace kwin {
         if (screencast_permission_helper_t::is_newly_initialized()) {
           BOOST_LOG(error) << "[kwingrab] zkde_screencast_unstable_v1 not found in registry. "sv
                               "A new permission desktop file was automatically created but might now have been recognized yet. "sv
-                              "Try restarting sunshine or set KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 to fully disable permission checks."sv;
+                              "Try restarting prism or set KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 to fully disable permission checks."sv;
         } else {
           BOOST_LOG(error) << "[kwingrab] zkde_screencast_unstable_v1 not found in registry. Check permission desktop file "sv
-                              "for sunshine binary or set KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 to fully disable permission checks."sv;
+                              "for prism binary or set KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 to fully disable permission checks."sv;
         }
         return -1;
       }
@@ -674,7 +674,6 @@ namespace kwin {
       if (screencast->init(true) < 0) {
         return -1;
       }
-#if !defined(__FreeBSD__)
       // Check if KWin screencasting extension is accessible after first init attempt
       if (!screencast->is_kwin_screencasting_available()) {
         // KWin screencasting extension was not found. Drop ALL elevated privileges in case KWin is missing CAP_SYS_NICE
@@ -687,7 +686,6 @@ namespace kwin {
           return -1;
         }
       }
-#endif
       if (screencast->start(display_name) < 0) {
         return -1;
       }
@@ -743,7 +741,7 @@ namespace platf {
    */
   std::vector<std::string> kwin_display_names() {
     if (has_elevated_privileges(false)) {
-      // We're still in the probing phase of Sunshine startup. Dropping portal security early will break KMS.
+      // We're still in the probing phase of Prism startup. Dropping portal security early will break KMS.
       // Just return a dummy screen for now. Display re-enumeration after encoder probing will yield full result.
       std::vector<std::string> display_names;
       display_names.emplace_back("");

@@ -41,41 +41,26 @@ namespace video {
     int enableIntraRefresh;  ///< Intra refresh setting: 0 = disabled, 1 = enabled.
   };
 
-  namespace amf {
-
-    /**
-     * @brief Enumerates supported coder options for the AMF encoder.
-     */
-    enum class coder_e : int {
-      auto_ = 0,  ///< Select the coder based on the H.264 profile.
-      cabac = 1,  ///< CABAC entropy coding.
-      cavlc = 2,  ///< CAVLC entropy coding.
-    };
-
-  }  // namespace amf
-
   /**
    * @brief Select the effective FFmpeg H.264 profile for an encoder configuration.
    *
-   * @param encoder_name FFmpeg encoder name selected for the stream.
    * @param config Encoding configuration requested by the remote client.
-   * @param amd_coder Configured AMF entropy-coder value.
    * @return FFmpeg H.264 profile applied to the codec context.
    */
-  int select_h264_profile(std::string_view encoder_name, const config_t &config, int amd_coder);
+  int select_h264_profile(const config_t &config);
 
   /**
-   * @brief Map an FFmpeg hardware device type to Sunshine's memory type.
+   * @brief Map an FFmpeg hardware device type to Prism's memory type.
    *
    * @param type FFmpeg hardware device type reported by the encoder backend.
-   * @return Sunshine memory type used by the capture and encode pipeline.
+   * @return Prism memory type used by the capture and encode pipeline.
    */
   platf::mem_type_e map_base_dev_type(AVHWDeviceType type);
   /**
-   * @brief Map an FFmpeg pixel format to Sunshine's pixel format enum.
+   * @brief Map an FFmpeg pixel format to Prism's pixel format enum.
    *
    * @param fmt FFmpeg pixel format to convert.
-   * @return Sunshine pixel format used by display and encoder backends.
+   * @return Prism pixel format used by display and encoder backends.
    */
   platf::pix_fmt_e map_pix_fmt(AVPixelFormat fmt);
 
@@ -217,7 +202,7 @@ namespace video {
   };
 
   /**
-   * @brief Encoder name and feature flags advertised by Sunshine.
+   * @brief Encoder name and feature flags advertised by Prism.
    */
   struct encoder_t {
     std::string_view name;  ///< Encoder name used in logs, configuration, and capability probes.
@@ -386,23 +371,9 @@ namespace video {
   // encoders
   extern encoder_t software;
 
-#if !defined(__APPLE__)
-  extern encoder_t nvenc;  // available for windows and linux
-#endif
+  extern encoder_t nvenc;  // available for linux
 
-#ifdef _WIN32
-  extern encoder_t amdvce;
-  extern encoder_t quicksync;
-  extern encoder_t mediafoundation;
-#endif
-
-#if defined(__linux__) || defined(linux) || defined(__linux) || defined(__FreeBSD__)
   extern encoder_t vaapi;
-#endif
-
-#ifdef __APPLE__
-  extern encoder_t videotoolbox;
-#endif
 
   /**
    * @brief Encoded packet wrapper used by the streaming pipeline.
@@ -487,7 +458,7 @@ namespace video {
     }
 
     /**
-     * @brief Return the FFmpeg packet PTS used as Sunshine's frame index.
+     * @brief Return the FFmpeg packet PTS used as Prism's frame index.
      *
      * @return Monotonic frame index assigned to this frame.
      */
@@ -521,7 +492,7 @@ namespace video {
    */
   struct packet_raw_generic: packet_raw_t {
     /**
-     * @brief Wrap generic encoded frame bytes in Sunshine packet metadata.
+     * @brief Wrap generic encoded frame bytes in Prism packet metadata.
      *
      * @param frame_data Encoded frame bytes produced by a non-FFmpeg encoder.
      * @param frame_index Monotonic frame index assigned to the encoded frame.

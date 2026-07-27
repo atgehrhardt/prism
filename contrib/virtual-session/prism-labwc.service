@@ -1,5 +1,5 @@
 [Unit]
-Description=Prism headless labwc compositor (virtual Sunshine capture target)
+Description=Prism headless labwc compositor (virtual Prism capture target)
 After=graphical-session.target
 PartOf=graphical-session.target
 

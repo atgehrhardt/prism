@@ -1,24 +1,16 @@
 # linux specific compile definitions
 
-if(FREEBSD)
-    add_compile_definitions(SUNSHINE_PLATFORM="freebsd")
-    # FreeBSD installs packages to /usr/local/lib, which is not in the default linker search path.
-    # link_directories() is directory-scoped and propagates to all subdirectories (including tests/),
-    # so all targets (sunshine, test_sunshine) can resolve libraries found via pkg_check_modules.
-    link_directories(/usr/local/lib)
-else()
-    add_compile_definitions(SUNSHINE_PLATFORM="linux")
-endif()
+add_compile_definitions(PRISM_PLATFORM="linux")
 
 # AppImage
-if(${SUNSHINE_BUILD_APPIMAGE})
+if(${PRISM_BUILD_APPIMAGE})
     # use relative assets path for AppImage
-    string(REPLACE "${CMAKE_INSTALL_PREFIX}" ".${CMAKE_INSTALL_PREFIX}" SUNSHINE_ASSETS_DIR_DEF ${SUNSHINE_ASSETS_DIR})
+    string(REPLACE "${CMAKE_INSTALL_PREFIX}" ".${CMAKE_INSTALL_PREFIX}" PRISM_ASSETS_DIR_DEF ${PRISM_ASSETS_DIR})
 endif()
 
 # cuda
 set(CUDA_FOUND OFF)
-if(${SUNSHINE_ENABLE_CUDA})
+if(${PRISM_ENABLE_CUDA})
     include(CheckLanguage)
     check_language(CUDA)
 
@@ -34,7 +26,7 @@ if(${SUNSHINE_ENABLE_CUDA})
             list(APPEND CMAKE_CUDA_ARCHITECTURES 75 80 86 87 89 90)
         else()
             message(FATAL_ERROR
-                    "Sunshine requires a minimum CUDA Compiler version of 12.0.
+                    "Prism requires a minimum CUDA Compiler version of 12.0.
                     Found version: ${CMAKE_CUDA_COMPILER_VERSION}"
             )
         endif()
@@ -65,7 +57,7 @@ if(${SUNSHINE_ENABLE_CUDA})
     elseif(${CUDA_FAIL_ON_MISSING})
         message(FATAL_ERROR
                 "CUDA not found.
-                If this is intentional, set '-DSUNSHINE_ENABLE_CUDA=OFF' or '-DCUDA_FAIL_ON_MISSING=OFF'"
+                If this is intentional, set '-DPRISM_ENABLE_CUDA=OFF' or '-DCUDA_FAIL_ON_MISSING=OFF'"
         )
     endif()
 endif()
@@ -77,25 +69,25 @@ if(CUDA_FOUND)
             "${CMAKE_SOURCE_DIR}/src/platform/linux/cuda.cpp"
             "${CMAKE_SOURCE_DIR}/third-party/nvfbc/NvFBC.h")
 
-    add_compile_definitions(SUNSHINE_BUILD_CUDA)
+    add_compile_definitions(PRISM_BUILD_CUDA)
 endif()
 
 # libdrm is required for DRM (KMS). Only the headers are required for Wayland,
 # Vulkan, and PipeWire (KWin, Portal).
-if(${SUNSHINE_ENABLE_DRM} OR ${SUNSHINE_ENABLE_WAYLAND} OR ${SUNSHINE_ENABLE_VULKAN}
-   OR ${SUNSHINE_ENABLE_KWIN} OR ${SUNSHINE_ENABLE_PORTAL})
+if(${PRISM_ENABLE_DRM} OR ${PRISM_ENABLE_WAYLAND} OR ${PRISM_ENABLE_VULKAN}
+   OR ${PRISM_ENABLE_KWIN} OR ${PRISM_ENABLE_PORTAL})
     find_package(LIBDRM REQUIRED)
 else()
     set(LIBDRM_FOUND OFF)
 endif()
 if(LIBDRM_FOUND)
     include_directories(SYSTEM ${LIBDRM_INCLUDE_DIRS})
-    if(${SUNSHINE_ENABLE_DRM})
+    if(${PRISM_ENABLE_DRM})
         list(APPEND PLATFORM_LIBRARIES ${LIBDRM_LIBRARIES})
-        add_compile_definitions(SUNSHINE_BUILD_DRM)
+        add_compile_definitions(PRISM_BUILD_DRM)
         list(APPEND PLATFORM_TARGET_FILES
                 "${CMAKE_SOURCE_DIR}/src/platform/linux/kmsgrab.cpp")
-        list(APPEND SUNSHINE_DEFINITIONS EGL_NO_X11=1)
+        list(APPEND PRISM_DEFINITIONS EGL_NO_X11=1)
     endif()
 endif()
 
@@ -107,16 +99,16 @@ if(LINUX)
 endif()
 
 # evdev
-include(dependencies/libevdev_Sunshine)
+include(dependencies/libevdev_Prism)
 
 # vaapi
-if(${SUNSHINE_ENABLE_VAAPI})
+if(${PRISM_ENABLE_VAAPI})
     find_package(Libva REQUIRED)
 else()
     set(LIBVA_FOUND OFF)
 endif()
 if(LIBVA_FOUND)
-    add_compile_definitions(SUNSHINE_BUILD_VAAPI)
+    add_compile_definitions(PRISM_BUILD_VAAPI)
     include_directories(SYSTEM ${LIBVA_INCLUDE_DIR})
     list(APPEND PLATFORM_LIBRARIES ${LIBVA_LIBRARIES} ${LIBVA_DRM_LIBRARIES})
     list(APPEND PLATFORM_TARGET_FILES
@@ -125,8 +117,8 @@ if(LIBVA_FOUND)
 endif()
 
 # vulkan video encoding (via FFmpeg)
-if(${SUNSHINE_ENABLE_VULKAN})
-    if(NOT SUNSHINE_SYSTEM_VULKAN_HEADERS)
+if(${PRISM_ENABLE_VULKAN})
+    if(NOT PRISM_SYSTEM_VULKAN_HEADERS)
         # use Vulkan headers from build-deps submodule (system headers may be too old, e.g. Ubuntu 22.04)
         set(VULKAN_HEADERS_DIR "${CMAKE_SOURCE_DIR}/third-party/build-deps/third-party/FFmpeg/Vulkan-Headers/include")
     else()
@@ -152,7 +144,7 @@ if(${SUNSHINE_ENABLE_VULKAN})
         message(FATAL_ERROR "Vulkan shader compiler not found (need glslc or glslangValidator)")
     endif()
 
-    list(APPEND SUNSHINE_DEFINITIONS SUNSHINE_BUILD_VULKAN=1)
+    list(APPEND PRISM_DEFINITIONS PRISM_BUILD_VULKAN=1)
     include_directories(SYSTEM ${VULKAN_HEADERS_DIR})
     list(APPEND PLATFORM_LIBRARIES ${VULKAN_LIBRARY})
     list(APPEND PLATFORM_TARGET_FILES
@@ -161,7 +153,7 @@ if(${SUNSHINE_ENABLE_VULKAN})
 
     # compile GLSL -> SPIR-V -> C include at build time
     set(VULKAN_SHADER_DIR "${CMAKE_BINARY_DIR}/generated-src/shaders")
-    set(VULKAN_SHADER_SOURCE "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/assets/shaders/vulkan/rgb2yuv.comp")
+    set(VULKAN_SHADER_SOURCE "${PRISM_SOURCE_ASSETS_DIR}/linux/assets/shaders/vulkan/rgb2yuv.comp")
     set(VULKAN_SHADER_SPV "${VULKAN_SHADER_DIR}/rgb2yuv.spv")
     set(VULKAN_SHADER_DATA "${VULKAN_SHADER_DIR}/rgb2yuv.spv.inc")
 
@@ -194,19 +186,19 @@ if(${SUNSHINE_ENABLE_VULKAN})
     add_custom_target(vulkan_shaders
             DEPENDS "${VULKAN_SHADER_DATA}"
             COMMENT "Vulkan shader compilation")
-    set(SUNSHINE_TARGET_DEPENDENCIES ${SUNSHINE_TARGET_DEPENDENCIES} vulkan_shaders)
+    set(PRISM_TARGET_DEPENDENCIES ${PRISM_TARGET_DEPENDENCIES} vulkan_shaders)
 endif()
 
 # wayland
-if(${SUNSHINE_ENABLE_WAYLAND})
+if(${PRISM_ENABLE_WAYLAND})
     find_package(Wayland REQUIRED)
 else()
     set(WAYLAND_FOUND OFF)
 endif()
 if(WAYLAND_FOUND)
-    add_compile_definitions(SUNSHINE_BUILD_WAYLAND)
+    add_compile_definitions(PRISM_BUILD_WAYLAND)
 
-    if(NOT SUNSHINE_SYSTEM_WAYLAND_PROTOCOLS)
+    if(NOT PRISM_SYSTEM_WAYLAND_PROTOCOLS)
         set(WAYLAND_PROTOCOLS_DIR "${CMAKE_SOURCE_DIR}/third-party/wayland-protocols")
     else()
         pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
@@ -230,13 +222,13 @@ if(WAYLAND_FOUND)
 endif()
 
 # x11
-if(${SUNSHINE_ENABLE_X11})
+if(${PRISM_ENABLE_X11})
     find_package(X11 REQUIRED)
 else()
     set(X11_FOUND OFF)
 endif()
 if(X11_FOUND)
-    add_compile_definitions(SUNSHINE_BUILD_X11)
+    add_compile_definitions(PRISM_BUILD_X11)
     include_directories(SYSTEM ${X11_INCLUDE_DIR})
     list(APPEND PLATFORM_LIBRARIES ${X11_LIBRARIES})
     list(APPEND PLATFORM_TARGET_FILES
@@ -252,7 +244,7 @@ if(GIO_FOUND)
 endif()
 
 # Pipewire
-if(${SUNSHINE_ENABLE_KWIN} OR ${SUNSHINE_ENABLE_PORTAL})
+if(${PRISM_ENABLE_KWIN} OR ${PRISM_ENABLE_PORTAL})
     pkg_check_modules(PIPEWIRE libpipewire-0.3 REQUIRED)
 else()
     set(PIPEWIRE_FOUND OFF)
@@ -266,24 +258,24 @@ endif()
 
 # XDG portal
 set(PORTAL_FOUND OFF)
-if(PIPEWIRE_FOUND AND GIO_FOUND AND ${SUNSHINE_ENABLE_PORTAL})
+if(PIPEWIRE_FOUND AND GIO_FOUND AND ${PRISM_ENABLE_PORTAL})
     set(PORTAL_FOUND ON)
-    add_compile_definitions(SUNSHINE_BUILD_PORTAL)
+    add_compile_definitions(PRISM_BUILD_PORTAL)
     list(APPEND PLATFORM_TARGET_FILES
             "${CMAKE_SOURCE_DIR}/src/platform/linux/portalgrab.cpp")
 endif()
 
 # KWin ScreenCast (direct Wayland protocol, bypasses portal)
 set(KWIN_FOUND OFF)
-if(PIPEWIRE_FOUND AND WAYLAND_FOUND AND ${SUNSHINE_ENABLE_KWIN})
+if(PIPEWIRE_FOUND AND WAYLAND_FOUND AND ${PRISM_ENABLE_KWIN})
     set(KWIN_FOUND ON)
-    add_compile_definitions(SUNSHINE_BUILD_KWIN)
+    add_compile_definitions(PRISM_BUILD_KWIN)
     GEN_WAYLAND("${CMAKE_SOURCE_DIR}/third-party/plasma-wayland-protocols/src/protocols" "" kde-output-order-v1)
     GEN_WAYLAND("${CMAKE_SOURCE_DIR}/third-party/plasma-wayland-protocols/src/protocols" "" zkde-screencast-unstable-v1)
     list(APPEND PLATFORM_TARGET_FILES
             "${CMAKE_SOURCE_DIR}/src/platform/linux/kwingrab.cpp")
-elseif(${SUNSHINE_ENABLE_KWIN} AND NOT WAYLAND_FOUND)
-    message(FATAL_ERROR "SUNSHINE_ENABLE_KWIN requires SUNSHINE_ENABLE_WAYLAND — KWin capture disabled")
+elseif(${PRISM_ENABLE_KWIN} AND NOT WAYLAND_FOUND)
+    message(FATAL_ERROR "PRISM_ENABLE_KWIN requires PRISM_ENABLE_WAYLAND — KWin capture disabled")
 endif()
 
 if(NOT ${CUDA_FOUND}
@@ -299,12 +291,9 @@ endif()
 # These need to be set before adding the inputtino subdirectory in order for them to be picked up
 set(LIBEVDEV_CUSTOM_INCLUDE_DIR "${EVDEV_INCLUDE_DIR}")
 set(LIBEVDEV_CUSTOM_LIBRARY "${EVDEV_LIBRARY}")
-if(FREEBSD)
-    set(USE_UHID OFF)
-endif()
 
 add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/inputtino")
-list(APPEND SUNSHINE_EXTERNAL_LIBRARIES inputtino::libinputtino)
+list(APPEND PRISM_EXTERNAL_LIBRARIES inputtino::libinputtino)
 file(GLOB_RECURSE INPUTTINO_SOURCES
         ${CMAKE_SOURCE_DIR}/src/platform/linux/input/inputtino*.h
         ${CMAKE_SOURCE_DIR}/src/platform/linux/input/inputtino*.cpp)
@@ -316,11 +305,11 @@ if(EXTERNAL_PROJECT_LIBEVDEV_USED)
 endif()
 
 # AppImage and Flatpak
-if (${SUNSHINE_BUILD_APPIMAGE})
-    list(APPEND SUNSHINE_DEFINITIONS SUNSHINE_BUILD_APPIMAGE=1)
+if (${PRISM_BUILD_APPIMAGE})
+    list(APPEND PRISM_DEFINITIONS PRISM_BUILD_APPIMAGE=1)
 endif ()
-if (${SUNSHINE_BUILD_FLATPAK})
-    list(APPEND SUNSHINE_DEFINITIONS SUNSHINE_BUILD_FLATPAK=1)
+if (${PRISM_BUILD_FLATPAK})
+    list(APPEND PRISM_DEFINITIONS PRISM_BUILD_FLATPAK=1)
 endif ()
 
 include_directories(SYSTEM
@@ -339,4 +328,4 @@ list(APPEND PLATFORM_LIBRARIES
         pulse
         pulse-simple)
 
-list(APPEND SUNSHINE_EXTERNAL_LIBRARIES glad)
+list(APPEND PRISM_EXTERNAL_LIBRARIES glad)

@@ -6,11 +6,11 @@
 #   prism-desktop-session.sh set      (prep "do")
 #   prism-desktop-session.sh restore  (prep "undo")
 #
-# Uses Sunshine's per-client env: SUNSHINE_CLIENT_WIDTH, SUNSHINE_CLIENT_HEIGHT,
-# SUNSHINE_CLIENT_FPS, SUNSHINE_CLIENT_HDR.
+# Uses Prism's per-client env: PRISM_CLIENT_WIDTH, PRISM_CLIENT_HEIGHT,
+# PRISM_CLIENT_FPS, PRISM_CLIENT_HDR.
 #
 # Note: KWin cannot add arbitrary modes, so if the client resolution is not a
-# native mode of the panel, the native resolution is kept (Sunshine scales the
+# native mode of the panel, the native resolution is kept (Prism scales the
 # capture to the client) and only the refresh rate is snapped to the closest
 # native match of the client FPS.
 set -u
@@ -20,7 +20,7 @@ STATE="$RUNTIME/prism-desktop-session.state"
 LOG="$HOME/.local/state/prism-desktop.log"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
-echo "=== desktop-session ${1:-?} $(date -Is) client=${SUNSHINE_CLIENT_WIDTH:-?}x${SUNSHINE_CLIENT_HEIGHT:-?}@${SUNSHINE_CLIENT_FPS:-?} hdr=${SUNSHINE_CLIENT_HDR:-?} ==="
+echo "=== desktop-session ${1:-?} $(date -Is) client=${PRISM_CLIENT_WIDTH:-?}x${PRISM_CLIENT_HEIGHT:-?}@${PRISM_CLIENT_FPS:-?} hdr=${PRISM_CLIENT_HDR:-?} ==="
 
 command -v kscreen-doctor >/dev/null || exit 0
 
@@ -48,7 +48,7 @@ output_state() {
 # Best mode id: prefer exact client resolution, else native panel resolution;
 # within the candidate set pick the refresh closest to the client FPS.
 best_mode() {
-  local want_w="${SUNSHINE_CLIENT_WIDTH:-0}" want_h="${SUNSHINE_CLIENT_HEIGHT:-0}" fps="${SUNSHINE_CLIENT_FPS:-60}"
+  local want_w="${PRISM_CLIENT_WIDTH:-0}" want_h="${PRISM_CLIENT_HEIGHT:-0}" fps="${PRISM_CLIENT_FPS:-60}"
   kscreen-doctor -o 2>/dev/null | strip | awk -v out="$OUTPUT" -v ww="$want_w" -v wh="$want_h" -v fps="$fps" '
     $0 ~ "^Output:.* "out" " {f=1; next}
     f && /^Output:/ {exit}
@@ -69,7 +69,7 @@ best_mode() {
         split(b[2], c, "@"); split(c[1], r, "x"); w=r[1]+0; h=r[2]+0; rate=c[2]+0
         d=(rate-fps); if (d<0) d=-d
         # fallback candidates: only the panel native resolution (KWin cannot
-        # add custom modes; Sunshine scales the capture for other resolutions)
+        # add custom modes; Prism scales the capture for other resolutions)
         if (w==nw && h==nh && d<anyd) {anyd=d; any=id}
         if (w==ww && h==wh && d<exactd) {exactd=d; exact=id}
       }
@@ -119,14 +119,14 @@ case "${1:-}" in
       else
         MODE=""
       fi
-    elif [ -n "${SUNSHINE_CLIENT_WIDTH:-}" ] && command -v prism-kwin-mode >/dev/null; then
+    elif [ -n "${PRISM_CLIENT_WIDTH:-}" ] && command -v prism-kwin-mode >/dev/null; then
       # Client resolution is not a known mode: try adding it as a KWin custom
       # mode (works on most drivers; some reject compositor-generated
       # modelines, e.g. NVIDIA + DSC panels — then we fall back to native res
-      # and Sunshine scales the capture instead).
-      MHZ=$(( ${SUNSHINE_CLIENT_FPS:-60} * 1000 ))
-      echo "attempting custom mode ${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}@$MHZ on $OUTPUT"
-      if prism-kwin-mode apply "$OUTPUT" "${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}@$MHZ" 2>&1; then
+      # and Prism scales the capture instead).
+      MHZ=$(( ${PRISM_CLIENT_FPS:-60} * 1000 ))
+      echo "attempting custom mode ${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT}@$MHZ on $OUTPUT"
+      if prism-kwin-mode apply "$OUTPUT" "${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT}@$MHZ" 2>&1; then
         MODE=""
       else
         echo "custom mode rejected; falling back to native resolution + scaling"
@@ -137,7 +137,7 @@ case "${1:-}" in
       kscreen-doctor "output.$OUTPUT.mode.$MODE" 2>/dev/null || true
       sleep 1  # let the mode change settle before toggling color state
     fi
-    if [ "${SUNSHINE_CLIENT_HDR:-false}" = "true" ]; then
+    if [ "${PRISM_CLIENT_HDR:-false}" = "true" ]; then
       echo "enabling HDR+WCG on $OUTPUT"
       apply_color "$OUTPUT" enable enable
     else

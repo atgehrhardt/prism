@@ -25,20 +25,6 @@
 #include "platform/common.h"
 #include "rtsp.h"
 
-// platform-specific includes
-#ifdef _WIN32
-  #include <display_device/windows/settings_manager.h>
-  #include <display_device/windows/win_api_layer.h>
-  #include <display_device/windows/win_display_device.h>
-#endif
-
-#ifdef __APPLE__
-  #include <display_device/macos/display_power.h>
-  #include <display_device/macos/mac_api_layer.h>
-  #include <display_device/macos/mac_display_device.h>
-  #include <display_device/macos/settings_manager.h>
-#endif
-
 namespace display_device {
   namespace {
     constexpr std::chrono::milliseconds DEFAULT_RETRY_INTERVAL {5000};
@@ -59,7 +45,7 @@ namespace display_device {
      * to be deactivated before the stream starts. In this case the audio context
      * will be captured for this display and can be restored once it is turned back.
      */
-    class sunshine_audio_context_t: public AudioContextInterface {
+    class prism_audio_context_t: public AudioContextInterface {
     public:
       [[nodiscard]] bool capture() override {
         return context_scheduler.execute([](auto &audio_context) {
@@ -140,14 +126,6 @@ namespace display_device {
       }
       return (int) result;
     }
-
-#ifdef __APPLE__
-    bool is_unsigned_integer(std::string_view value) {
-      return !value.empty() && std::ranges::all_of(value, [](unsigned char character) {
-        return std::isdigit(character);
-      });
-    }
-#endif
 
     std::string_view apply_result_name(SettingsManagerInterface::ApplyResult result) {
       using enum SettingsManagerInterface::ApplyResult;
@@ -353,7 +331,7 @@ namespace display_device {
         case resolution_option_e::automatic:
           {
             if (!session.enable_sops) {
-              BOOST_LOG(warning) << R"(Sunshine is configured to change resolution automatically, but the "Optimize game settings" is not set in the client! Resolution will not be changed.)";
+              BOOST_LOG(warning) << R"(Prism is configured to change resolution automatically, but the "Optimize game settings" is not set in the client! Resolution will not be changed.)";
             } else if (session.width >= 0 && session.height >= 0) {
               config.m_resolution = Resolution {
                 static_cast<unsigned int>(session.width),
@@ -368,7 +346,7 @@ namespace display_device {
         case resolution_option_e::manual:
           {
             if (!session.enable_sops) {
-              BOOST_LOG(warning) << R"(Sunshine is configured to change resolution manually, but the "Optimize game settings" is not set in the client! Resolution will not be changed.)";
+              BOOST_LOG(warning) << R"(Prism is configured to change resolution manually, but the "Optimize game settings" is not set in the client! Resolution will not be changed.)";
             } else {
               if (!parse_resolution_string(video_config.dd.manual_resolution, config.m_resolution)) {
                 BOOST_LOG(error) << "Failed to parse manual resolution string!";
@@ -656,37 +634,11 @@ namespace display_device {
      * @return An interface or nullptr if the OS does not support the interface.
      */
     std::unique_ptr<SettingsManagerInterface> make_settings_manager([[maybe_unused]] const std::filesystem::path &persistence_filepath, [[maybe_unused]] const config::video_t &video_config) {
-#ifdef _WIN32
-      return std::make_unique<SettingsManager>(
-        std::make_shared<WinDisplayDevice>(std::make_shared<WinApiLayer>()),
-        std::make_shared<sunshine_audio_context_t>(),
-        std::make_unique<PersistentState>(
-          std::make_shared<FileSettingsPersistence>(persistence_filepath)
-        ),
-        WinWorkarounds {
-          .m_hdr_blank_delay = video_config.dd.wa.hdr_toggle_delay != std::chrono::milliseconds::zero() ? std::make_optional(video_config.dd.wa.hdr_toggle_delay) : std::nullopt
-        }
-      );
-#elif defined(__APPLE__)
-      return std::make_unique<MacSettingsManager>(
-        std::make_shared<MacDisplayDevice>(std::make_shared<MacApiLayer>()),
-        std::make_shared<sunshine_audio_context_t>(),
-        std::make_unique<MacPersistentState>(
-          std::make_shared<FileSettingsPersistence>(persistence_filepath)
-        ),
-        MacWorkarounds {}
-      );
-#else
       return nullptr;
-#endif
     }
 
     std::unique_ptr<DisplayPowerInterface> make_display_power() {
-#ifdef __APPLE__
-      return std::make_unique<MacDisplayPower>(std::make_shared<MacApiLayer>());
-#else
       return nullptr;
-#endif
     }
 
     /**
@@ -834,12 +786,6 @@ namespace display_device {
       return settings_iface.getDisplayName(output_name);
     })};
 
-#ifdef __APPLE__
-    if (mapped_name.empty() && is_unsigned_integer(output_name)) {
-      return output_name;
-    }
-#endif
-
     return mapped_name;
   }
 
@@ -935,19 +881,7 @@ namespace display_device {
     config.m_device_prep = *device_prep;
 
     const auto hdr_state {parse_hdr_option(video_config, session)};
-#ifdef __APPLE__
-    if (hdr_state) {
-      BOOST_LOG(info) << "Ignoring HDR display device request on macOS because macOS HDR changes are not supported by libdisplaydevice.";
-    }
-#else
     config.m_hdr_state = hdr_state;
-#endif
-
-#ifdef __APPLE__
-    if (config.m_device_prep != SingleDisplayConfiguration::DevicePreparation::VerifyOnly) {
-      BOOST_LOG(warning) << "macOS libdisplaydevice currently supports only VerifyOnly display preparation. The requested preparation mode will fail.";
-    }
-#endif
 
     if (!parse_resolution_option(video_config, session, config)) {
       // Error already logged

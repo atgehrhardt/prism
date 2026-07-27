@@ -8,7 +8,7 @@
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
-  testing::AddGlobalTestEnvironment(new SunshineEnvironment);
-  testing::UnitTest::GetInstance()->listeners().Append(new SunshineEventListener);
+  testing::AddGlobalTestEnvironment(new PrismEnvironment);
+  testing::UnitTest::GetInstance()->listeners().Append(new PrismEventListener);
   return RUN_ALL_TESTS();
 }

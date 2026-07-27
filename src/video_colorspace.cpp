@@ -16,17 +16,17 @@ extern "C" {
 namespace video {
 
   /**
-   * @brief Check whether a Sunshine colorspace represents HDR video.
+   * @brief Check whether a Prism colorspace represents HDR video.
    */
-  bool colorspace_is_hdr(const sunshine_colorspace_t &colorspace) {
+  bool colorspace_is_hdr(const prism_colorspace_t &colorspace) {
     return colorspace.colorspace == colorspace_e::bt2020;
   }
 
   /**
-   * @brief Derive Sunshine colorspace metadata from client stream configuration.
+   * @brief Derive Prism colorspace metadata from client stream configuration.
    */
-  sunshine_colorspace_t colorspace_from_client_config(const config_t &config, bool hdr_display) {
-    sunshine_colorspace_t colorspace;
+  prism_colorspace_t colorspace_from_client_config(const config_t &config, bool hdr_display) {
+    prism_colorspace_t colorspace;
 
     /* See video::config_t declaration for details */
 
@@ -83,12 +83,12 @@ namespace video {
   }
 
   /**
-   * @brief Convert Sunshine colorspace metadata to FFmpeg AVCodec fields.
+   * @brief Convert Prism colorspace metadata to FFmpeg AVCodec fields.
    */
-  avcodec_colorspace_t avcodec_colorspace_from_sunshine_colorspace(const sunshine_colorspace_t &sunshine_colorspace) {
+  avcodec_colorspace_t avcodec_colorspace_from_prism_colorspace(const prism_colorspace_t &prism_colorspace) {
     avcodec_colorspace_t avcodec_colorspace;
 
-    switch (sunshine_colorspace.colorspace) {
+    switch (prism_colorspace.colorspace) {
       case colorspace_e::rec601:
         // Rec. 601
         avcodec_colorspace.primaries = AVCOL_PRI_SMPTE170M;
@@ -108,7 +108,7 @@ namespace video {
       case colorspace_e::bt2020sdr:
         // Rec. 2020
         avcodec_colorspace.primaries = AVCOL_PRI_BT2020;
-        assert(sunshine_colorspace.bit_depth == 10);
+        assert(prism_colorspace.bit_depth == 10);
         avcodec_colorspace.transfer_function = AVCOL_TRC_BT2020_10;
         avcodec_colorspace.matrix = AVCOL_SPC_BT2020_NCL;
         avcodec_colorspace.software_format = SWS_CS_BT2020;
@@ -117,20 +117,20 @@ namespace video {
       case colorspace_e::bt2020:
         // Rec. 2020 with ST 2084 perceptual quantizer
         avcodec_colorspace.primaries = AVCOL_PRI_BT2020;
-        assert(sunshine_colorspace.bit_depth == 10);
+        assert(prism_colorspace.bit_depth == 10);
         avcodec_colorspace.transfer_function = AVCOL_TRC_SMPTE2084;
         avcodec_colorspace.matrix = AVCOL_SPC_BT2020_NCL;
         avcodec_colorspace.software_format = SWS_CS_BT2020;
         break;
     }
 
-    avcodec_colorspace.range = sunshine_colorspace.full_range ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
+    avcodec_colorspace.range = prism_colorspace.full_range ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
 
     return avcodec_colorspace;
   }
 
-  const color_t *color_vectors_from_colorspace(const sunshine_colorspace_t &colorspace, bool unorm_output) {
-    constexpr auto generate_color_vectors = [](const sunshine_colorspace_t &colorspace, bool unorm_output) -> color_t {
+  const color_t *color_vectors_from_colorspace(const prism_colorspace_t &colorspace, bool unorm_output) {
+    constexpr auto generate_color_vectors = [](const prism_colorspace_t &colorspace, bool unorm_output) -> color_t {
       // "Table 4 – Interpretation of matrix coefficients (MatrixCoefficients) value" section of ITU-T H.273
       double Kr;
       double Kb;

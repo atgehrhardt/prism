@@ -29,7 +29,7 @@
  * @def DEFAULT_APP_IMAGE_PATH
  * @brief Macro for DEFAULT APP IMAGE PATH.
  */
-#define DEFAULT_APP_IMAGE_PATH SUNSHINE_ASSETS_DIR "/box.png"
+#define DEFAULT_APP_IMAGE_PATH PRISM_ASSETS_DIR "/box.png"
 
 namespace proc {
   /**
@@ -44,13 +44,13 @@ namespace proc {
 
   /**
    * pre_cmds -- guaranteed to be executed unless any of the commands fail.
-   * detached -- commands detached from Sunshine
+   * detached -- commands detached from Prism
    * cmd -- Runs indefinitely until:
    *    No session is running and a different set of commands it to be executed
    *    Command exits
    * working_dir -- the process working directory. This is required for some games to run properly.
    * cmd_output --
-   *    empty    -- The output of the commands are appended to the output of sunshine
+   *    empty    -- The output of the commands are appended to the output of prism
    *    "null"   -- The output of the commands are discarded
    *    filename -- The output of the commands are appended to filename
    */
@@ -80,7 +80,7 @@ namespace proc {
     std::string id;  ///< Stable identifier for the configured application.
     bool elevated;  ///< Whether the process should be launched elevated.
     bool auto_detach;  ///< Whether the process should detach automatically.
-    bool wait_all;  ///< Whether Sunshine waits for all child processes.
+    bool wait_all;  ///< Whether Prism waits for all child processes.
     std::chrono::seconds exit_timeout;  ///< Exit timeout.
   };
 

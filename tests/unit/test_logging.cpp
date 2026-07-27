@@ -19,7 +19,7 @@ namespace {
     std::tuple("fatal", &fatal),
   };
 
-  constexpr auto log_file = "test_sunshine.log";
+  constexpr auto log_file = "test_prism.log";
 }  // namespace
 
 struct LogLevelsTest: BaseTest, testing::WithParamInterface<decltype(log_levels)::value_type> {};

@@ -51,13 +51,13 @@ namespace prism::steam {
   std::vector<game_t> installed_games();
 
   /**
-   * @brief Convert a game's JPEG box art to the PNG format Sunshine requires.
+   * @brief Convert a game's JPEG box art to the PNG format Prism requires.
    *
    * When the source is empty, the art is first downloaded from Steam's public
    * CDN into the cache. Converts with ffmpeg into
    * `$XDG_CACHE_HOME/prism/covers/<appid>.png` (default `~/.cache`), reusing
    * the cached PNG while it is newer than the source. Steam art is JPEG-only,
-   * but Sunshine's image validation requires PNG, so this bridge is needed
+   * but Prism's image validation requires PNG, so this bridge is needed
    * for box art to reach Moonlight clients.
    *
    * @param appid Steam app id (used as the cache file name).

@@ -3,7 +3,7 @@ import i18n from './locale'
 import 'bootstrap/dist/css/bootstrap.min.css'
 // Load Prism.css after bootstrap to override some of the styles.
 // Makes themes load and style correctly.
-import './sunshine.css'
+import './prism.css'
 
 // must import even if not implicitly using here
 // https://github.com/aurelia/skeleton-navigation/issues/894

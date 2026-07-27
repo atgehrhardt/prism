@@ -42,7 +42,7 @@ namespace platf {
   }
 
   /**
-   * @brief Variant of inputtino virtual gamepad implementations Sunshine can create.
+   * @brief Variant of inputtino virtual gamepad implementations Prism can create.
    */
   using joypads_t = std::variant<inputtino::XboxOneJoypad, inputtino::SwitchJoypad, inputtino::PS5Joypad>;
 

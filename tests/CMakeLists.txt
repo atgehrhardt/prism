@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 # https://github.com/google/oss-policies-info/blob/main/foundational-cxx-support-matrix.md#foundational-c-support
 
-project(test_sunshine)
+project(test_prism)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,8 +25,8 @@ include_directories("${GTEST_SOURCE_DIR}/googletest/include" "${GTEST_SOURCE_DIR
 
 # coverage
 # https://gcovr.com/en/stable/guide/compiling.html#compiler-options
-option(SUNSHINE_LLVM_COVERAGE "Use LLVM source-based coverage" OFF)
-if(SUNSHINE_LLVM_COVERAGE)
+option(PRISM_LLVM_COVERAGE "Use LLVM source-based coverage" OFF)
+if(PRISM_LLVM_COVERAGE)
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping -ggdb -O0)
     add_link_options(-fprofile-instr-generate)
 else()
@@ -36,7 +36,7 @@ endif()
 
 # Find the correct libgcov library path matching the gcc compiler version
 # This ensures the test executable links against the same libgcov version used during compilation
-if(UNIX AND NOT APPLE)
+if(UNIX)
     # Get the gcc compiler version
     execute_process(
         COMMAND ${CMAKE_C_COMPILER} -dumpversion
@@ -73,59 +73,40 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
-# if windows
-if (WIN32)
-    # For Windows: Prevent overriding the parent project's compiler/linker settings
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)  # cmake-lint: disable=C0103
-endif ()
-
-# modify SUNSHINE_DEFINITIONS
-if (WIN32)
-    list(APPEND
-            SUNSHINE_DEFINITIONS SUNSHINE_SHADERS_DIR="${CMAKE_SOURCE_DIR}/src_assets/windows/assets/shaders/directx")
-elseif (NOT APPLE)
-    list(APPEND SUNSHINE_DEFINITIONS SUNSHINE_SHADERS_DIR="${CMAKE_SOURCE_DIR}/src_assets/linux/assets/shaders/opengl")
-endif ()
+# modify PRISM_DEFINITIONS
+list(APPEND PRISM_DEFINITIONS PRISM_SHADERS_DIR="${CMAKE_SOURCE_DIR}/src_assets/linux/assets/shaders/opengl")
 
 set(TEST_DEFINITIONS)  # list will be appended as needed
 
-# this indicates we're building tests in case sunshine needs to adjust some code or add private tests
-list(APPEND TEST_DEFINITIONS SUNSHINE_TESTS)
-list(APPEND TEST_DEFINITIONS SUNSHINE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-list(APPEND TEST_DEFINITIONS SUNSHINE_TEST_BIN_DIR="${CMAKE_CURRENT_BINARY_DIR}")
+# this indicates we're building tests in case prism needs to adjust some code or add private tests
+list(APPEND TEST_DEFINITIONS PRISM_TESTS)
+list(APPEND TEST_DEFINITIONS PRISM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+list(APPEND TEST_DEFINITIONS PRISM_TEST_BIN_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 
-# Override SUNSHINE_ASSETS_DIR to use a writable temp directory for tests
-# Remove the existing definition from SUNSHINE_DEFINITIONS to avoid redefinition error
-list(FILTER SUNSHINE_DEFINITIONS EXCLUDE REGEX "^SUNSHINE_ASSETS_DIR=")
-list(APPEND TEST_DEFINITIONS SUNSHINE_ASSETS_DIR="${CMAKE_CURRENT_BINARY_DIR}/test_assets")
+# Override PRISM_ASSETS_DIR to use a writable temp directory for tests
+# Remove the existing definition from PRISM_DEFINITIONS to avoid redefinition error
+list(FILTER PRISM_DEFINITIONS EXCLUDE REGEX "^PRISM_ASSETS_DIR=")
+list(APPEND TEST_DEFINITIONS PRISM_ASSETS_DIR="${CMAKE_CURRENT_BINARY_DIR}/test_assets")
 
-if(NOT WIN32)
-    find_package(Udev 255)  # we need 255+ for udevadm verify
-    message(STATUS "UDEV_FOUND: ${UDEV_FOUND}")
-    if(UDEV_FOUND)
-        list(APPEND TEST_DEFINITIONS UDEVADM_EXECUTABLE="${UDEVADM_EXECUTABLE}")
-    endif()
+find_package(Udev 255)  # we need 255+ for udevadm verify
+message(STATUS "UDEV_FOUND: ${UDEV_FOUND}")
+if(UDEV_FOUND)
+    list(APPEND TEST_DEFINITIONS UDEVADM_EXECUTABLE="${UDEVADM_EXECUTABLE}")
 endif()
 
 file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
         ${CMAKE_SOURCE_DIR}/tests/*.h
         ${CMAKE_SOURCE_DIR}/tests/*.cpp)
-# Add macOS-specific test files only when building tests for macOS
-if (APPLE)
-    file(GLOB_RECURSE MACOS_TEST_SOURCES CONFIGURE_DEPENDS
-            ${CMAKE_SOURCE_DIR}/tests/*.mm)
-    list(APPEND TEST_SOURCES ${MACOS_TEST_SOURCES})
-endif ()
 
-set(SUNSHINE_SOURCES
-        ${SUNSHINE_TARGET_FILES})
+set(PRISM_SOURCES
+        ${PRISM_TARGET_FILES})
 
 # remove main.cpp from the list of sources
-list(REMOVE_ITEM SUNSHINE_SOURCES ${CMAKE_SOURCE_DIR}/src/main.cpp)
+list(REMOVE_ITEM PRISM_SOURCES ${CMAKE_SOURCE_DIR}/src/main.cpp)
 
 add_executable(${PROJECT_NAME}
         ${TEST_SOURCES}
-        ${SUNSHINE_SOURCES})
+        ${PRISM_SOURCES})
 
 # Copy files needed for config consistency tests to build directory
 # This ensures both CLI and CLion can access the same files relative to the test executable
@@ -136,7 +117,7 @@ set(INTEGRATION_TEST_FILES
     "docs/configuration.md"
     "src_assets/common/assets/web/public/assets/locale/en.json"
     "src_assets/common/assets/web/configs/tabs/General.vue"
-    "src_assets/linux/misc/60-sunshine.rules"
+    "src_assets/linux/misc/60-prism.rules"
 )
 
 foreach(file ${INTEGRATION_TEST_FILES})
@@ -159,8 +140,8 @@ add_custom_target(sync_locale_files ALL
     VERBATIM
 )
 
-foreach(dep ${SUNSHINE_TARGET_DEPENDENCIES})
-    add_dependencies(${PROJECT_NAME} ${dep})  # compile these before sunshine
+foreach(dep ${PRISM_TARGET_DEPENDENCIES})
+    add_dependencies(${PROJECT_NAME} ${dep})  # compile these before prism
 endforeach()
 
 # Ensure locale files are synchronized before building the test executable
@@ -168,7 +149,7 @@ add_dependencies(${PROJECT_NAME} sync_locale_files)
 
 # Build the list of libraries to link
 set(TEST_LINK_LIBRARIES
-    ${SUNSHINE_EXTERNAL_LIBRARIES}
+    ${PRISM_EXTERNAL_LIBRARIES}
     lizardbyte::test_support
     ${PLATFORM_LIBRARIES}
 )
@@ -179,23 +160,6 @@ if(GCOV_LINK_LIBRARY)
 endif()
 
 target_link_libraries(${PROJECT_NAME} ${TEST_LINK_LIBRARIES})
-target_compile_definitions(${PROJECT_NAME} PUBLIC ${SUNSHINE_DEFINITIONS} ${TEST_DEFINITIONS})
-target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${SUNSHINE_COMPILE_OPTIONS}>;$<$<COMPILE_LANGUAGE:CUDA>:${SUNSHINE_COMPILE_OPTIONS_CUDA};-std=c++17>)  # cmake-lint: disable=C0301
-target_link_options(${PROJECT_NAME} PRIVATE ${SUNSHINE_LINK_OPTIONS})
-
-if (WIN32)
-    # prefer static libraries since we're linking statically
-    # this fixes libcurl linking errors when using non MSYS2 version of CMake
-    set_target_properties(${PROJECT_NAME} PROPERTIES LINK_SEARCH_START_STATIC 1)
-
-    # Copy minhook-detours DLL to test binary directory for ARM64
-    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64" AND DEFINED _MINHOOK_DLL)
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${_MINHOOK_DLL}"
-                "${CMAKE_CURRENT_BINARY_DIR}"
-            COMMENT "Copying minhook-detours DLL to test binary directory"
-            VERBATIM
-        )
-    endif()
-endif ()
+target_compile_definitions(${PROJECT_NAME} PUBLIC ${PRISM_DEFINITIONS} ${TEST_DEFINITIONS})
+target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${PRISM_COMPILE_OPTIONS}>;$<$<COMPILE_LANGUAGE:CUDA>:${PRISM_COMPILE_OPTIONS_CUDA};-std=c++17>)  # cmake-lint: disable=C0301
+target_link_options(${PROJECT_NAME} PRIVATE ${PRISM_LINK_OPTIONS})

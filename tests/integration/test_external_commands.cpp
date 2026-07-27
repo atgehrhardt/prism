@@ -22,7 +22,7 @@ struct ExternalCommandTestData {
   std::string platform;  // "windows", "linux", "macos", or "all"
   bool should_succeed;
   std::string description;
-  std::string working_directory;  // Optional: if empty, uses SUNSHINE_SOURCE_DIR
+  std::string working_directory;  // Optional: if empty, uses PRISM_SOURCE_DIR
   bool xfail_condition = false;  // Optional: condition for expected failure
   std::string xfail_reason = "";  // Optional: reason for expected failure
 
@@ -41,13 +41,7 @@ class ExternalCommandTest: public BaseTest, public ::testing::WithParamInterface
 protected:
   void SetUp() override {
     BaseTest::SetUp();
-    if constexpr (IS_WINDOWS) {
-      current_platform = "windows";
-    } else if constexpr (IS_MACOS) {
-      current_platform = "macos";
-    } else if constexpr (IS_LINUX) {
-      current_platform = "linux";
-    }
+    current_platform = "linux";
   }
 
   [[nodiscard]] bool shouldRunOnCurrentPlatform(const std::string_view &test_platform) const {
@@ -58,14 +52,14 @@ protected:
   static std::pair<int, std::string> runCommand(const std::string &cmd, const std::string_view &working_dir) {
     const auto env = boost::this_process::environment();
 
-    // Determine the working directory: use the provided working_dir or fall back to SUNSHINE_SOURCE_DIR
+    // Determine the working directory: use the provided working_dir or fall back to PRISM_SOURCE_DIR
     boost::filesystem::path effective_working_dir;
 
     if (!working_dir.empty()) {
       effective_working_dir = working_dir;
     } else {
-      // Use SUNSHINE_SOURCE_DIR CMake definition as the default working directory
-      effective_working_dir = SUNSHINE_SOURCE_DIR;
+      // Use PRISM_SOURCE_DIR CMake definition as the default working directory
+      effective_working_dir = PRISM_SOURCE_DIR;
     }
 
     std::error_code ec;
@@ -143,13 +137,13 @@ TEST_P(ExternalCommandTest, RunExternalCommand) {
   }
 }
 
-// Platform-specific command strings
-constexpr auto SIMPLE_COMMAND = IS_WINDOWS ? "where cmd" : "which sh";
+// Command strings
+constexpr auto SIMPLE_COMMAND = "which sh";
 
 #ifdef UDEVADM_EXECUTABLE
   #define UDEV_TESTS \
     ExternalCommandTestData { \
-      std::format("{} verify {}/src_assets/linux/misc/60-sunshine.rules", UDEVADM_EXECUTABLE, SUNSHINE_TEST_BIN_DIR), \
+      std::format("{} verify {}/src_assets/linux/misc/60-prism.rules", UDEVADM_EXECUTABLE, PRISM_TEST_BIN_DIR), \
       "linux", \
       true, \
       "Test udev rules file" \
@@ -164,15 +158,12 @@ INSTANTIATE_TEST_SUITE_P(
   ExternalCommandTest,
   ::testing::Values(
     UDEV_TESTS
-      // Cross-platform tests with xfail on Windows CI
+      // Simple command test
       ExternalCommandTestData {
         SIMPLE_COMMAND,
         "all",
         true,
-        "Simple command test",
-        "",  // working_directory
-        IS_WINDOWS,  // xfail_condition
-        "Simple command test fails on Windows CI environment"  // xfail_reason
+        "Simple command test"
       },
     // Cross-platform failing test
     ExternalCommandTestData {

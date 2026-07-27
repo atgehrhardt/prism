@@ -12,7 +12,7 @@ TEST(EntryHandlerTests, LogPublisherDataTest) {
   log_publisher_data();
 
   // check if specific log messages exist
-  ASSERT_TRUE(log_checker::line_starts_with("test_sunshine.log", "Info: Package Publisher: "));
-  ASSERT_TRUE(log_checker::line_starts_with("test_sunshine.log", "Info: Publisher Website: "));
-  ASSERT_TRUE(log_checker::line_starts_with("test_sunshine.log", "Info: Get support: "));
+  ASSERT_TRUE(log_checker::line_starts_with("test_prism.log", "Info: Package Publisher: "));
+  ASSERT_TRUE(log_checker::line_starts_with("test_prism.log", "Info: Publisher Website: "));
+  ASSERT_TRUE(log_checker::line_starts_with("test_prism.log", "Info: Get support: "));
 }
