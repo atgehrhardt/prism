@@ -1,65 +1,91 @@
 #!/usr/bin/env bash
-# Prism: launch a Steam game inside the headless session and exit when the
-# game exits, so the app — and therefore the stream — closes with the game.
-# Prism runs this as the app command of synced Steam games; the session's
-# own lightweight Steam client (plain `steam -silent`, no Deck UI) is brought
-# up by prism-headless-start.sh when PRISM_STEAM_APP_ID is set.
-#
-# Usage: prism-steam-game.sh <appid>
+# Launch and monitor one Steam game strictly inside Prism's owned headless
+# session. The stream remains alive for arbitrarily long shader compilation.
 set -u
 
 ID="${1:?usage: prism-steam-game.sh <appid>}"
+RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+STATE="$RUNTIME/prism-headless.state"
 LOG="$HOME/.local/state/prism-headless.log"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=contrib/virtual-session/prism-headless-common.sh
+. "$SCRIPT_DIR/prism-headless-common.sh"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
-echo "=== steam-game $(date -Is) appid=$ID ==="
-echo "wrapper env: WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-unset} DISPLAY=${DISPLAY:-unset}"
 
-# Games run under Steam's reaper as `reaper SteamLaunch AppId=<id> -- ...`.
-# The ` -- ` is required: install-script evaluators run as
-# `reaper SteamLaunch AppId=<id> Install=1 -- ...` and must NOT count as the
-# game. The trailing space also prevents prefix collisions (44 vs 440).
+EXPECTED_SESSION="${PRISM_SESSION_ID:-}"
+STATE_SESSION="$(prism_state_get "$STATE" session_id 2>/dev/null || true)"
+STATE_UNIT="$(prism_state_get "$STATE" unit 2>/dev/null || true)"
+if [ -z "$EXPECTED_SESSION" ] || [ "$STATE_SESSION" != "$EXPECTED_SESSION" ]; then
+  echo "ERROR: headless session state does not match game launch"
+  exit 1
+fi
+PRISM_HEADLESS_UNIT="${PRISM_HEADLESS_UNIT:-$STATE_UNIT}"
+if [ -z "$PRISM_HEADLESS_UNIT" ] || ! prism_unit_live "$PRISM_HEADLESS_UNIT"; then
+  echo "ERROR: owned headless session is not active"
+  exit 1
+fi
+
+echo "=== steam-game $(date -Is) appid=$ID session=$EXPECTED_SESSION unit=$PRISM_HEADLESS_UNIT ==="
+# Install-script evaluators include `Install=1` before `--`; requiring the
+# exact delimiter below prevents them from being mistaken for the game.
 GAME_PATTERN="SteamLaunch AppId=$ID -- "
 
-# 1. Launch the game through the session Steam client, retrying while the
-#    client is still booting. Steam queues URLs sent to a running instance,
-#    so repeats are harmless until the game process shows up. There is no
-#    fixed timeout: install scripts and Vulkan shader processing can legitimately
-#    take a very long time before the game process appears, and giving up would
-#    end the app (and the stream) mid-compile. We only abort if the session
-#    Steam client itself dies, which makes launching impossible.
-launched=0
-# The wrapper can start before the session Steam client has spawned; give it
-# a moment to appear before treating "no steam" as fatal.
-for _ in $(seq 1 30); do
-  pgrep -x steam >/dev/null && break
-  sleep 2
+session_game_pids() {
+  local pid command_line
+  while read -r pid; do
+    [ -r "/proc/$pid/cmdline" ] || continue
+    command_line="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    case "$command_line" in
+      *"$GAME_PATTERN"*) printf '%s\n' "$pid" ;;
+    esac
+  done < <(prism_unit_pids "$PRISM_HEADLESS_UNIT")
+}
+
+for _ in $(seq 1 60); do
+  prism_unit_live "$PRISM_HEADLESS_UNIT" || break
+  prism_unit_has_comm "$PRISM_HEADLESS_UNIT" steam && break
+  sleep 1
 done
-while pgrep -x steam >/dev/null; do
-  steam "steam://rungameid/$ID" >/dev/null 2>&1 || true
-  sleep 2
-  if pgrep -f "$GAME_PATTERN" >/dev/null; then
+if ! prism_unit_has_comm "$PRISM_HEADLESS_UNIT" steam; then
+  echo "ERROR: session Steam did not start"
+  exit 1
+fi
+
+launched=0
+queued=0
+while prism_unit_live "$PRISM_HEADLESS_UNIT" &&
+  prism_unit_has_comm "$PRISM_HEADLESS_UNIT" steam; do
+  if [ "$queued" = "0" ] &&
+    steam "steam://rungameid/$ID" >/dev/null 2>&1; then
+    queued=1
+  fi
+  if [ -n "$(session_game_pids | head -1)" ]; then
     launched=1
     break
   fi
-done
-if [ "$launched" != "1" ]; then
-  echo "game $ID never appeared and session steam is gone; giving up"
-  exit 1
-fi
-GAME_PID="$(pgrep -f "$GAME_PATTERN" | head -1)"
-echo "game $ID launched (pid $GAME_PID)"
-if [ -n "$GAME_PID" ]; then
-  echo "game env: $(tr '\0' '\n' < "/proc/$GAME_PID/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' | tr '\n' ' ')"
-fi
-
-# 2. Wait for the game to exit.
-while pgrep -f "$GAME_PATTERN" >/dev/null; do
   sleep 2
 done
-echo "game $ID exited; shutting down session steam"
+if [ "$launched" != "1" ]; then
+  echo "ERROR: game $ID never appeared before session Steam exited"
+  exit 1
+fi
 
-# 3. Quit the session Steam client so the teardown in prism-headless-stop.sh
-#    restores the desktop one. Exiting here ends the app, which closes the
-#    stream and the session.
-steam -shutdown 2>/dev/null || true
+GAME_PID="$(session_game_pids | head -1)"
+echo "game $ID launched (pid $GAME_PID)"
+while prism_unit_live "$PRISM_HEADLESS_UNIT" &&
+  prism_unit_has_comm "$PRISM_HEADLESS_UNIT" steam &&
+  [ -n "$(session_game_pids | head -1)" ]; do
+  sleep 2
+done
+if ! prism_unit_live "$PRISM_HEADLESS_UNIT"; then
+  echo "ERROR: owned headless session died while game $ID was running"
+  exit 1
+fi
+if ! prism_unit_has_comm "$PRISM_HEADLESS_UNIT" steam &&
+  [ -n "$(session_game_pids | head -1)" ]; then
+  echo "ERROR: session Steam died while game $ID was running"
+  exit 1
+fi
+echo "game $ID exited; shutting down session Steam"
+steam -shutdown >/dev/null 2>&1 || true

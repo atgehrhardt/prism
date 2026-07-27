@@ -1,157 +1,96 @@
 #!/usr/bin/env bash
-# Prism: tear down the headless gamescope session (capture mode "headless" /
-# "steamos"). Idempotent; also runs when the client disconnects/crashes.
-# Steam is returned to the desktop only if the session had PRISM_STEAM=1.
+# Tear down Prism's owned headless session. Safe after partial startup or when
+# called repeatedly.
 set -u
 
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 OVERRIDE_FILE="$RUNTIME/prism-capture-override"
 STATE="$RUNTIME/prism-headless.state"
+ASTATE="$RUNTIME/prism-headless-audio.state"
+ENV_FILE="$RUNTIME/prism-headless-session.env"
 LOG="$HOME/.local/state/prism-headless.log"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=contrib/virtual-session/prism-headless-common.sh
+. "$SCRIPT_DIR/prism-headless-common.sh"
+
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 echo "=== headless-stop $(date -Is) ==="
-
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
-# Shared cross-mode capture lock (see prism-headless-start.sh).
+prism_headless_require_backend || exit 1
 exec 9>"$RUNTIME/prism-capture.lock"
-flock -x -w 90 9 || echo "headless-stop: lock timeout, proceeding anyway"
+flock -x -w 90 9 || {
+  echo "ERROR: timed out waiting for capture lifecycle lock" >&2
+  exit 1
+}
 
-STEAM=0
-# shellcheck source=/dev/null
-[ -f "$STATE" ] && . "$STATE" 2>/dev/null && STEAM="${steam:-0}"
+VERSION="$(prism_state_get "$STATE" version 2>/dev/null || true)"
+VALID_STATE=0
+HAD_SESSION=0
+if prism_state_valid "$STATE"; then
+  VALID_STATE=1
+elif [ -f "$STATE" ] && [ "$VERSION" = "2" ]; then
+  echo "WARN: ignoring malformed versioned state; stopping fixed Prism-owned units only" >&2
+fi
+STEAM="$(prism_state_get "$STATE" steam 2>/dev/null || true)"
+PHYSICAL_SINK="$(prism_state_get "$STATE" physical_sink 2>/dev/null || true)"
+SESSION_SINK_MODULE="$(prism_state_get "$STATE" session_sink_module 2>/dev/null || true)"
+LOOP_MODULE="$(prism_state_get "$STATE" loop_module 2>/dev/null || true)"
+APP_UNIT="$(prism_state_get "$STATE" app_unit 2>/dev/null || true)"
+if [ "$VALID_STATE" != "1" ]; then
+  STEAM=0
+  SESSION_SINK_MODULE=""
+  LOOP_MODULE=""
+  APP_UNIT=""
+fi
+if [ -f "$STATE" ] || prism_unit_live "$PRISM_HEADLESS_UNIT" ||
+  prism_unit_has_pids "$PRISM_HEADLESS_UNIT"; then
+  HAD_SESSION=1
+fi
+if [ -z "$LOOP_MODULE" ]; then
+  LOOP_MODULE="$(prism_state_get "$ASTATE" loop_module 2>/dev/null || true)"
+fi
+if [ -z "$PHYSICAL_SINK" ]; then
+  PHYSICAL_SINK="$(prism_state_get "$ASTATE" physical_sink 2>/dev/null || true)"
+fi
 
-# 1. Disarm the capture override first so any new stream uses the desktop.
 rm -f "$OVERRIDE_FILE"
 
-# 2. Tear down gamescope (session children exit via gamescopereaper).
-pkill -x gamescope 2>/dev/null || true
-pkill -x gamescopereaper 2>/dev/null || true
-for _ in $(seq 1 20); do
-  pgrep -x gamescope >/dev/null || break
-  sleep 0.5
-done
-pkill -9 -x gamescope 2>/dev/null || true
-pkill -9 -x gamescopereaper 2>/dev/null || true
-# Wait for the hard-killed processes to actually be reaped; a zombie gamescope
-# must not outlive this teardown into the next session's bring-up.
-for _ in $(seq 1 20); do
-  pgrep -x gamescope >/dev/null || break
-  sleep 0.5
-done
-
-# 2b. Kill any Steam still attached to the headless session. steamwebhelper
-# is a separate process name and survives killing `steam` alone; left behind
-# it holds the single-instance lock and the fossilize shader-cache state.
-for name in steam steamwebhelper; do
-  for p in $(pgrep -x "$name"); do
-    env_disp="$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
-    case "$env_disp" in
-      *wayland-prism* | *gamescope* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
-        kill "$p" 2>/dev/null || true ;;
-    esac
-  done
-done
-# Wait for the session-attached Steam processes to exit, escalating to a hard
-# kill, so the single-instance lock and fossilize state are released before
-# the next session (or the desktop relaunch below) starts Steam again.
-for _ in $(seq 1 20); do
-  alive=0
-  for name in steam steamwebhelper; do
-    for p in $(pgrep -x "$name"); do
-      env_disp="$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
-      case "$env_disp" in
-        *wayland-prism* | *gamescope* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
-          alive=1 ;;
-      esac
-    done
-  done
-  [ "$alive" = "0" ] && break
-  sleep 0.5
-done
-for name in steam steamwebhelper; do
-  for p in $(pgrep -x "$name"); do
-    env_disp="$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
-    case "$env_disp" in
-      *wayland-prism* | *gamescope* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
-        kill -9 "$p" 2>/dev/null || true ;;
-    esac
-  done
-done
-
-# Shader-compile workers from the torn-down session must not outlive it; they
-# keep cache locks that hang the next session's shader processing. Kill them
-# unconditionally: a stale fossilize_replay from ANY previous Steam session
-# (not just one whose teardown had STEAM=1) hangs the next session at
-# "Processing Vulkan shaders".
-pkill -x fossilize_replay 2>/dev/null || true
-
-# 2c. Tear down headless audio separation: stop the guard if it is still
-# waiting, remove the loopback into the capture sink, and destroy the
-# session's dedicated sink.
-pkill -f prism-headless-audio.sh 2>/dev/null || true
-ASTATE="$RUNTIME/prism-headless-audio.state"
-if [ -f "$ASTATE" ]; then
-  # shellcheck source=/dev/null
-  . "$ASTATE" 2>/dev/null || true
-  if [ -n "${loop_module:-}" ]; then
-    pactl unload-module "$loop_module" 2>/dev/null || true
+if [ -f "$STATE" ] && [ "$VERSION" != "2" ]; then
+  prism_cleanup_legacy_headless
+else
+  if [ -n "$APP_UNIT" ] && ! prism_stop_unit "$APP_UNIT"; then
+    echo "ERROR: preserving state because the owned app scope could not be stopped" >&2
+    exit 1
   fi
-  rm -f "$ASTATE"
+  prism_stop_headless_app_units || {
+    echo "ERROR: one or more owned app scopes could not be stopped" >&2
+    exit 1
+  }
+  if ! prism_stop_unit "$PRISM_HEADLESS_UNIT"; then
+    echo "ERROR: preserving state because the owned session could not be stopped" >&2
+    exit 1
+  fi
 fi
-pactl list short modules 2>/dev/null | grep 'sink_name=prism-headless' | cut -f1 \
-  | while read -r m; do pactl unload-module "$m" 2>/dev/null || true; done
-
-# Hand the desktop back to the configured prism_default_sink, falling back to
-# the recorded physical output. PipeWire/WirePlumber can move the default
-# while the session sink is being torn down, so retry and verify.
-RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
-RESTORE="${RESTORE:-${physical_sink:-}}"
-if [ -n "$RESTORE" ]; then
-  echo "restoring default sink: $RESTORE"
-  for _ in $(seq 1 20); do
-    if pactl list short sinks 2>/dev/null | grep -q "[[:space:]]${RESTORE}[[:space:]]"; then
-      pactl set-default-sink "$RESTORE" 2>/dev/null || true
-      [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
-    fi
-    sleep 0.5
-  done
-  echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
+if [ "$HAD_SESSION" = "1" ]; then
+  prism_mark_labwc_reset_required || {
+    echo "ERROR: could not record required labwc reset" >&2
+    exit 1
+  }
 fi
 
-rm -f "$STATE"
+prism_unload_module "$LOOP_MODULE"
+prism_unload_module "$SESSION_SINK_MODULE"
+prism_unload_named_sink_modules prism-headless
 
-# 3. Return Steam to the desktop if this was a Steam session.
+RESTORE="$(sed -n 's/^prism_default_sink *= *//p' \
+  "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
+RESTORE="${RESTORE:-$PHYSICAL_SINK}"
+prism_restore_default_sink "$RESTORE" || true
+
+rm -f "$STATE" "$ASTATE" "$ENV_FILE"
 if [ "$STEAM" = "1" ]; then
-  unset WAYLAND_DISPLAY
-  # Wait for the headless instance to fully exit so Steam's single-instance
-  # lock is released before relaunching on the desktop. steamwebhelper must
-  # also be gone: relaunching while it lingers makes the new client treat the
-  # launch as "open Steam" and show its window.
-  for _ in $(seq 1 40); do
-    pgrep -x steam >/dev/null || break
-    sleep 0.5
-  done
-  pkill -9 -x steamwebhelper 2>/dev/null || true
-  for _ in $(seq 1 20); do
-    pgrep -x steamwebhelper >/dev/null || break
-    sleep 0.5
-  done
-  # Relaunch with verification: a failed or ignored start is retried, since
-  # Steam silently no-ops if its lock has not been released yet.
-  for attempt in 1 2 3; do
-    pgrep -x steam >/dev/null && break
-    echo "relaunching desktop steam (attempt $attempt)"
-    setsid steam -silent >/dev/null 2>&1 9>&- &
-    for _ in $(seq 1 20); do
-      pgrep -x steam >/dev/null && break
-      sleep 0.5
-    done
-  done
-  if pgrep -x steam >/dev/null; then
-    echo "desktop steam running"
-  else
-    echo "WARNING: failed to relaunch desktop steam after 3 attempts"
-  fi
+  prism_schedule_steam_restore
 fi
+echo "headless session torn down"

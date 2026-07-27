@@ -20,7 +20,7 @@ sudo dnf install -y \
   openssl-devel pipewire-devel glslc vulkan-loader-devel \
   libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
   numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
-  wayland-devel libxkbcommon-devel python3-jinja2 \
+  wayland-devel libxkbcommon-devel python3-jinja2 bubblewrap \
   gamescope labwc wlr-randr steam kscreen krfb mangohud
 
 # --- 2. Source --------------------------------------------------------------
@@ -78,10 +78,15 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
 log "Installing Prism scripts and systemd user units"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-start.sh"   "$HOME/.local/bin/prism-steamos-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-stop.sh"    "$HOME/.local/bin/prism-steamos-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-common.sh" "$HOME/.local/bin/prism-headless-common.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-exec.sh"   "$HOME/.local/bin/prism-headless-exec.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-start.sh"  "$HOME/.local/bin/prism-headless-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-stop.sh"   "$HOME/.local/bin/prism-headless-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-session.sh" "$HOME/.local/bin/prism-headless-session.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-steam.sh"  "$HOME/.local/bin/prism-headless-steam.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-audio.sh"  "$HOME/.local/bin/prism-headless-audio.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steam-game.sh"      "$HOME/.local/bin/prism-steam-game.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steam-restore.sh"   "$HOME/.local/bin/prism-steam-restore.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-start.sh"   "$HOME/.local/bin/prism-virtual-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-stop.sh"    "$HOME/.local/bin/prism-virtual-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-audio.sh"   "$HOME/.local/bin/prism-virtual-audio.sh"
@@ -89,6 +94,10 @@ install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-mirror-audio.sh"    "$HOM
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-desktop-session.sh" "$HOME/.local/bin/prism-desktop-session.sh"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-labwc.service" \
   "$HOME/.config/systemd/user/prism-labwc.service"
+install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-headless-session.service" \
+  "$HOME/.config/systemd/user/prism-headless-session.service"
+install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-steam-restore.service" \
+  "$HOME/.config/systemd/user/prism-steam-restore.service"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism.service" \
   "$HOME/.config/systemd/user/prism.service"
 

@@ -413,3 +413,92 @@ TEST_F(CaptureModeResolveTest, ExplicitNonHeadlessModeStillWinsForGames) {
   EXPECT_EQ(resolved.mode, "virtual");
   EXPECT_FALSE(resolved.steam);
 }
+
+/**
+ * @brief Tests validation of atomically published headless session state.
+ */
+class HeadlessStateTest: public BaseTest {
+protected:
+  void SetUp() override {
+    BaseTest::SetUp();
+    state_path = fs::temp_directory_path() / "prism_headless_state_test";
+  }
+
+  void TearDown() override {
+    fs::remove(state_path);
+    BaseTest::TearDown();
+  }
+
+  /**
+   * @brief Write headless state content for one parser test.
+   *
+   * @param content Complete state file content.
+   */
+  void writeState(const std::string &content) const {
+    std::ofstream state(state_path);
+    state << content;
+  }
+
+  fs::path state_path;  ///< Temporary state file used by the test.
+};
+
+TEST_F(HeadlessStateTest, AcceptsCompleteMatchingState) {
+  writeState(
+    "version=2\n"
+    "session_id=42\n"
+    "backend=systemd\n"
+    "unit=prism-headless-session.service\n"
+    "app_unit=prism-headless-app-42.scope\n"
+    "steam=1\n"
+    "wayland_display=gamescope-7\n"
+    "x_display=:9\n"
+    "physical_sink=speakers\n"
+    "capture_sink_module=\n"
+    "session_sink_module=123\n"
+    "loop_module=456\n"
+  );
+
+  const auto state = proc::prism_read_headless_state(state_path, "42");
+  ASSERT_TRUE(state.has_value());
+  EXPECT_EQ(state->version, 2);
+  EXPECT_EQ(state->session_id, "42");
+  EXPECT_TRUE(state->steam);
+  EXPECT_EQ(state->wayland_display, "gamescope-7");
+  EXPECT_EQ(state->x_display, ":9");
+  EXPECT_EQ(state->session_sink_module, "123");
+}
+
+TEST_F(HeadlessStateTest, RejectsAnotherLaunchSession) {
+  writeState(
+    "version=2\nsession_id=41\nbackend=systemd\n"
+    "unit=prism-headless-session.service\napp_unit=prism-headless-app-41.scope\nsteam=0\n"
+    "wayland_display=gamescope-0\nx_display=:2\nphysical_sink=\n"
+    "capture_sink_module=\nsession_sink_module=123\nloop_module=456\n"
+  );
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+}
+
+TEST_F(HeadlessStateTest, RejectsLegacyOrIncompleteState) {
+  writeState("steam=1\nwayland_display=gamescope-0\nx_display=:2\n");
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+}
+
+TEST_F(HeadlessStateTest, RejectsGuessedOrMalformedDisplays) {
+  writeState(
+    "version=2\nsession_id=42\nbackend=systemd\n"
+    "unit=prism-headless-session.service\napp_unit=prism-headless-app-42.scope\nsteam=0\n"
+    "wayland_display=wayland-prism\nx_display=desktop\nphysical_sink=\n"
+    "capture_sink_module=\nsession_sink_module=123\nloop_module=456\n"
+  );
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+}
+
+TEST_F(HeadlessStateTest, RejectsDuplicateKeys) {
+  writeState(
+    "version=2\nsession_id=42\nsession_id=43\nbackend=systemd\n"
+    "unit=prism-headless-session.service\napp_unit=prism-headless-app-42.scope\nsteam=0\n"
+    "wayland_display=gamescope-0\nx_display=:2\nphysical_sink=\n"
+    "capture_sink_module=\nsession_sink_module=123\nloop_module=456\n"
+  );
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+}

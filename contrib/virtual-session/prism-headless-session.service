@@ -1,0 +1,13 @@
+[Unit]
+Description=Prism owned headless streaming session
+After=prism-labwc.service
+Requires=prism-labwc.service
+
+[Service]
+Type=simple
+EnvironmentFile=%t/prism-headless-session.env
+ExecStart=%h/.local/bin/prism-headless-session.sh
+KillMode=control-group
+TimeoutStopSec=20
+SendSIGKILL=yes
+Restart=no

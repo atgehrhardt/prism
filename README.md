@@ -72,7 +72,7 @@ Nothing is Fedora- or NVIDIA-locked, but features vary by desktop environment:
 | Feature | Requirement | Notes |
 |---|---|---|
 | **Mirror (default) capture** | Any Sunshine-supported setup | Stock Sunshine capture paths (PipeWire/portal, KMS, X11, kwingrab) — works on GNOME, KDE, wlroots, X11, any GPU. |
-| **Headless (gamescope) mode** | labwc + gamescope + PipeWire | DE-independent: Prism launches its own nested labwc session, so it works next to GNOME, KDE, etc., on any distro. |
+| **Headless (gamescope) mode** | labwc + gamescope + PipeWire + bubblewrap + systemd user manager | DE-independent: Prism launches its own nested labwc session and owns each stream in a user-service cgroup. Bubblewrap gives headless Steam a private device view so host controllers cannot displace the streamed controller. Non-systemd hosts retain other supported capture modes, but headless startup fails safely until an equivalent ownership backend is available. |
 | **Steam game sync / headless Steam** | Same as headless | Any distro with Steam installed. |
 | **Audio separation** (`prism-stream`/`prism-virtual`/`prism-headless` sinks, `prism_default_sink`) | PipeWire (via `pactl`) | Distro- and DE-agnostic, but **not** PulseAudio- or ALSA-only systems. |
 | **Virtual display mode** | KDE Plasma 6 (Wayland) | Relies on KWin virtual outputs (`krfb-virtualmonitor`). No equivalent on other DEs yet. |
@@ -92,6 +92,9 @@ Installs dependencies, builds Prism, and sets up:
 
 - `prism.service` — the stream host (`~/.local/bin/prism`)
 - `prism-labwc.service` — persistent headless compositor (socket `wayland-prism`)
+- `prism-headless-session.service` — owns gamescope and every process belonging to
+  the active headless stream
+- `prism-steam-restore.service` — cancelable five-second handoff back to desktop Steam
 - `prism-input-bridge.service` — routes Sunshine's virtual keyboard/mouse/touch into
   headless sessions (exclusively, only while one is active)
 - the four default apps in `~/.config/prism/apps.json` (existing file is backed up;
@@ -146,9 +149,17 @@ rm -rf ~/.config/prism ~/.cache/prism
   Streaming Mode) covers apps with no explicit mode, and the Applications tab supports
   multiselect bulk changes (backed by `POST /api/apps/capture`, matched by name).
 - **Headless session** (`contrib/virtual-session/prism-headless-*.sh`): sizes the headless
-  output to the client (`wlr-randr`), launches gamescope at the client's mode, records the
-  session sockets for app commands, and tears everything down — serialized with a lock so
-  a mid-setup disconnect can't leave orphans.
+  output to the client (`wlr-randr`), launches gamescope at the client's mode in
+  `prism-headless-session.service`, verifies that the Wayland/Xwayland sockets belong to
+  that service, and only then publishes the capture override. Gamescope, Steam, games,
+  shader workers, and the audio guard are owned by that service; a session-specific scope
+  owns app commands launched afterward. Teardown and crash recovery target these cgroups
+  without global process-name killing. Headless Steam and its games also run in a
+  bubblewrap mount namespace that hides host controller device nodes while leaving
+  Prism's dynamically created virtual controllers visible. After teardown, the next
+  headless startup resets the private labwc compositor before attaching gamescope; this
+  prevents stale client state from blocking an immediate replacement stream. The ownership calls are isolated in
+  `prism-headless-common.sh` for a future non-systemd backend.
 - **Virtual display** (`contrib/virtual-session/prism-virtual-*.sh`): creates/removes the
   KWin virtual output via `krfb-virtualmonitor` (KWin gates virtual outputs behind its
   security-context system; krfb is a trusted app) and disables physical outputs meanwhile.
@@ -163,9 +174,9 @@ rm -rf ~/.config/prism ~/.cache/prism
   **Virtual display** selects a `prism-virtual` sink as the system default for the session
   (physical outputs are off, so everything belongs on the stream) and loops it in.
   **Headless** session apps output to a dedicated `prism-headless` sink (`PULSE_SINK` plus a
-  routing watchdog), which is looped in, while the desktop's default sink stays on the
-  physical output — desktop audio is never captured, and desktop apps keep playing locally —
-  mirroring how inputs are separated. Set `prism_default_sink = <sink-name>` in
+  cgroup-aware routing watchdog), which is looped in, while the desktop's default sink stays
+  on the physical output — desktop audio is never captured, and desktop apps keep playing
+  locally — mirroring how inputs are separated. Set `prism_default_sink = <sink-name>` in
   `prism.conf` to force a specific default sink whenever any stream ends
   (e.g. your speakers, if the physical output varies); without it the sink
   recorded at stream start is restored.
