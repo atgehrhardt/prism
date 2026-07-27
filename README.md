@@ -62,9 +62,25 @@ it as a regular override app, and an app you define yourself always wins on name
 
 ⚠️ **Currently validated on Fedora 44 (KDE Plasma 6, Wayland, NVIDIA) only.** The design is
 GPU-agnostic (capture routing only; encoding stays on Sunshine's normal nvenc/vaapi/software
-paths) and should work on other Wayland desktops and distros — **testers wanted!** If you
-try Prism on another distro, GPU, or desktop environment, please report back in
-[Issues](https://github.com/atgehrhardt/prism/issues).
+paths) — **testers wanted!** If you try Prism on another distro, GPU, or desktop environment,
+please report back in [Issues](https://github.com/atgehrhardt/prism/issues).
+
+## Compatibility
+
+Nothing is Fedora- or NVIDIA-locked, but features vary by desktop environment:
+
+| Feature | Requirement | Notes |
+|---|---|---|
+| **Mirror (default) capture** | Any Sunshine-supported setup | Stock Sunshine capture paths (PipeWire/portal, KMS, X11, kwingrab) — works on GNOME, KDE, wlroots, X11, any GPU. |
+| **Headless (gamescope) mode** | labwc + gamescope + PipeWire | DE-independent: Prism launches its own nested labwc session, so it works next to GNOME, KDE, etc., on any distro. |
+| **Steam game sync / headless Steam** | Same as headless | Any distro with Steam installed. |
+| **Audio separation** (`prism-stream`/`prism-virtual`/`prism-headless` sinks, `prism_default_sink`) | PipeWire (via `pactl`) | Distro- and DE-agnostic, but **not** PulseAudio- or ALSA-only systems. |
+| **Virtual display mode** | KDE Plasma 6 (Wayland) | Relies on KWin virtual outputs (`krfb-virtualmonitor`). No equivalent on other DEs yet. |
+| **Physical-display mode/HDR switching** (`prism-desktop-session.sh`, `prism-kwin-mode`) | KDE Plasma 6 | Built on `kscreen-doctor` / kde-output-management-v2; silently no-ops elsewhere. |
+
+In short: on non-KDE desktops you keep mirror capture, headless sessions, Steam sync, and
+audio separation; you lose virtual-display mode and physical-display switching. On any
+PipeWire distro with KDE Plasma 6, everything should work.
 
 ## Install (Fedora 44)
 
