@@ -52,11 +52,19 @@ The list is re-synced on every client applist request, so installs and uninstall
 up without a restart, and box art is pulled from Steam's library cache (converted to PNG
 via ffmpeg into `~/.cache/prism/covers`).
 Launching one brings up a lightweight headless Steam session (a plain background
-Steam client — not the heavy SteamOS/Deck UI session) and starts the game inside it
-(the appid is handed to the session via `PRISM_STEAM_APP_ID`, and `prism-steam-game.sh`
-launches the game and exits with it, so closing the game closes the stream); ending the
-stream either way tears the session down. Synced apps are marked `prism-steam` in the Applications tab; editing one imports
-it as a regular override app, and an app you define yourself always wins on name collision.
+Steam client — not the heavy SteamOS/Deck UI session) and includes the game URL on
+Steam's initial command line inside the isolated headless session. The appid is handed
+to the session via `PRISM_STEAM_APP_ID`; `prism-steam-game.sh` monitors the resulting
+game and exits with it, so closing the game closes the stream. Ending the stream either
+way tears the session down. Synced apps are marked `prism-steam` in the Applications
+tab; editing one imports it as a regular override app, and an app you define yourself
+always wins on name collision.
+
+With `gamepad = auto`, Prism honors the controller type and capabilities reported by
+the Moonlight client. A PlayStation controller or a motion-capable client can therefore
+appear as a virtual DualSense in Steam's Controller Settings. Steam Input may still
+translate that DualSense to Xbox/XInput for individual games; this is expected and
+preserves compatibility with games that do not support native DualSense input.
 
 ## Status
 
