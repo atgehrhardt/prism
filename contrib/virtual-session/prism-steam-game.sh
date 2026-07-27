@@ -23,11 +23,19 @@ GAME_PATTERN="SteamLaunch AppId=$ID -- "
 
 # 1. Launch the game through the session Steam client, retrying while the
 #    client is still booting. Steam queues URLs sent to a running instance,
-#    so repeats are harmless until the game process shows up. The wait is
-#    generous: install scripts and Vulkan shader processing can take minutes
-#    before the game process appears.
+#    so repeats are harmless until the game process shows up. There is no
+#    fixed timeout: install scripts and Vulkan shader processing can legitimately
+#    take a very long time before the game process appears, and giving up would
+#    end the app (and the stream) mid-compile. We only abort if the session
+#    Steam client itself dies, which makes launching impossible.
 launched=0
-for _ in $(seq 1 150); do
+# The wrapper can start before the session Steam client has spawned; give it
+# a moment to appear before treating "no steam" as fatal.
+for _ in $(seq 1 30); do
+  pgrep -x steam >/dev/null && break
+  sleep 2
+done
+while pgrep -x steam >/dev/null; do
   steam "steam://rungameid/$ID" >/dev/null 2>&1 || true
   sleep 2
   if pgrep -f "$GAME_PATTERN" >/dev/null; then
@@ -36,7 +44,7 @@ for _ in $(seq 1 150); do
   fi
 done
 if [ "$launched" != "1" ]; then
-  echo "game $ID never appeared; giving up"
+  echo "game $ID never appeared and session steam is gone; giving up"
   exit 1
 fi
 GAME_PID="$(pgrep -f "$GAME_PATTERN" | head -1)"

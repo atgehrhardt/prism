@@ -21,14 +21,29 @@ echo "=== headless-start $(date -Is) steam=${PRISM_STEAM:-0} client=${PRISM_CLIE
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
-# Serialize with prism-headless-stop.sh.
-exec 9>"$RUNTIME/prism-headless.lock"
+# Serialize with all other capture-mode scripts (headless/virtual start/stop)
+# on a single shared lock: every mode writes or deletes the same
+# prism-capture-override file, so per-mode locks let a delayed teardown of one
+# mode clobber the bring-up of another.
+exec 9>"$RUNTIME/prism-capture.lock"
 flock -x 9
 
 # 0. Recover from a previous session that was never torn down (e.g. prism
 # crashed): a leftover gamescope would fight the new one for the session.
-if [ -f "$STATE" ]; then
-  echo "found stale state file; tearing down previous headless session"
+# Also recover when the state file is gone but a gamescope attached to our
+# compositor is still alive (e.g. teardown was interrupted mid-way).
+STALE=0
+[ -f "$STATE" ] && STALE=1
+if [ "$STALE" = "0" ]; then
+  for p in $(pgrep -x gamescope); do
+    if tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -q '^WAYLAND_DISPLAY=wayland-prism$'; then
+      STALE=1
+      break
+    fi
+  done
+fi
+if [ "$STALE" = "1" ]; then
+  echo "found stale headless session; tearing it down"
   pkill -x gamescope 2>/dev/null || true
   pkill -x gamescopereaper 2>/dev/null || true
   for _ in $(seq 1 20); do
@@ -37,6 +52,13 @@ if [ -f "$STATE" ]; then
   done
   pkill -9 -x gamescope 2>/dev/null || true
   pkill -9 -x gamescopereaper 2>/dev/null || true
+  for _ in $(seq 1 20); do
+    pgrep -x gamescope >/dev/null || break
+    sleep 0.5
+  done
+  # Leftover shader-compile workers hold cache locks that hang the new
+  # session's Steam at "Processing Vulkan shaders".
+  pkill -x fossilize_replay 2>/dev/null || true
   rm -f "$STATE"
 fi
 
@@ -89,6 +111,10 @@ if [ "${PRISM_STEAM:-0}" = "1" ]; then
     done
   fi
   pgrep -x steam >/dev/null && echo "WARNING: desktop steam still running; session launch may misroute"
+  # Desktop Steam's shader-compile workers must be gone too: they hold the
+  # fossilize cache locks the session Steam needs, and leftover workers hang
+  # games at "Processing Vulkan shaders".
+  pkill -x fossilize_replay 2>/dev/null || true
 fi
 
 # 2. Arm the capture override so this stream captures the headless session.

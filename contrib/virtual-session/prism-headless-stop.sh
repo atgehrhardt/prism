@@ -14,7 +14,8 @@ echo "=== headless-stop $(date -Is) ==="
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
-exec 9>"$RUNTIME/prism-headless.lock"
+# Shared cross-mode capture lock (see prism-headless-start.sh).
+exec 9>"$RUNTIME/prism-capture.lock"
 flock -x -w 90 9 || echo "headless-stop: lock timeout, proceeding anyway"
 
 STEAM=0
@@ -33,6 +34,12 @@ for _ in $(seq 1 20); do
 done
 pkill -9 -x gamescope 2>/dev/null || true
 pkill -9 -x gamescopereaper 2>/dev/null || true
+# Wait for the hard-killed processes to actually be reaped; a zombie gamescope
+# must not outlive this teardown into the next session's bring-up.
+for _ in $(seq 1 20); do
+  pgrep -x gamescope >/dev/null || break
+  sleep 0.5
+done
 
 # 2b. Kill any Steam still attached to the headless session. steamwebhelper
 # is a separate process name and survives killing `steam` alone; left behind
@@ -46,12 +53,39 @@ for name in steam steamwebhelper; do
     esac
   done
 done
+# Wait for the session-attached Steam processes to exit, escalating to a hard
+# kill, so the single-instance lock and fossilize state are released before
+# the next session (or the desktop relaunch below) starts Steam again.
+for _ in $(seq 1 20); do
+  alive=0
+  for name in steam steamwebhelper; do
+    for p in $(pgrep -x "$name"); do
+      env_disp="$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
+      case "$env_disp" in
+        *wayland-prism* | *gamescope* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
+          alive=1 ;;
+      esac
+    done
+  done
+  [ "$alive" = "0" ] && break
+  sleep 0.5
+done
+for name in steam steamwebhelper; do
+  for p in $(pgrep -x "$name"); do
+    env_disp="$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -E '^(WAYLAND_DISPLAY|DISPLAY)=' || true)"
+    case "$env_disp" in
+      *wayland-prism* | *gamescope* | DISPLAY=:1 | DISPLAY=:2 | DISPLAY=:3)
+        kill -9 "$p" 2>/dev/null || true ;;
+    esac
+  done
+done
 
 # Shader-compile workers from the torn-down session must not outlive it; they
-# keep cache locks that hang the next session's shader processing.
-if [ "$STEAM" = "1" ]; then
-  pkill -x fossilize_replay 2>/dev/null || true
-fi
+# keep cache locks that hang the next session's shader processing. Kill them
+# unconditionally: a stale fossilize_replay from ANY previous Steam session
+# (not just one whose teardown had STEAM=1) hangs the next session at
+# "Processing Vulkan shaders".
+pkill -x fossilize_replay 2>/dev/null || true
 
 # 2c. Tear down headless audio separation: stop the guard if it is still
 # waiting, remove the loopback into the capture sink, and destroy the

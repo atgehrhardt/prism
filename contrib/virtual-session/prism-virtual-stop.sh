@@ -17,7 +17,8 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 # kscreen-doctor can hang when KWin is in a degenerate state; cap every call.
 KSD="timeout 10 kscreen-doctor"
 
-exec 9>"$RUNTIME/prism-virtual.lock"
+# Shared cross-mode capture lock (see prism-headless-start.sh).
+exec 9>"$RUNTIME/prism-capture.lock"
 flock -x -w 90 9 || echo "virtual-stop: lock timeout, proceeding anyway"
 
 # Disarm capture override first so any new stream uses the desktop.
