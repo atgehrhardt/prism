@@ -40,7 +40,15 @@ if [ "$ACTION" = "stop" ]; then
   RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
   RESTORE="${RESTORE:-$PHYSICAL}"
   if [ -n "$RESTORE" ]; then
-    pactl set-default-sink "$RESTORE" 2>/dev/null || true
+    # PipeWire/WirePlumber can move the default while the loopback is being
+    # torn down, so retry and verify instead of firing once.
+    echo "restoring default sink: $RESTORE"
+    for _ in $(seq 1 10); do
+      pactl set-default-sink "$RESTORE" 2>/dev/null || true
+      [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
+      sleep 0.5
+    done
+    echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
   fi
   exit 0
 fi

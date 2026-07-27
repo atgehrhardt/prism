@@ -23,8 +23,23 @@ flock -x -w 90 9 || echo "virtual-stop: lock timeout, proceeding anyway"
 # Disarm capture override first so any new stream uses the desktop.
 rm -f "$OVERRIDE_FILE"
 
+# Restore the desktop default sink, retrying until it sticks: PipeWire and
+# WirePlumber can move the default while session sinks are being torn down,
+# so a single set-default-sink easily loses the race.
+restore_default_sink() {
+  local target="$1"
+  [ -z "$target" ] && return 0
+  echo "restoring default sink: $target"
+  for _ in $(seq 1 10); do
+    pactl set-default-sink "$target" 2>/dev/null || true
+    [ "$(pactl get-default-sink 2>/dev/null || true)" = "$target" ] && break
+    sleep 0.5
+  done
+  echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
+}
+
 # Tear down audio routing: stop the guard, unload the loopback and the
-# session sink, and restore the physical default sink.
+# session sink, and restore the default sink.
 pkill -f prism-virtual-audio.sh 2>/dev/null || true
 ASTATE="$RUNTIME/prism-virtual-audio.state"
 if [ -f "$ASTATE" ]; then
@@ -36,14 +51,12 @@ if [ -f "$ASTATE" ]; then
   if [ -n "${sink_module:-}" ]; then
     pactl unload-module "$sink_module" 2>/dev/null || true
   fi
-  if [ -n "${physical_sink:-}" ]; then
-    # A user-configured prism_default_sink wins over the recorded physical sink.
-    RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
-    RESTORE="${RESTORE:-$physical_sink}"
-    pactl set-default-sink "$RESTORE" 2>/dev/null || true
-  fi
   rm -f "$ASTATE"
 fi
+# A user-configured prism_default_sink wins over the recorded physical sink.
+RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+RESTORE="${RESTORE:-${physical_sink:-}}"
+restore_default_sink "$RESTORE"
 
 # Re-enable the physical outputs we disabled.
 if [ -f "$STATE" ]; then
