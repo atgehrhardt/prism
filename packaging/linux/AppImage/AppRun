@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# custom AppRun for Sunshine AppImage
+# custom AppRun for Prism AppImage
 
 # path of the extracted AppRun
 HERE="$(dirname "$(readlink -f "${0}")")"
-SUNSHINE_PATH=/usr/bin/sunshine
-SUNSHINE_BIN_HERE=$HERE/usr/bin/sunshine
-SUNSHINE_SHARE_HERE=$HERE/usr/share/sunshine
+PRISM_PATH=/usr/bin/prism
+PRISM_BIN_HERE=$HERE/usr/bin/prism
+PRISM_SHARE_HERE=$HERE/usr/share/prism
 
 # Set APPDIR when running directly from the AppDir:
 if [ -z "$APPDIR" ]; then
@@ -18,60 +18,60 @@ cd "$HERE" || exit 1
 function help() {
 echo "
  ------------------------------
-   Sunshine AppImage package.
+   Prism AppImage package.
  ------------------------------
 
- sunshine.AppImage options
+ prism.AppImage options
  ------------------------
 
  Usage:  $ARGV0  --help, -h
  ------            # This message
 
          $ARGV0  --install, -i
-                   # Install input rules sunshine.service files. Restart required.
+                   # Install input rules prism.service files. Restart required.
 
          $ARGV0  --remove, -r
-                   # Remove input rules sunshine.service files.
+                   # Remove input rules prism.service files.
 
          $ARGV0  --appimage-help
                    # Show available AppImage options
 
- sunshine options
+ prism options
  ----------------
 "
-# print sunshine binary help, replacing the sunshine command in usage statement
-"$SUNSHINE_BIN_HERE" --help | sed -e "s#$SUNSHINE_BIN_HERE#$ARGV0#g"
+# print prism binary help, replacing the prism command in usage statement
+"$PRISM_BIN_HERE" --help | sed -e "s#$PRISM_BIN_HERE#$ARGV0#g"
 }
 
 function install() {
   # user input rules
   # shellcheck disable=SC2002
-  cat "$SUNSHINE_SHARE_HERE/udev/rules.d/60-sunshine.rules" | sudo tee /etc/udev/rules.d/60-sunshine.rules
-  cat "$SUNSHINE_SHARE_HERE/modules-load.d/60-sunshine.conf" | sudo tee /etc/modules-load.d/60-sunshine.conf
+  cat "$PRISM_SHARE_HERE/udev/rules.d/60-prism.rules" | sudo tee /etc/udev/rules.d/60-prism.rules
+  cat "$PRISM_SHARE_HERE/modules-load.d/60-prism.conf" | sudo tee /etc/modules-load.d/60-prism.conf
   sudo modprobe uhid
   sudo udevadm control --reload-rules
   sudo udevadm trigger --property-match=DEVNAME=/dev/uinput
   sudo udevadm trigger --property-match=DEVNAME=/dev/uhid
 
-  # sunshine service
+  # prism service
   mkdir -p ~/.config/systemd/user
-  cp -r "$SUNSHINE_SHARE_HERE/systemd/user/" ~/.config/systemd/
+  cp -r "$PRISM_SHARE_HERE/systemd/user/" ~/.config/systemd/
   # patch service executable path
-  sed -i -e "s#$SUNSHINE_PATH#$(readlink -f $ARGV0)#g" ~/.config/systemd/user/app-dev.lizardbyte.app.Sunshine.service
+  sed -i -e "s#$PRISM_PATH#$(readlink -f $ARGV0)#g" ~/.config/systemd/user/app-dev.lizardbyte.app.Prism.service
 
   # setcap
-  sudo setcap cap_sys_admin,cap_sys_nice+p "$(readlink -f "$SUNSHINE_BIN_HERE")"
+  sudo setcap cap_sys_admin,cap_sys_nice+p "$(readlink -f "$PRISM_BIN_HERE")"
 }
 
 function remove() {
   # remove input rules
-  sudo rm -f /etc/udev/rules.d/60-sunshine.rules
+  sudo rm -f /etc/udev/rules.d/60-prism.rules
 
   # remove uhid module loading config
-  sudo rm -f /etc/modules-load.d/60-sunshine.conf
+  sudo rm -f /etc/modules-load.d/60-prism.conf
 
   # remove service
-  sudo rm -f ~/.config/systemd/user/app-dev.lizardbyte.app.Sunshine.service
+  sudo rm -f ~/.config/systemd/user/app-dev.lizardbyte.app.Prism.service
 }
 
 # process arguments
@@ -92,7 +92,7 @@ fi
 
 # create config directory if it doesn't exist
 # https://github.com/LizardByte/Sunshine/issues/324
-mkdir -p ~/.config/sunshine
+mkdir -p ~/.config/prism
 
-# run sunshine
-"$SUNSHINE_BIN_HERE" $@
+# run prism
+"$PRISM_BIN_HERE" $@

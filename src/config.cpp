@@ -1,6 +1,6 @@
 /**
  * @file src/config.cpp
- * @brief Definitions for the configuration of Sunshine.
+ * @brief Definitions for the configuration of Prism.
  */
 // standard includes
 #include <algorithm>
@@ -29,24 +29,16 @@
 #include "rtsp.h"
 #include "utility.h"
 
-#ifdef _WIN32
-  #include <shellapi.h>
-#endif
+// For NVENC legacy constants
+#include <ffnvcodec/nvEncodeAPI.h>
 
-#if !defined(__ANDROID__) && !defined(__APPLE__)
-  // For NVENC legacy constants
-  #include <ffnvcodec/nvEncodeAPI.h>
-#endif
-
-#if (defined(linux) || defined(__FreeBSD__)) && !defined(DOXYGEN)
-  // For VAAPI rate control types
-  #include <va/va.h>
-#endif
+// For VAAPI rate control types
+#include <va/va.h>
 
 namespace fs = std::filesystem;
 using namespace std::literals;
 
-constexpr auto CA_DIR = "credentials";  ///< Subdirectory under app data that stores Sunshine credentials.
+constexpr auto CA_DIR = "credentials";  ///< Subdirectory under app data that stores Prism credentials.
 const std::string PRIVATE_KEY_FILE = std::string(CA_DIR) + "/cakey.pem";  ///< Relative path to the persisted private key PEM file.
 const std::string CERTIFICATE_FILE = std::string(CA_DIR) + "/cacert.pem";  ///< Relative path to the persisted certificate PEM file.
 const std::string APPS_JSON_PATH = platf::appdata().string() + "/apps.json";  ///< Default path to the applications JSON file.
@@ -97,243 +89,6 @@ namespace config {
     }
 
   }  // namespace nv
-
-  namespace amd {
-#if !defined(_WIN32) || defined(DOXYGEN)
-    // values accurate as of 27/12/2022, but aren't strictly necessary for MacOS build
-    constexpr int AMF_VIDEO_ENCODER_AV1_QUALITY_PRESET_SPEED = 100;  ///< Fallback AMF enum value for av1 quality preset speed.
-    constexpr int AMF_VIDEO_ENCODER_AV1_QUALITY_PRESET_QUALITY = 30;  ///< Fallback AMF enum value for av1 quality preset quality.
-    constexpr int AMF_VIDEO_ENCODER_AV1_QUALITY_PRESET_BALANCED = 70;  ///< Fallback AMF enum value for av1 quality preset balanced.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_SPEED = 10;  ///< Fallback AMF enum value for hevc quality preset speed.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_QUALITY = 0;  ///< Fallback AMF enum value for hevc quality preset quality.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_BALANCED = 5;  ///< Fallback AMF enum value for hevc quality preset balanced.
-    constexpr int AMF_VIDEO_ENCODER_QUALITY_PRESET_SPEED = 1;  ///< Fallback AMF enum value for quality preset speed.
-    constexpr int AMF_VIDEO_ENCODER_QUALITY_PRESET_QUALITY = 2;  ///< Fallback AMF enum value for quality preset quality.
-    constexpr int AMF_VIDEO_ENCODER_QUALITY_PRESET_BALANCED = 0;  ///< Fallback AMF enum value for quality preset balanced.
-    constexpr int AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_CONSTANT_QP = 0;  ///< Fallback AMF enum value for av1 rate control method constant qp.
-    constexpr int AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_CBR = 3;  ///< Fallback AMF enum value for av1 rate control method cbr.
-    constexpr int AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_PEAK_CONSTRAINED_VBR = 2;  ///< Fallback AMF enum value for av1 rate control method peak constrained vbr.
-    constexpr int AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_LATENCY_CONSTRAINED_VBR = 1;  ///< Fallback AMF enum value for av1 rate control method latency constrained vbr.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_CONSTANT_QP = 0;  ///< Fallback AMF enum value for hevc rate control method constant qp.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_CBR = 3;  ///< Fallback AMF enum value for hevc rate control method cbr.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_PEAK_CONSTRAINED_VBR = 2;  ///< Fallback AMF enum value for hevc rate control method peak constrained vbr.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_LATENCY_CONSTRAINED_VBR = 1;  ///< Fallback AMF enum value for hevc rate control method latency constrained vbr.
-    constexpr int AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CONSTANT_QP = 0;  ///< Fallback AMF enum value for rate control method constant qp.
-    constexpr int AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR = 1;  ///< Fallback AMF enum value for rate control method cbr.
-    constexpr int AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_PEAK_CONSTRAINED_VBR = 2;  ///< Fallback AMF enum value for rate control method peak constrained vbr.
-    constexpr int AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_LATENCY_CONSTRAINED_VBR = 3;  ///< Fallback AMF enum value for rate control method latency constrained vbr.
-    constexpr int AMF_VIDEO_ENCODER_AV1_USAGE_TRANSCODING = 0;  ///< Fallback AMF enum value for av1 usage transcoding.
-    constexpr int AMF_VIDEO_ENCODER_AV1_USAGE_LOW_LATENCY = 1;  ///< Fallback AMF enum value for av1 usage low latency.
-    constexpr int AMF_VIDEO_ENCODER_AV1_USAGE_ULTRA_LOW_LATENCY = 2;  ///< Fallback AMF enum value for av1 usage ultra low latency.
-    constexpr int AMF_VIDEO_ENCODER_AV1_USAGE_WEBCAM = 3;  ///< Fallback AMF enum value for av1 usage webcam.
-    constexpr int AMF_VIDEO_ENCODER_AV1_USAGE_LOW_LATENCY_HIGH_QUALITY = 5;  ///< Fallback AMF enum value for av1 usage low latency high quality.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_USAGE_TRANSCODING = 0;  ///< Fallback AMF enum value for hevc usage transcoding.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_USAGE_ULTRA_LOW_LATENCY = 1;  ///< Fallback AMF enum value for hevc usage ultra low latency.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY = 2;  ///< Fallback AMF enum value for hevc usage low latency.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_USAGE_WEBCAM = 3;  ///< Fallback AMF enum value for hevc usage webcam.
-    constexpr int AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY_HIGH_QUALITY = 5;  ///< Fallback AMF enum value for hevc usage low latency high quality.
-    constexpr int AMF_VIDEO_ENCODER_USAGE_TRANSCODING = 0;  ///< Fallback AMF enum value for usage transcoding.
-    constexpr int AMF_VIDEO_ENCODER_USAGE_ULTRA_LOW_LATENCY = 1;  ///< Fallback AMF enum value for usage ultra low latency.
-    constexpr int AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY = 2;  ///< Fallback AMF enum value for usage low latency.
-    constexpr int AMF_VIDEO_ENCODER_USAGE_WEBCAM = 3;  ///< Fallback AMF enum value for usage webcam.
-    constexpr int AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY_HIGH_QUALITY = 5;  ///< Fallback AMF enum value for usage low latency high quality.
-    constexpr int AMF_VIDEO_ENCODER_UNDEFINED = 0;  ///< Fallback AMF enum value for undefined.
-    constexpr int AMF_VIDEO_ENCODER_CABAC = 1;  ///< Fallback AMF enum value for cabac.
-    constexpr int AMF_VIDEO_ENCODER_CALV = 2;  ///< Fallback AMF enum value for calv.
-#else
-  #ifdef _GLIBCXX_USE_C99_INTTYPES
-    #undef _GLIBCXX_USE_C99_INTTYPES
-  #endif
-  #include <AMF/components/VideoEncoderAV1.h>
-  #include <AMF/components/VideoEncoderHEVC.h>
-  #include <AMF/components/VideoEncoderVCE.h>
-#endif
-
-    /**
-     * @brief Enumerates supported quality AV1 options.
-     */
-    enum class quality_av1_e : int {
-      speed = AMF_VIDEO_ENCODER_AV1_QUALITY_PRESET_SPEED,  ///< Speed preset
-      quality = AMF_VIDEO_ENCODER_AV1_QUALITY_PRESET_QUALITY,  ///< Quality preset
-      balanced = AMF_VIDEO_ENCODER_AV1_QUALITY_PRESET_BALANCED  ///< Balanced preset
-    };
-
-    /**
-     * @brief Enumerates supported quality HEVC options.
-     */
-    enum class quality_hevc_e : int {
-      speed = AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_SPEED,  ///< Speed preset
-      quality = AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_QUALITY,  ///< Quality preset
-      balanced = AMF_VIDEO_ENCODER_HEVC_QUALITY_PRESET_BALANCED  ///< Balanced preset
-    };
-
-    /**
-     * @brief Enumerates supported quality h264 options.
-     */
-    enum class quality_h264_e : int {
-      speed = AMF_VIDEO_ENCODER_QUALITY_PRESET_SPEED,  ///< Speed preset
-      quality = AMF_VIDEO_ENCODER_QUALITY_PRESET_QUALITY,  ///< Quality preset
-      balanced = AMF_VIDEO_ENCODER_QUALITY_PRESET_BALANCED  ///< Balanced preset
-    };
-
-    /**
-     * @brief Enumerates supported rc AV1 options.
-     */
-    enum class rc_av1_e : int {
-      cbr = AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_CBR,  ///< CBR
-      cqp = AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_CONSTANT_QP,  ///< CQP
-      vbr_latency = AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_LATENCY_CONSTRAINED_VBR,  ///< VBR with latency constraints
-      vbr_peak = AMF_VIDEO_ENCODER_AV1_RATE_CONTROL_METHOD_PEAK_CONSTRAINED_VBR  ///< VBR with peak constraints
-    };
-
-    /**
-     * @brief Enumerates supported rc HEVC options.
-     */
-    enum class rc_hevc_e : int {
-      cbr = AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_CBR,  ///< CBR
-      cqp = AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_CONSTANT_QP,  ///< CQP
-      vbr_latency = AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_LATENCY_CONSTRAINED_VBR,  ///< VBR with latency constraints
-      vbr_peak = AMF_VIDEO_ENCODER_HEVC_RATE_CONTROL_METHOD_PEAK_CONSTRAINED_VBR  ///< VBR with peak constraints
-    };
-
-    /**
-     * @brief Enumerates supported rc h264 options.
-     */
-    enum class rc_h264_e : int {
-      cbr = AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CBR,  ///< CBR
-      cqp = AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_CONSTANT_QP,  ///< CQP
-      vbr_latency = AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_LATENCY_CONSTRAINED_VBR,  ///< VBR with latency constraints
-      vbr_peak = AMF_VIDEO_ENCODER_RATE_CONTROL_METHOD_PEAK_CONSTRAINED_VBR  ///< VBR with peak constraints
-    };
-
-    /**
-     * @brief Enumerates supported usage AV1 options.
-     */
-    enum class usage_av1_e : int {
-      transcoding = AMF_VIDEO_ENCODER_AV1_USAGE_TRANSCODING,  ///< Transcoding preset
-      webcam = AMF_VIDEO_ENCODER_AV1_USAGE_WEBCAM,  ///< Webcam preset
-      lowlatency_high_quality = AMF_VIDEO_ENCODER_AV1_USAGE_LOW_LATENCY_HIGH_QUALITY,  ///< Low latency high quality preset
-      lowlatency = AMF_VIDEO_ENCODER_AV1_USAGE_LOW_LATENCY,  ///< Low latency preset
-      ultralowlatency = AMF_VIDEO_ENCODER_AV1_USAGE_ULTRA_LOW_LATENCY  ///< Ultra low latency preset
-    };
-
-    /**
-     * @brief Enumerates supported usage HEVC options.
-     */
-    enum class usage_hevc_e : int {
-      transcoding = AMF_VIDEO_ENCODER_HEVC_USAGE_TRANSCODING,  ///< Transcoding preset
-      webcam = AMF_VIDEO_ENCODER_HEVC_USAGE_WEBCAM,  ///< Webcam preset
-      lowlatency_high_quality = AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY_HIGH_QUALITY,  ///< Low latency high quality preset
-      lowlatency = AMF_VIDEO_ENCODER_HEVC_USAGE_LOW_LATENCY,  ///< Low latency preset
-      ultralowlatency = AMF_VIDEO_ENCODER_HEVC_USAGE_ULTRA_LOW_LATENCY  ///< Ultra low latency preset
-    };
-
-    /**
-     * @brief Enumerates supported usage h264 options.
-     */
-    enum class usage_h264_e : int {
-      transcoding = AMF_VIDEO_ENCODER_USAGE_TRANSCODING,  ///< Transcoding preset
-      webcam = AMF_VIDEO_ENCODER_USAGE_WEBCAM,  ///< Webcam preset
-      lowlatency_high_quality = AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY_HIGH_QUALITY,  ///< Low latency high quality preset
-      lowlatency = AMF_VIDEO_ENCODER_USAGE_LOW_LATENCY,  ///< Low latency preset
-      ultralowlatency = AMF_VIDEO_ENCODER_USAGE_ULTRA_LOW_LATENCY  ///< Ultra low latency preset
-    };
-
-    /**
-     * @brief Enumerates supported coder options.
-     */
-    enum coder_e : int {
-      _auto = AMF_VIDEO_ENCODER_UNDEFINED,  ///< Auto
-      cabac = AMF_VIDEO_ENCODER_CABAC,  ///< CABAC
-      cavlc = AMF_VIDEO_ENCODER_CALV  ///< CAVLC
-    };
-
-    /**
-     * @brief Parse an AMD quality preset while preserving the current value on invalid input.
-     *
-     * @param quality_type Configuration text naming the AMD quality preset.
-     * @param original Original text value used when reporting a parsing failure.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    template<class T>
-    ::std::optional<int> quality_from_view(const ::std::string_view &quality_type, const ::std::optional<int>(&original)) {
-#ifndef DOXYGEN
-  #define _CONVERT_(x) \
-    if (quality_type == #x##sv) \
-    return (int) T::x
-#endif
-      _CONVERT_(balanced);
-      _CONVERT_(quality);
-      _CONVERT_(speed);
-#undef _CONVERT_
-      return original;
-    }
-
-    /**
-     * @brief Parse an AMD rate-control mode while preserving the current value on invalid input.
-     *
-     * @param rc Rate-control mode selected in the configuration.
-     * @param original Original text value used when reporting a parsing failure.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    template<class T>
-    ::std::optional<int> rc_from_view(const ::std::string_view &rc, const ::std::optional<int>(&original)) {
-#ifndef DOXYGEN
-  #define _CONVERT_(x) \
-    if (rc == #x##sv) \
-    return (int) T::x
-#endif
-      _CONVERT_(cbr);
-      _CONVERT_(cqp);
-      _CONVERT_(vbr_latency);
-      _CONVERT_(vbr_peak);
-#undef _CONVERT_
-      return original;
-    }
-
-    /**
-     * @brief Parse an AMD encoder usage mode while preserving the current value on invalid input.
-     *
-     * @param usage Encoder usage mode selected in the configuration.
-     * @param original Original text value used when reporting a parsing failure.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    template<class T>
-    ::std::optional<int> usage_from_view(const ::std::string_view &usage, const ::std::optional<int>(&original)) {
-#ifndef DOXYGEN
-  #define _CONVERT_(x) \
-    if (usage == #x##sv) \
-    return (int) T::x
-#endif
-      _CONVERT_(lowlatency);
-      _CONVERT_(lowlatency_high_quality);
-      _CONVERT_(transcoding);
-      _CONVERT_(ultralowlatency);
-      _CONVERT_(webcam);
-#undef _CONVERT_
-      return original;
-    }
-
-    /**
-     * @brief Parse an entropy-coder mode from configuration text.
-     *
-     * @param coder Entropy-coder mode selected in the configuration.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    int coder_from_view(const ::std::string_view &coder) {
-      if (coder == "auto"sv) {
-        return _auto;
-      }
-      if (coder == "cabac"sv || coder == "ac"sv) {
-        return cabac;
-      }
-      if (coder == "cavlc"sv || coder == "vlc"sv) {
-        return cavlc;
-      }
-
-      return _auto;
-    }
-  }  // namespace amd
 
   namespace qsv {
     /**
@@ -403,14 +158,6 @@ namespace config {
   }  // namespace qsv
 
   namespace vaapi {
-#if !(defined(linux) || defined(__FreeBSD__)) || defined(DOXYGEN)
-    constexpr int VA_RC_CBR = 0x00000002;  ///< CBR rate control
-    constexpr int VA_RC_VBR = 0x00000004;  ///< VBR rate control
-    constexpr int VA_RC_CQP = 0x00000010;  ///< CQP rate control
-    constexpr int VA_RC_ICQ = 0x00000040;  ///< ICQ rate control
-    constexpr int VA_RC_QVBR = 0x00000400;  ///< QVBR rate control
-    constexpr int VA_RC_AVBR = 0x00000800;  ///< AVBR rate control
-#endif
     /**
      * @brief Enumerates supported VA-API quality options.
      */
@@ -484,81 +231,6 @@ namespace config {
     }
 
   }  // namespace vaapi
-
-  namespace vt {
-
-    /**
-     * @brief Enumerates supported coder options.
-     */
-    enum coder_e : int {
-      _auto = 0,  ///< Auto
-      cabac,  ///< CABAC
-      cavlc  ///< CAVLC
-    };
-
-    /**
-     * @brief Parse an entropy-coder mode from configuration text.
-     *
-     * @param coder Entropy-coder mode selected in the configuration.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    int coder_from_view(const std::string_view &coder) {
-      if (coder == "auto"sv) {
-        return _auto;
-      }
-      if (coder == "cabac"sv || coder == "ac"sv) {
-        return cabac;
-      }
-      if (coder == "cavlc"sv || coder == "vlc"sv) {
-        return cavlc;
-      }
-
-      return -1;
-    }
-
-    /**
-     * @brief Parse whether VideoToolbox software encoding is allowed.
-     *
-     * @param software Whether the software encoder path is being configured.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    int allow_software_from_view(const std::string_view &software) {
-      if (software == "allowed"sv || software == "forced") {
-        return 1;
-      }
-
-      return 0;
-    }
-
-    /**
-     * @brief Parse whether VideoToolbox software encoding is forced.
-     *
-     * @param software Whether the software encoder path is being configured.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    int force_software_from_view(const std::string_view &software) {
-      if (software == "forced") {
-        return 1;
-      }
-
-      return 0;
-    }
-
-    /**
-     * @brief Parse the VideoToolbox realtime encoder flag.
-     *
-     * @param rt Real-time encoder usage selector.
-     * @return Parsed enum value, or the setting-specific default when the text is unknown.
-     */
-    int rt_from_view(const std::string_view &rt) {
-      if (rt == "disabled" || rt == "off" || rt == "0") {
-        return 0;
-      }
-
-      return 1;
-    }
-
-  }  // namespace vt
 
   namespace sw {
     /**
@@ -722,9 +394,6 @@ namespace config {
     },  // software
 
     {},  // nv
-    true,  // nv_realtime_hags
-    true,  // nv_opengl_vulkan_on_dxgi
-    true,  // nv_sunshine_high_power_mode
     {},  // nv_legacy
 
     {
@@ -732,29 +401,6 @@ namespace config {
       qsv::_auto,  // cavlc
       false,  // slow_hevc
     },  // qsv
-
-    {
-      (int) amd::usage_h264_e::ultralowlatency,  // usage (h264)
-      (int) amd::usage_hevc_e::ultralowlatency,  // usage (hevc)
-      (int) amd::usage_av1_e::ultralowlatency,  // usage (av1)
-      (int) amd::rc_h264_e::vbr_latency,  // rate control (h264)
-      (int) amd::rc_hevc_e::vbr_latency,  // rate control (hevc)
-      (int) amd::rc_av1_e::vbr_latency,  // rate control (av1)
-      0,  // enforce_hrd
-      (int) amd::quality_h264_e::balanced,  // quality (h264)
-      (int) amd::quality_hevc_e::balanced,  // quality (hevc)
-      (int) amd::quality_av1_e::balanced,  // quality (av1)
-      0,  // preanalysis
-      1,  // vbaq
-      (int) amd::coder_e::_auto,  // coder
-    },  // amd
-
-    {
-      0,
-      0,
-      1,
-      -1,
-    },  // vt
 
     {
       0,  // blbrc
@@ -799,7 +445,6 @@ namespace config {
     {},  // virtual_sink
     {},  // prism_default_sink
     true,  // stream audio
-    true,  // install_steam_drivers
   };
 
   /**
@@ -828,8 +473,8 @@ namespace config {
     PRIVATE_KEY_FILE,
     CERTIFICATE_FILE,
 
-    platf::get_host_name(),  // sunshine_name,
-    "sunshine_state.json"s,  // file_state
+    platf::get_host_name(),  // prism_name,
+    "prism_state.json"s,  // file_state
     {},  // external_ip
   };
 
@@ -860,15 +505,14 @@ namespace config {
     true,  // android back as guide
     true,  // mouse enabled
     true,  // controller enabled
-    true,  // always send scancodes
     true,  // high resolution scrolling
     true,  // native pen/touch support
   };
 
   /**
-   * @brief Default top-level Sunshine configuration values used before file and CLI overrides.
+   * @brief Default top-level Prism configuration values used before file and CLI overrides.
    */
-  sunshine_t sunshine {
+  prism_t prism {
     "en",  // locale
     2,  // min_log_level
     0,  // flags
@@ -876,12 +520,12 @@ namespace config {
     {},  // Username
     {},  // Password
     {},  // Password Salt
-    platf::appdata().string() + "/sunshine.conf",  // config file
+    platf::appdata().string() + "/prism.conf",  // config file
     {},  // cmd args
     47989,  // Base port number
     "ipv4",  // Address family
     {},  // Bind address
-    platf::appdata().string() + "/sunshine.log",  // log file
+    platf::appdata().string() + "/prism.log",  // log file
     false,  // notify_pre_releases
     true,  // system_tray
     {},  // prep commands
@@ -1012,7 +656,7 @@ namespace config {
   }
 
   /**
-   * @brief Parse Sunshine configuration text into key-value entries.
+   * @brief Parse Prism configuration text into key-value entries.
    */
   std::unordered_map<std::string, std::string> parse_config(const std::string_view &file_content) {
     std::unordered_map<std::string, std::string> vars;
@@ -1460,7 +1104,7 @@ namespace config {
     }
 
     // The framerate list must be cleared before adding values from the file configuration.
-    // If the list is not cleared, then the specified parameters do not affect the behavior of the sunshine server.
+    // If the list is not cleared, then the specified parameters do not affect the behavior of the prism server.
     // That is, if you set only 30 fps in the configuration file, it will not work because by default, during initialization the list includes 10, 30, 60, 90 and 120 fps.
     input.clear();
     for (auto &el : list) {
@@ -1510,7 +1154,7 @@ namespace config {
   }
 
   /**
-   * @brief Apply single-character command-line flags to the global Sunshine flags bitset.
+   * @brief Apply single-character command-line flags to the global Prism flags bitset.
    *
    * @param line Configuration line being parsed.
    * @return 0 when all flags are recognized; -1 when at least one flag is unknown.
@@ -1520,16 +1164,16 @@ namespace config {
     while (*line != '\0') {
       switch (*line) {
         case '0':
-          config::sunshine.flags[config::flag::PIN_STDIN].flip();
+          config::prism.flags[config::flag::PIN_STDIN].flip();
           break;
         case '1':
-          config::sunshine.flags[config::flag::FRESH_STATE].flip();
+          config::prism.flags[config::flag::FRESH_STATE].flip();
           break;
         case '2':
-          config::sunshine.flags[config::flag::FORCE_VIDEO_HEADER_REPLACE].flip();
+          config::prism.flags[config::flag::FORCE_VIDEO_HEADER_REPLACE].flip();
           break;
         case 'p':
-          config::sunshine.flags[config::flag::UPNP].flip();
+          config::prism.flags[config::flag::UPNP].flip();
           break;
         default:
           BOOST_LOG(warning) << "config: Unrecognized flag: ["sv << *line << ']' << std::endl;
@@ -1596,11 +1240,7 @@ namespace config {
     generic_f(vars, "nvenc_twopass", video.nv.two_pass, nv::twopass_from_view);
     bool_f(vars, "nvenc_h264_cavlc", video.nv.h264_cavlc);
     generic_f(vars, "nvenc_split_encode", video.nv.split_frame_encoding, nv::split_encode_from_view);
-    bool_f(vars, "nvenc_realtime_hags", video.nv_realtime_hags);
-    bool_f(vars, "nvenc_opengl_vulkan_on_dxgi", video.nv_opengl_vulkan_on_dxgi);
-    bool_f(vars, "nvenc_latency_over_power", video.nv_sunshine_high_power_mode);
 
-#if !defined(__ANDROID__) && !defined(__APPLE__)
     video.nv_legacy.preset = video.nv.quality_preset + 11;
     video.nv_legacy.multipass = video.nv.two_pass == nvenc::nvenc_two_pass::quarter_resolution ? NV_ENC_TWO_PASS_QUARTER_RESOLUTION :
                                 video.nv.two_pass == nvenc::nvenc_two_pass::full_resolution    ? NV_ENC_TWO_PASS_FULL_RESOLUTION :
@@ -1608,45 +1248,10 @@ namespace config {
     video.nv_legacy.h264_coder = video.nv.h264_cavlc ? NV_ENC_H264_ENTROPY_CODING_MODE_CAVLC : NV_ENC_H264_ENTROPY_CODING_MODE_CABAC;
     video.nv_legacy.aq = video.nv.adaptive_quantization;
     video.nv_legacy.vbv_percentage_increase = video.nv.vbv_percentage_increase;
-#endif
 
     int_f(vars, "qsv_preset", video.qsv.qsv_preset, qsv::preset_from_view);
     int_f(vars, "qsv_coder", video.qsv.qsv_cavlc, qsv::coder_from_view);
     bool_f(vars, "qsv_slow_hevc", video.qsv.qsv_slow_hevc);
-
-    std::string quality;
-    string_f(vars, "amd_quality", quality);
-    if (!quality.empty()) {
-      video.amd.amd_quality_h264 = amd::quality_from_view<amd::quality_h264_e>(quality, video.amd.amd_quality_h264);
-      video.amd.amd_quality_hevc = amd::quality_from_view<amd::quality_hevc_e>(quality, video.amd.amd_quality_hevc);
-      video.amd.amd_quality_av1 = amd::quality_from_view<amd::quality_av1_e>(quality, video.amd.amd_quality_av1);
-    }
-
-    std::string rc;
-    string_f(vars, "amd_rc", rc);
-    int_f(vars, "amd_coder", video.amd.amd_coder, amd::coder_from_view);
-    if (!rc.empty()) {
-      video.amd.amd_rc_h264 = amd::rc_from_view<amd::rc_h264_e>(rc, video.amd.amd_rc_h264);
-      video.amd.amd_rc_hevc = amd::rc_from_view<amd::rc_hevc_e>(rc, video.amd.amd_rc_hevc);
-      video.amd.amd_rc_av1 = amd::rc_from_view<amd::rc_av1_e>(rc, video.amd.amd_rc_av1);
-    }
-
-    std::string usage;
-    string_f(vars, "amd_usage", usage);
-    if (!usage.empty()) {
-      video.amd.amd_usage_h264 = amd::usage_from_view<amd::usage_h264_e>(usage, video.amd.amd_usage_h264);
-      video.amd.amd_usage_hevc = amd::usage_from_view<amd::usage_hevc_e>(usage, video.amd.amd_usage_hevc);
-      video.amd.amd_usage_av1 = amd::usage_from_view<amd::usage_av1_e>(usage, video.amd.amd_usage_av1);
-    }
-
-    bool_f(vars, "amd_preanalysis", (bool &) video.amd.amd_preanalysis);
-    bool_f(vars, "amd_vbaq", (bool &) video.amd.amd_vbaq);
-    bool_f(vars, "amd_enforce_hrd", (bool &) video.amd.amd_enforce_hrd);
-
-    int_f(vars, "vt_coder", video.vt.vt_coder, vt::coder_from_view);
-    int_f(vars, "vt_software", video.vt.vt_allow_sw, vt::allow_software_from_view);
-    int_f(vars, "vt_software", video.vt.vt_require_sw, vt::force_software_from_view);
-    int_f(vars, "vt_realtime", video.vt.vt_realtime, vt::rt_from_view);
 
     std::string vaapi_quality;
     string_f(vars, "vaapi_quality", vaapi_quality);
@@ -1694,22 +1299,21 @@ namespace config {
 
     path_f(vars, "pkey", nvhttp.pkey);
     path_f(vars, "cert", nvhttp.cert);
-    string_f(vars, "sunshine_name", nvhttp.sunshine_name);
-    path_f(vars, "log_path", config::sunshine.log_file);
+    string_f(vars, "prism_name", nvhttp.prism_name);
+    path_f(vars, "log_path", config::prism.log_file);
     path_f(vars, "file_state", nvhttp.file_state);
 
     // Must be run after "file_state"
-    config::sunshine.credentials_file = config::nvhttp.file_state;
-    path_f(vars, "credentials_file", config::sunshine.credentials_file);
+    config::prism.credentials_file = config::nvhttp.file_state;
+    path_f(vars, "credentials_file", config::prism.credentials_file);
 
     string_f(vars, "external_ip", nvhttp.external_ip);
-    list_prep_cmd_f(vars, "global_prep_cmd", config::sunshine.prep_cmds);
+    list_prep_cmd_f(vars, "global_prep_cmd", config::prism.prep_cmds);
 
     string_f(vars, "audio_sink", audio.sink);
     string_f(vars, "virtual_sink", audio.virtual_sink);
     string_f(vars, "prism_default_sink", audio.default_sink);
     bool_f(vars, "stream_audio", audio.stream);
-    bool_f(vars, "install_steam_audio_drivers", audio.install_steam_drivers);
 
     string_restricted_f(vars, "origin_web_ui_allowed", nvhttp.origin_web_ui_allowed, {"pc"sv, "lan"sv, "wan"sv});
 
@@ -1718,7 +1322,7 @@ namespace config {
     string_list_f(vars, "csrf_allowed_origins", user_csrf_origins);
 
     // Start with default localhost variants
-    sunshine.csrf_allowed_origins = {
+    prism.csrf_allowed_origins = {
       "https://localhost",
       "https://127.0.0.1",
       "https://[::1]"
@@ -1728,7 +1332,7 @@ namespace config {
     bool csrf_invalid_config = false;
     for (const auto &origin : user_csrf_origins) {
       if (origin.size() > 8 && origin.starts_with("https://")) {
-        sunshine.csrf_allowed_origins.push_back(origin);
+        prism.csrf_allowed_origins.push_back(origin);
       } else {
         csrf_invalid_config = true;
         BOOST_LOG(warning) << "Invalid 'csrf_allowed_origins' entry rejected: "sv << origin;
@@ -1758,7 +1362,7 @@ namespace config {
 #ifndef __ANDROID__
     // TODO: Android can possibly support this
     if (!fs::exists(stream.file_apps.c_str())) {
-      fs::copy_file(SUNSHINE_ASSETS_DIR "/apps.json", stream.file_apps);
+      fs::copy_file(PRISM_ASSETS_DIR "/apps.json", stream.file_apps);
       fs::permissions(
         stream.file_apps,
         fs::perms::owner_read | fs::perms::owner_write,
@@ -1811,83 +1415,81 @@ namespace config {
     bool_f(vars, "keyboard", input.keyboard);
     bool_f(vars, "controller", input.controller);
 
-    bool_f(vars, "always_send_scancodes", input.always_send_scancodes);
-
     bool_f(vars, "high_resolution_scrolling", input.high_resolution_scrolling);
     bool_f(vars, "native_pen_touch", input.native_pen_touch);
 
-    bool_f(vars, "notify_pre_releases", sunshine.notify_pre_releases);
-    bool_f(vars, "system_tray", sunshine.system_tray);
+    bool_f(vars, "notify_pre_releases", prism.notify_pre_releases);
+    bool_f(vars, "system_tray", prism.system_tray);
 
-    int port = sunshine.port;
+    int port = prism.port;
     int_between_f(vars, "port"s, port, {1024 + nvhttp::PORT_HTTPS, 65535 - rtsp_stream::RTSP_SETUP_PORT});
-    sunshine.port = (std::uint16_t) port;
+    prism.port = (std::uint16_t) port;
 
     // Now that we have the port, add web UI port-specific origins to CSRF allowed list
     // Web UI runs on port + 1 (PORT_HTTPS offset is 1 for confighttp)
-    const unsigned short web_ui_port = sunshine.port + 1;
-    sunshine.csrf_allowed_origins.push_back(std::format("https://localhost:{}", web_ui_port));
-    sunshine.csrf_allowed_origins.push_back(std::format("https://127.0.0.1:{}", web_ui_port));
-    sunshine.csrf_allowed_origins.push_back(std::format("https://[::1]:{}", web_ui_port));
+    const unsigned short web_ui_port = prism.port + 1;
+    prism.csrf_allowed_origins.push_back(std::format("https://localhost:{}", web_ui_port));
+    prism.csrf_allowed_origins.push_back(std::format("https://127.0.0.1:{}", web_ui_port));
+    prism.csrf_allowed_origins.push_back(std::format("https://[::1]:{}", web_ui_port));
 
-    string_restricted_f(vars, "address_family", sunshine.address_family, {"ipv4"sv, "both"sv});
-    string_f(vars, "bind_address", sunshine.bind_address);
+    string_restricted_f(vars, "address_family", prism.address_family, {"ipv4"sv, "both"sv});
+    string_f(vars, "bind_address", prism.bind_address);
 
     bool upnp = false;
     bool_f(vars, "upnp"s, upnp);
 
     if (upnp) {
-      config::sunshine.flags[config::flag::UPNP].flip();
+      config::prism.flags[config::flag::UPNP].flip();
     }
 
-    string_restricted_f(vars, "locale", config::sunshine.locale, {
-                                                                   "bg"sv,  // Bulgarian
-                                                                   "cs"sv,  // Czech
-                                                                   "de"sv,  // German
-                                                                   "en"sv,  // English
-                                                                   "en_GB"sv,  // English (UK)
-                                                                   "en_US"sv,  // English (US)
-                                                                   "es"sv,  // Spanish
-                                                                   "fr"sv,  // French
-                                                                   "hu"sv,  // Hungarian
-                                                                   "it"sv,  // Italian
-                                                                   "ja"sv,  // Japanese
-                                                                   "ko"sv,  // Korean
-                                                                   "pl"sv,  // Polish
-                                                                   "pt"sv,  // Portuguese
-                                                                   "pt_BR"sv,  // Portuguese (Brazilian)
-                                                                   "ru"sv,  // Russian
-                                                                   "sv"sv,  // Swedish
-                                                                   "tr"sv,  // Turkish
-                                                                   "uk"sv,  // Ukrainian
-                                                                   "vi"sv,  // Vietnamese
-                                                                   "zh"sv,  // Chinese
-                                                                   "zh_TW"sv,  // Chinese (Traditional)
-                                                                 });
+    string_restricted_f(vars, "locale", config::prism.locale, {
+                                                                "bg"sv,  // Bulgarian
+                                                                "cs"sv,  // Czech
+                                                                "de"sv,  // German
+                                                                "en"sv,  // English
+                                                                "en_GB"sv,  // English (UK)
+                                                                "en_US"sv,  // English (US)
+                                                                "es"sv,  // Spanish
+                                                                "fr"sv,  // French
+                                                                "hu"sv,  // Hungarian
+                                                                "it"sv,  // Italian
+                                                                "ja"sv,  // Japanese
+                                                                "ko"sv,  // Korean
+                                                                "pl"sv,  // Polish
+                                                                "pt"sv,  // Portuguese
+                                                                "pt_BR"sv,  // Portuguese (Brazilian)
+                                                                "ru"sv,  // Russian
+                                                                "sv"sv,  // Swedish
+                                                                "tr"sv,  // Turkish
+                                                                "uk"sv,  // Ukrainian
+                                                                "vi"sv,  // Vietnamese
+                                                                "zh"sv,  // Chinese
+                                                                "zh_TW"sv,  // Chinese (Traditional)
+                                                              });
 
     std::string log_level_string;
     string_f(vars, "min_log_level", log_level_string);
 
     if (!log_level_string.empty()) {
       if (log_level_string == "verbose"sv) {
-        sunshine.min_log_level = 0;
+        prism.min_log_level = 0;
       } else if (log_level_string == "debug"sv) {
-        sunshine.min_log_level = 1;
+        prism.min_log_level = 1;
       } else if (log_level_string == "info"sv) {
-        sunshine.min_log_level = 2;
+        prism.min_log_level = 2;
       } else if (log_level_string == "warning"sv) {
-        sunshine.min_log_level = 3;
+        prism.min_log_level = 3;
       } else if (log_level_string == "error"sv) {
-        sunshine.min_log_level = 4;
+        prism.min_log_level = 4;
       } else if (log_level_string == "fatal"sv) {
-        sunshine.min_log_level = 5;
+        prism.min_log_level = 5;
       } else if (log_level_string == "none"sv) {
-        sunshine.min_log_level = 6;
+        prism.min_log_level = 6;
       } else {
         // accept digit directly
         auto val = log_level_string[0];
         if (val >= '0' && val < '7') {
-          sunshine.min_log_level = val - '0';
+          prism.min_log_level = val - '0';
         }
       }
     }
@@ -1899,7 +1501,7 @@ namespace config {
       vars.erase(it);
     }
 
-    if (sunshine.min_log_level <= 3) {
+    if (prism.min_log_level <= 3) {
       for (auto &[var, _] : vars) {
         std::cout << "Warning: Unrecognized configurable option ["sv << var << ']' << std::endl;
       }
@@ -1911,10 +1513,6 @@ namespace config {
    */
   int parse(int argc, char *argv[]) {
     std::unordered_map<std::string, std::string> cmd_vars;
-#ifdef _WIN32
-    bool shortcut_launch = false;
-    bool service_admin_launch = false;
-#endif
 
     for (auto x = 1; x < argc; ++x) {
       auto line = argv[x];
@@ -1922,19 +1520,11 @@ namespace config {
       if (line == "--help"sv) {
         logging::print_help(*argv);
         return 1;
-      }
-#ifdef _WIN32
-      else if (line == "--shortcut"sv) {
-        shortcut_launch = true;
-      } else if (line == "--shortcut-admin"sv) {
-        service_admin_launch = true;
-      }
-#endif
-      else if (*line == '-') {
+      } else if (*line == '-') {
         if (*(line + 1) == '-') {
-          sunshine.cmd.name = line + 2;
-          sunshine.cmd.argc = argc - x - 1;
-          sunshine.cmd.argv = argv + x + 1;
+          prism.cmd.name = line + 2;
+          prism.cmd.argc = argc - x - 1;
+          prism.cmd.argv = argv + x + 1;
 
           break;
         }
@@ -1947,7 +1537,7 @@ namespace config {
 
         auto pos = std::find(line, line_end, '=');
         if (pos == line_end) {
-          sunshine.config_file = line;
+          prism.config_file = line;
         } else {
           TUPLE_EL(var, 1, parse_option(line, line_end));
           if (!var) {
@@ -1973,12 +1563,12 @@ namespace config {
       file_handler::make_directory(platf::appdata().string());
 
       // Create empty config file if it does not exist
-      if (!fs::exists(sunshine.config_file)) {
-        std::ofstream {sunshine.config_file};
+      if (!fs::exists(prism.config_file)) {
+        std::ofstream {prism.config_file};
       }
 
       // Read config file
-      auto vars = parse_config(file_handler::read_file(sunshine.config_file.c_str()));
+      auto vars = parse_config(file_handler::read_file(prism.config_file.c_str()));
 
       for (auto &[name, value] : cmd_vars) {
         vars.insert_or_assign(std::move(name), std::move(value));
@@ -1995,63 +1585,9 @@ namespace config {
       BOOST_LOG(fatal) << "Failed to apply config: "sv << err.what();
     }
 
-#ifdef _WIN32
-    // UCRT64 raises an access denied exception if launching from the shortcut
-    // as non-admin and the config folder is not yet present; we can defer
-    // so that service instance will do the work instead.
-
-    if (!config_loaded && !shortcut_launch) {
-      BOOST_LOG(fatal) << "To relaunch Sunshine successfully, use the shortcut in the Start Menu. Do not run Sunshine.exe manually."sv;
-      std::this_thread::sleep_for(10s);
-#else
     if (!config_loaded) {
-#endif
       return -1;
     }
-
-#ifdef _WIN32
-    // We have to wait until the config is loaded to handle these launches,
-    // because we need to have the correct base port loaded in our config.
-    // Exception: UCRT64 shortcut_launch instances may have no config loaded due to
-    // insufficient permissions to create folder; port defaults will be acceptable.
-    if (service_admin_launch) {
-      // This is a relaunch as admin to start the service
-      service_ctrl::start_service();
-
-      // Always return 1 to ensure Sunshine doesn't start normally
-      return 1;
-    }
-    if (shortcut_launch) {
-      if (!service_ctrl::is_service_running()) {
-        // If the service isn't running, relaunch ourselves as admin to start it
-        WCHAR executable[MAX_PATH];
-        GetModuleFileNameW(nullptr, executable, ARRAYSIZE(executable));
-
-        SHELLEXECUTEINFOW shell_exec_info {};
-        shell_exec_info.cbSize = sizeof(shell_exec_info);
-        shell_exec_info.fMask = SEE_MASK_NOASYNC | SEE_MASK_NO_CONSOLE | SEE_MASK_NOCLOSEPROCESS;
-        shell_exec_info.lpVerb = L"runas";
-        shell_exec_info.lpFile = executable;
-        shell_exec_info.lpParameters = L"--shortcut-admin";
-        shell_exec_info.nShow = SW_NORMAL;
-        if (!ShellExecuteExW(&shell_exec_info)) {
-          auto winerr = GetLastError();
-          BOOST_LOG(error) << "Failed executing shell command: " << winerr << std::endl;
-          return 1;
-        }
-
-        // Wait for the elevated process to finish starting the service
-        WaitForSingleObject(shell_exec_info.hProcess, INFINITE);
-        CloseHandle(shell_exec_info.hProcess);
-
-        // Wait for the UI to be ready for connections
-        service_ctrl::wait_for_ui_ready();
-      }
-
-      // Always return 1 to ensure Sunshine doesn't start normally
-      return 1;
-    }
-#endif
 
     return 0;
   }

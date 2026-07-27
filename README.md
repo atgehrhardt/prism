@@ -94,7 +94,7 @@ Installs dependencies, builds Prism, and sets up:
 - `prism-labwc.service` — persistent headless compositor (socket `wayland-prism`)
 - `prism-input-bridge.service` — routes Sunshine's virtual keyboard/mouse/touch into
   headless sessions (exclusively, only while one is active)
-- the four default apps in `~/.config/sunshine/apps.json` (existing file is backed up;
+- the four default apps in `~/.config/prism/apps.json` (existing file is backed up;
   other custom apps are preserved)
 
 Then open `https://<host>:47990`, set credentials, and pair Moonlight as usual.
@@ -131,7 +131,7 @@ data (full clean slate):
 
 ```bash
 sudo rm -f /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
-rm -rf ~/.config/sunshine ~/.cache/prism
+rm -rf ~/.config/prism ~/.cache/prism
 ```
 
 ## How it works
@@ -157,7 +157,7 @@ rm -rf ~/.config/sunshine ~/.cache/prism
   `zwp_virtual_keyboard_v1`; the bridge re-injects Sunshine's uinput events there and holds
   an exclusive `EVIOCGRAB` only during headless streams.
 - **Audio separation** (`contrib/virtual-session/prism-*-audio.sh`): Sunshine captures a
-  dedicated `prism-stream` null sink (`audio_sink` in `sunshine.conf`, set by `install.sh`),
+  dedicated `prism-stream` null sink (`audio_sink` in `prism.conf`, set by `install.sh`),
   and each capture mode routes the right audio into it. **Mirror/portal** streams loop the
   physical sink's monitor in (stock behavior: audio on stream and host speakers).
   **Virtual display** selects a `prism-virtual` sink as the system default for the session
@@ -166,7 +166,7 @@ rm -rf ~/.config/sunshine ~/.cache/prism
   routing watchdog), which is looped in, while the desktop's default sink stays on the
   physical output — desktop audio is never captured, and desktop apps keep playing locally —
   mirroring how inputs are separated. Set `prism_default_sink = <sink-name>` in
-  `sunshine.conf` to force a specific default sink whenever any stream ends
+  `prism.conf` to force a specific default sink whenever any stream ends
   (e.g. your speakers, if the physical output varies); without it the sink
   recorded at stream start is restored.
 - **`prism-kwin-mode`** (`contrib/virtual-session/prism-kwin-mode.c`): native

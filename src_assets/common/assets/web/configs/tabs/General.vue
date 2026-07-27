@@ -78,10 +78,10 @@ function removeCmd(index) {
 
     <!-- Prism Name -->
     <div class="mb-3">
-      <label for="sunshine_name" class="form-label">{{ $t('config.sunshine_name') }}</label>
-      <input type="text" class="form-control" id="sunshine_name" placeholder="Prism"
-             v-model="config.sunshine_name" />
-      <div class="form-text">{{ $t('config.sunshine_name_desc') }}</div>
+      <label for="prism_name" class="form-label">{{ $t('config.prism_name') }}</label>
+      <input type="text" class="form-control" id="prism_name" placeholder="Prism"
+             v-model="config.prism_name" />
+      <div class="form-text">{{ $t('config.prism_name_desc') }}</div>
     </div>
 
     <!-- Log Level -->

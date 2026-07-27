@@ -153,7 +153,7 @@ TEST_F(SteamGamesTest, BoxArtPngConvertsAndCaches) {
   ASSERT_EQ(png, cache_dir / "prism" / "covers" / "440.png");
   ASSERT_TRUE(fs::is_regular_file(png));
 
-  // Valid PNG signature (Sunshine's image validation requires it).
+  // Valid PNG signature (Prism's image validation requires it).
   std::ifstream in(png, std::ios::binary);
   const std::vector<char> bytes {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
   ASSERT_GE(bytes.size(), 8u);

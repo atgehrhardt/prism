@@ -17,12 +17,12 @@ endif()
 
 set(PROJECT_LICENSE "GPL-3.0-only")
 
-set(PROJECT_FQDN "dev.lizardbyte.app.Sunshine")
+set(PROJECT_FQDN "dev.lizardbyte.app.Prism")
 
 set(PROJECT_BRIEF_DESCRIPTION "GameStream host for Moonlight")  # must be <= 35 characters
 
 set(PROJECT_LONG_DESCRIPTION "Offering low latency, cloud gaming server capabilities with support for AMD, Intel, \
-and Nvidia GPUs for hardware encoding. Software encoding is also available. You can connect to Sunshine from any \
+and Nvidia GPUs for hardware encoding. Software encoding is also available. You can connect to Prism from any \
 Moonlight client on a variety of devices. A web UI is provided to allow configuration, and client pairing, from \
 your favorite web browser. Pair from the local server or any mobile device.")
 
@@ -31,8 +31,8 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-    set(FREEBSD ON)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "Prism is a Linux-only fork of Sunshine. Detected system: ${CMAKE_SYSTEM_NAME}")
 endif()
 
 # set the module path, used for includes
@@ -50,7 +50,7 @@ include(${CMAKE_MODULE_PATH}/prep/options.cmake)
 # initial prep
 include(${CMAKE_MODULE_PATH}/prep/init.cmake)
 
-# configure special package files, such as sunshine.desktop, Flatpak manifest, Portfile , etc.
+# configure special package files, such as prism.desktop, Flatpak manifest, Portfile , etc.
 include(${CMAKE_MODULE_PATH}/prep/special_package_configuration.cmake)
 
 # Exit early if END_BUILD is ON, i.e. when only generating package manifests

@@ -10,7 +10,7 @@
 #include <map>
 #include <vector>
 
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
   #include <linux-dmabuf-unstable-v1.h>
   #include <wlr-screencopy-unstable-v1.h>
   #include <xdg-output-unstable-v1.h>
@@ -21,9 +21,9 @@
 
 /**
  * The classes defined in this macro block should only be used by
- * cpp files whose compilation depends on SUNSHINE_BUILD_WAYLAND
+ * cpp files whose compilation depends on PRISM_BUILD_WAYLAND
  */
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
 
 namespace wl {
   /**

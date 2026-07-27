@@ -12,7 +12,7 @@
 #include <src/crypto.h>
 
 TEST(CryptoTest, GeneratedCredentialsExposeSubjectAndVerifySignatures) {
-  constexpr std::string_view common_name = "Sunshine Test Host";
+  constexpr std::string_view common_name = "Prism Test Host";
   constexpr std::string_view payload = "payload";
 
   auto creds = crypto::gen_creds(common_name, 2048);

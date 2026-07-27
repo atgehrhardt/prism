@@ -8,11 +8,7 @@
 #include <cstdint>
 #include <drm_fourcc.h>
 #include <sys/stat.h>
-#if defined(__FreeBSD__)
-  #include <sys/types.h>
-#else
-  #include <sys/sysmacros.h>
-#endif
+#include <sys/sysmacros.h>
 #include <vector>
 #include <vulkan/vulkan.h>
 

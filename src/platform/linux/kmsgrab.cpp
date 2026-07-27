@@ -468,7 +468,7 @@ namespace platf {
 
         if (drmSetClientCap(fd.el, DRM_CLIENT_CAP_ATOMIC, 1)) {
           BOOST_LOG(warning) << "GPU driver doesn't support atomic mode-setting: "sv << path;
-#if defined(SUNSHINE_BUILD_X11)
+#if defined(PRISM_BUILD_X11)
           // We won't be able to capture the mouse cursor with KMS on non-atomic drivers,
           // so fall back to X11 if it's available and the user didn't explicitly force KMS.
           if (window_system == window_system_e::X11 && config::video.capture != "kms") {
@@ -1572,17 +1572,17 @@ namespace platf {
       /**
        * @brief Create AVCodec encode device.
        *
-       * @param pix_fmt Sunshine pixel format to convert or allocate for.
+       * @param pix_fmt Prism pixel format to convert or allocate for.
        * @return Constructed AVCodec encode device object.
        */
       std::unique_ptr<avcodec_encode_device_t> make_avcodec_encode_device(pix_fmt_e pix_fmt) override {
-#ifdef SUNSHINE_BUILD_VAAPI
+#ifdef PRISM_BUILD_VAAPI
         if (mem_type == mem_type_e::vaapi) {
           return va::make_avcodec_encode_device(width, height, false);
         }
 #endif
 
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
         if (mem_type == mem_type_e::cuda) {
           return cuda::make_avcodec_encode_device(width, height, false);
         }
@@ -1744,23 +1744,23 @@ namespace platf {
       /**
        * @brief Create AVCodec encode device.
        *
-       * @param pix_fmt Sunshine pixel format to convert or allocate for.
+       * @param pix_fmt Prism pixel format to convert or allocate for.
        * @return Constructed AVCodec encode device object.
        */
       std::unique_ptr<avcodec_encode_device_t> make_avcodec_encode_device(pix_fmt_e pix_fmt) override {
-#ifdef SUNSHINE_BUILD_VAAPI
+#ifdef PRISM_BUILD_VAAPI
         if (mem_type == mem_type_e::vaapi) {
           return va::make_avcodec_encode_device(width, height, dup(card.render_fd.el), img_offset_x, img_offset_y, true);
         }
 #endif
 
-#ifdef SUNSHINE_BUILD_VULKAN
+#ifdef PRISM_BUILD_VULKAN
         if (mem_type == mem_type_e::vulkan) {
           return vk::make_avcodec_encode_device_vram(width, height, img_offset_x, img_offset_y);
         }
 #endif
 
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
         if (mem_type == mem_type_e::cuda) {
           return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y);
         }
@@ -1908,14 +1908,14 @@ namespace platf {
           return -1;
         }
 
-#ifdef SUNSHINE_BUILD_VAAPI
+#ifdef PRISM_BUILD_VAAPI
         if (mem_type == mem_type_e::vaapi && !va::validate(card.render_fd.el)) {
           BOOST_LOG(warning) << "Monitor "sv << display_name << " doesn't support hardware encoding. Reverting back to GPU -> RAM -> GPU"sv;
           return -1;
         }
 #endif
 
-#ifndef SUNSHINE_BUILD_CUDA
+#ifndef PRISM_BUILD_CUDA
         if (mem_type == mem_type_e::cuda) {
           BOOST_LOG(warning) << "Attempting to use NVENC without CUDA support. Reverting back to GPU -> RAM -> GPU"sv;
           return -1;
@@ -2103,7 +2103,7 @@ namespace platf {
 
         if (!fb->handles[0]) {
           BOOST_LOG(error) << "Couldn't get handle for DRM Framebuffer ["sv << plane->fb_id << "]: Probably not permitted"sv;
-#if defined(SUNSHINE_BUILD_FLATPAK) || defined(SUNSHINE_BUILD_APPIMAGE)
+#if defined(PRISM_BUILD_FLATPAK) || defined(PRISM_BUILD_APPIMAGE)
           BOOST_LOG((config::video.capture == "kms") ? fatal : error)
             << "AppImage and Flatpak do not support KMS capture. Use another capture method."sv;
 #endif

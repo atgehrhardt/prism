@@ -109,30 +109,30 @@ protected:
   void SetUp() override {
     BaseTest::SetUp();
     // Save current config
-    saved_username = config::sunshine.username;
-    saved_password = config::sunshine.password;
-    saved_salt = config::sunshine.salt;
-    saved_locale = config::sunshine.locale;
-    saved_csrf_allowed_origins = config::sunshine.csrf_allowed_origins;
+    saved_username = config::prism.username;
+    saved_password = config::prism.password;
+    saved_salt = config::prism.salt;
+    saved_locale = config::prism.locale;
+    saved_csrf_allowed_origins = config::prism.csrf_allowed_origins;
 
     // Set up test credentials
-    config::sunshine.username = "testuser";
-    config::sunshine.salt = "testsalt";
-    config::sunshine.password = util::hex(crypto::hash("testpass" + config::sunshine.salt)).to_string();
+    config::prism.username = "testuser";
+    config::prism.salt = "testsalt";
+    config::prism.password = util::hex(crypto::hash("testpass" + config::prism.salt)).to_string();
 
     // Set test locale
-    config::sunshine.locale = "en";
+    config::prism.locale = "en";
 
     // Set test web UI port (will be used in SetUp after server starts)
     // For now, just set the base defaults - we'll add the port-specific ones after server starts
-    config::sunshine.csrf_allowed_origins = {
+    config::prism.csrf_allowed_origins = {
       "https://localhost",
       "https://127.0.0.1",
       "https://[::1]"
     };
 
     // Create test web directory in temp
-    test_web_dir = std::filesystem::temp_directory_path() / "sunshine_test_confighttp";  // NOSONAR(cpp:S5443): safe for tests
+    test_web_dir = std::filesystem::temp_directory_path() / "prism_test_confighttp";  // NOSONAR(cpp:S5443): safe for tests
     std::filesystem::create_directories(test_web_dir / "web");
 
     // Create test HTML file in WEB_DIR, creating parent directories with proper permissions
@@ -324,9 +324,9 @@ protected:
     ASSERT_NE(port, 0) << "Server failed to start";
 
     // Now that we have the port, add it to CSRF allowed origins
-    config::sunshine.csrf_allowed_origins.push_back(std::format("https://localhost:{}", port));
-    config::sunshine.csrf_allowed_origins.push_back(std::format("https://127.0.0.1:{}", port));
-    config::sunshine.csrf_allowed_origins.push_back(std::format("https://[::1]:{}", port));
+    config::prism.csrf_allowed_origins.push_back(std::format("https://localhost:{}", port));
+    config::prism.csrf_allowed_origins.push_back(std::format("https://127.0.0.1:{}", port));
+    config::prism.csrf_allowed_origins.push_back(std::format("https://[::1]:{}", port));
 
     // Set up client
     client = std::make_unique<SimpleWeb::Client<SimpleWeb::HTTPS>>(std::format("localhost:{}", port), false);
@@ -341,11 +341,11 @@ protected:
       server_thread.join();
     }
 
-    config::sunshine.username = saved_username;
-    config::sunshine.password = saved_password;
-    config::sunshine.salt = saved_salt;
-    config::sunshine.locale = saved_locale;
-    config::sunshine.csrf_allowed_origins = saved_csrf_allowed_origins;
+    config::prism.username = saved_username;
+    config::prism.password = saved_password;
+    config::prism.salt = saved_salt;
+    config::prism.locale = saved_locale;
+    config::prism.csrf_allowed_origins = saved_csrf_allowed_origins;
 
     // Clean up test HTML file from WEB_DIR
     if (std::filesystem::exists(web_dir_test_file)) {
@@ -710,14 +710,14 @@ TEST_F(ConfigHttpTest, GetPageRedirectsWhenUsernameSet) {
 // Test: confighttp::getPage() doesn't redirect when username is empty
 TEST_F(ConfigHttpTest, GetPageNoRedirectWhenUsernameEmpty) {
   // Temporarily clear username
-  const std::string saved = config::sunshine.username;
-  config::sunshine.username = "";
+  const std::string saved = config::prism.username;
+  config::prism.username = "";
 
   const auto response = client->request("GET", "/page-redirect-test");
   ASSERT_EQ(response->status_code, "200 OK");
 
   // Restore username
-  config::sunshine.username = saved;
+  config::prism.username = saved;
 }
 
 // Test: confighttp::getLocale() returns locale JSON
@@ -746,7 +746,7 @@ TEST_F(ConfigHttpTest, GetLocaleReturnsJson) {
  * the browse endpoint can be exercised with predictable contents.
  *
  * Layout:
- *   sunshine_browse_test/
+ *   prism_browse_test/
  *   ├── subdir_a/
  *   ├── subdir_b/
  *   ├── file_alpha.txt
@@ -760,7 +760,7 @@ protected:
   void SetUp() override {
     ConfigHttpTest::SetUp();
 
-    browse_test_dir = std::filesystem::temp_directory_path() / "sunshine_browse_test";  // NOSONAR(cpp:S5443): safe for tests
+    browse_test_dir = std::filesystem::temp_directory_path() / "prism_browse_test";  // NOSONAR(cpp:S5443): safe for tests
 
     // Remove any leftover directory from a previous interrupted run
     if (std::filesystem::exists(browse_test_dir)) {
@@ -772,9 +772,6 @@ protected:
     std::ofstream(browse_test_dir / "file_alpha.txt") << "alpha";
     std::ofstream(browse_test_dir / "file_beta.txt") << "beta";
 
-#ifdef _WIN32
-    std::ofstream(browse_test_dir / "test_exec.exe") << "fake exe";
-#else
     const auto exec_file = browse_test_dir / "test_exec";
     std::ofstream(exec_file) << "#!/bin/sh\necho hello";
     std::filesystem::permissions(
@@ -782,7 +779,6 @@ protected:
       std::filesystem::perms::owner_read | std::filesystem::perms::owner_write | std::filesystem::perms::owner_exec,
       std::filesystem::perm_options::replace
     );
-#endif
   }
 
   void TearDown() override {
@@ -1080,11 +1076,7 @@ TEST_F(BrowseDirectoryTest, BrowseTypeExecutableIncludesExecutableFile) {
   const nlohmann::json json = nlohmann::json::parse(response->content.string());
   const auto &entries = json["entries"];
 
-#ifdef _WIN32
-  const std::string exec_name = "test_exec.exe";
-#else
   const std::string exec_name = "test_exec";
-#endif
 
   ASSERT_NE(find_entry(entries, exec_name), entries.end())
     << "Expected executable file '" << exec_name << "' not found with type=executable filter";
@@ -1126,7 +1118,7 @@ TEST_F(BrowseDirectoryTest, BrowseTrulyNonexistentPathReturnsBadRequest) {
   headers.emplace("Authorization", create_auth_header("testuser", "testpass"));
 
   // Construct a deeply non-existent path (parent also doesn't exist)
-  const std::string nonexistent = "/sunshine_nonexistent_xyz_54321/also_nonexistent";
+  const std::string nonexistent = "/prism_nonexistent_xyz_54321/also_nonexistent";
   const auto response = client->request("GET", browse_url(nonexistent), "", headers);
   ASSERT_EQ(response->status_code, "400 Bad Request");
 }
@@ -1146,31 +1138,6 @@ TEST_F(BrowseDirectoryTest, BrowseEmptyPathReturnsValidResponse) {
   ASSERT_TRUE(json["entries"].is_array());
 }
 
-#ifdef _WIN32
-// Test (Windows): empty/root path returns the list of logical drive letters
-TEST_F(BrowseDirectoryTest, BrowseWindowsEmptyPathReturnsDriveList) {
-  SimpleWeb::CaseInsensitiveMultimap headers;
-  headers.emplace("Authorization", create_auth_header("testuser", "testpass"));
-
-  const auto response = client->request("GET", "/browse-test", "", headers);
-  ASSERT_EQ(response->status_code, "200 OK");
-
-  const nlohmann::json json = nlohmann::json::parse(response->content.string());
-  ASSERT_EQ(json["path"].get<std::string>(), "");
-  ASSERT_EQ(json["parent"].get<std::string>(), "");
-  ASSERT_GT(json["entries"].size(), 0u);
-
-  // Every entry must look like "X:\" – a drive letter root
-  for (const auto &entry : json["entries"]) {
-    ASSERT_EQ(entry["type"].get<std::string>(), "directory");
-    const std::string name = entry["name"].get<std::string>();
-    ASSERT_EQ(name.size(), 3u) << "Drive entry name should be 3 chars, e.g. 'C:\\'";
-    ASSERT_TRUE(std::isalpha(static_cast<unsigned char>(name[0])));
-    ASSERT_EQ(name[1], ':');
-    ASSERT_EQ(name[2], '\\');
-  }
-}
-#else
 // Test (Unix): browsing "/" returns path == "/" and parent == "/" (at root, parent == self)
 TEST_F(BrowseDirectoryTest, BrowseUnixRootParentEqualsSelf) {
   SimpleWeb::CaseInsensitiveMultimap headers;
@@ -1186,43 +1153,12 @@ TEST_F(BrowseDirectoryTest, BrowseUnixRootParentEqualsSelf) {
   ASSERT_EQ(path, "/");
   ASSERT_EQ(parent, "/");
 }
-#endif
 
 // ============================================================
 // Direct unit tests for browseDirectory helper functions
 // ============================================================
 
 // Test: is_browsable_executable correctly identifies executable files
-#ifdef _WIN32
-TEST_F(BrowseDirectoryTest, IsBrowsableExecutable_WindowsExeExtension_ReturnsTrue) {
-  const std::filesystem::path exec_file = browse_test_dir / "test_exec.exe";
-  const std::filesystem::directory_entry entry(exec_file);
-  ASSERT_TRUE(confighttp::is_browsable_executable(entry, std::filesystem::status(exec_file)));
-}
-
-TEST_F(BrowseDirectoryTest, IsBrowsableExecutable_WindowsBatExtension_ReturnsTrue) {
-  const std::filesystem::path bat_file = browse_test_dir / "test_script.bat";
-  std::ofstream(bat_file) << "@echo off";
-  const std::filesystem::directory_entry entry(bat_file);
-  ASSERT_TRUE(confighttp::is_browsable_executable(entry, std::filesystem::status(bat_file)));
-  std::filesystem::remove(bat_file);
-}
-
-TEST_F(BrowseDirectoryTest, IsBrowsableExecutable_WindowsTxtExtension_ReturnsFalse) {
-  const std::filesystem::path txt_file = browse_test_dir / "file_alpha.txt";
-  const std::filesystem::directory_entry entry(txt_file);
-  ASSERT_FALSE(confighttp::is_browsable_executable(entry, std::filesystem::status(txt_file)));
-}
-
-TEST_F(BrowseDirectoryTest, IsBrowsableExecutable_WindowsCaseInsensitive_ReturnsTrue) {
-  // .EXE uppercase should still be recognized
-  const std::filesystem::path upper_exe = browse_test_dir / "UPPER.EXE";
-  std::ofstream(upper_exe) << "fake";
-  const std::filesystem::directory_entry entry(upper_exe);
-  ASSERT_TRUE(confighttp::is_browsable_executable(entry, std::filesystem::status(upper_exe)));
-  std::filesystem::remove(upper_exe);
-}
-#else
 TEST_F(BrowseDirectoryTest, IsBrowsableExecutable_LinuxExecBitSet_ReturnsTrue) {
   const std::filesystem::path exec_file = browse_test_dir / "test_exec";
   const std::filesystem::directory_entry entry(exec_file);
@@ -1247,7 +1183,6 @@ TEST_F(BrowseDirectoryTest, IsBrowsableExecutable_LinuxGroupExecBit_ReturnsTrue)
   ASSERT_TRUE(confighttp::is_browsable_executable(entry, std::filesystem::status(group_exec)));
   std::filesystem::remove(group_exec);
 }
-#endif
 
 // Test: build_browse_entries returns all entries for "any" type
 TEST_F(BrowseDirectoryTest, BuildBrowseEntries_TypeAny_ReturnsAllEntries) {
@@ -1289,11 +1224,7 @@ TEST_F(BrowseDirectoryTest, BuildBrowseEntries_TypeExecutable_IncludesDirsAndExe
   ASSERT_NE(find_entry(entries, "subdir_a"), entries.end());
   ASSERT_NE(find_entry(entries, "subdir_b"), entries.end());
 
-#ifdef _WIN32
-  const std::string exec_name = "test_exec.exe";
-#else
   const std::string exec_name = "test_exec";
-#endif
   ASSERT_NE(find_entry(entries, exec_name), entries.end())
     << "Expected executable '" << exec_name << "' not found";
 
@@ -1373,32 +1304,7 @@ TEST_F(BrowseDirectoryTest, BuildBrowseEntries_EmptyDirectory_ReturnsEmptyArray)
 
 // Test: build_browse_entries on a non-existent path returns an empty array (does not throw)
 TEST_F(BrowseDirectoryTest, BuildBrowseEntries_NonexistentDirectory_ReturnsEmptyArray) {
-  const auto entries = confighttp::build_browse_entries("/sunshine_nonexistent_dir_xyz_99999", "any");
+  const auto entries = confighttp::build_browse_entries("/prism_nonexistent_dir_xyz_99999", "any");
   ASSERT_TRUE(entries.is_array());
   ASSERT_TRUE(entries.empty());
 }
-
-#ifdef _WIN32
-// Test: get_windows_drives returns at least one drive
-TEST_F(BrowseDirectoryTest, GetWindowsDrives_ReturnsAtLeastOneDrive) {
-  const auto drives = confighttp::get_windows_drives();
-  ASSERT_TRUE(drives.is_array());
-  ASSERT_GT(drives.size(), 0u);
-}
-
-// Test: get_windows_drives entries have correct name/type/path fields
-TEST_F(BrowseDirectoryTest, GetWindowsDrives_EntriesHaveCorrectFormat) {
-  for (const auto drives = confighttp::get_windows_drives(); const auto &drive : drives) {
-    ASSERT_TRUE(drive.contains("name"));
-    ASSERT_TRUE(drive.contains("type"));
-    ASSERT_TRUE(drive.contains("path"));
-    ASSERT_EQ(drive["type"].get<std::string>(), "directory");
-    const std::string name = drive["name"].get<std::string>();
-    ASSERT_EQ(name.size(), 3u) << "Drive name should be 3 chars, e.g. 'C:\\'";
-    ASSERT_TRUE(std::isalpha(static_cast<unsigned char>(name[0])));
-    ASSERT_EQ(name[1], ':');
-    ASSERT_EQ(name[2], '\\');
-    ASSERT_EQ(drive["path"].get<std::string>(), name);
-  }
-}
-#endif

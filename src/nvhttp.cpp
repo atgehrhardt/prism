@@ -40,26 +40,26 @@ using namespace std::literals;
 
 namespace nvhttp {
 
-  static constexpr std::string_view EMPTY_PROPERTY_TREE_ERROR_MSG = "Property tree is empty. Probably, control flow got interrupted by an unexpected C++ exception. This is a bug in Sunshine. Moonlight-qt will report Malformed XML (missing root element)."sv;
+  static constexpr std::string_view EMPTY_PROPERTY_TREE_ERROR_MSG = "Property tree is empty. Probably, control flow got interrupted by an unexpected C++ exception. This is a bug in Prism. Moonlight-qt will report Malformed XML (missing root element)."sv;
 
   namespace fs = std::filesystem;
   namespace pt = boost::property_tree;
 
-  crypto::cert_chain_t cert_chain;  ///< Certificate chain presented by Sunshine's GameStream HTTPS server.
+  crypto::cert_chain_t cert_chain;  ///< Certificate chain presented by Prism's GameStream HTTPS server.
 
   /**
-   * @brief HTTPS server backend that adds Sunshine's client-certificate verification.
+   * @brief HTTPS server backend that adds Prism's client-certificate verification.
    */
-  class SunshineHTTPSServer: public SimpleWeb::ServerBase<SunshineHTTPS> {
+  class PrismHTTPSServer: public SimpleWeb::ServerBase<PrismHTTPS> {
   public:
     /**
-     * @brief Initialize the HTTPS server with Sunshine's certificate and key files.
+     * @brief Initialize the HTTPS server with Prism's certificate and key files.
      *
      * @param certification_file Path to the server certificate file.
      * @param private_key_file Path to the matching private key file.
      */
-    SunshineHTTPSServer(const std::string &certification_file, const std::string &private_key_file):
-        ServerBase<SunshineHTTPS>::ServerBase(443),
+    PrismHTTPSServer(const std::string &certification_file, const std::string &private_key_file):
+        ServerBase<PrismHTTPS>::ServerBase(443),
         context(boost::asio::ssl::context::tls_server) {
       // Disabling TLS 1.0 and 1.1 (see RFC 8996)
       context.set_options(boost::asio::ssl::context::no_tlsv1);
@@ -72,7 +72,7 @@ namespace nvhttp {
     std::function<void(std::shared_ptr<Response>, std::shared_ptr<Request>)> on_verify_failed;  ///< Handler used to return the pairing challenge when client verification fails.
 
   protected:
-    boost::asio::ssl::context context;  ///< TLS server context configured with Sunshine's certificate and protocol policy.
+    boost::asio::ssl::context context;  ///< TLS server context configured with Prism's certificate and protocol policy.
 
     /**
      * @brief Enable client-certificate verification after the listening socket is bound.
@@ -138,7 +138,7 @@ namespace nvhttp {
   /**
    * @brief HTTPS server type used for GameStream endpoints requiring TLS.
    */
-  using https_server_t = SunshineHTTPSServer;
+  using https_server_t = PrismHTTPSServer;
   /**
    * @brief Plain HTTP server type used for GameStream endpoints without TLS.
    */
@@ -150,7 +150,7 @@ namespace nvhttp {
   struct conf_intern_t {
     std::string servercert;  ///< Server certificate PEM string.
     std::string pkey;  ///< Private key PEM string or path.
-  } conf_intern;  ///< TLS credential paths loaded from Sunshine's runtime configuration.
+  } conf_intern;  ///< TLS credential paths loaded from Prism's runtime configuration.
 
   /**
    * @brief Certificate entry associated with a client name and UUID.
@@ -184,11 +184,11 @@ namespace nvhttp {
   /**
    * @brief Shared HTTPS response object passed to GameStream handlers.
    */
-  using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>;
+  using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<PrismHTTPS>::Response>;
   /**
    * @brief Shared HTTPS request object received by GameStream handlers.
    */
-  using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Request>;
+  using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<PrismHTTPS>::Request>;
   /**
    * @brief Shared HTTP response object passed to redirect and discovery handlers.
    */
@@ -348,7 +348,7 @@ namespace nvhttp {
     named_cert.uuid = uuid_util::uuid_t::generate().string();
     client.named_devices.emplace_back(named_cert);
 
-    if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
+    if (!config::prism.flags[config::flag::FRESH_STATE]) {
       save_state();
     }
   }
@@ -619,7 +619,7 @@ namespace nvhttp {
    * @brief HTTPS tunnel session used for encrypted client requests.
    */
   template<>
-  struct tunnel<SunshineHTTPS> {
+  struct tunnel<PrismHTTPS> {
     static auto constexpr to_string = "HTTPS"sv;  ///< To string.
   };
 
@@ -724,7 +724,7 @@ namespace nvhttp {
         auto ptr = map_id_sess.emplace(sess.client.uniqueID, std::move(sess)).first;
 
         ptr->second.async_insert_pin.salt = std::move(get_arg(args, "salt"));
-        if (config::sunshine.flags[config::flag::PIN_STDIN]) {
+        if (config::prism.flags[config::flag::PIN_STDIN]) {
           std::string pin;
 
           std::cout << "Please insert pin: "sv;
@@ -733,7 +733,7 @@ namespace nvhttp {
           getservercert(ptr->second, tree, pin);
           return;
         } else {
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+#if defined PRISM_TRAY && PRISM_TRAY >= 1
           system_tray::update_tray_require_pin();
 #endif
           ptr->second.async_insert_pin.response = std::move(response);
@@ -868,7 +868,7 @@ namespace nvhttp {
     print_req<T>(request);
 
     int pair_status = 0;
-    if constexpr (std::is_same_v<SunshineHTTPS, T>) {
+    if constexpr (std::is_same_v<PrismHTTPS, T>) {
       auto args = request->parse_query_string();
       auto clientID = args.find("uniqueid"s);
 
@@ -882,7 +882,7 @@ namespace nvhttp {
     pt::ptree tree;
 
     tree.put("root.<xmlattr>.status_code", 200);
-    tree.put("root.hostname", config::nvhttp.sunshine_name);
+    tree.put("root.hostname", config::nvhttp.prism_name);
 
     tree.put("root.appversion", VERSION);
     tree.put("root.GfeVersion", GFE_VERSION);
@@ -893,7 +893,7 @@ namespace nvhttp {
 
     // Only include the MAC address for requests sent from paired clients over HTTPS.
     // For HTTP requests, use a placeholder MAC address that Moonlight knows to ignore.
-    if constexpr (std::is_same_v<SunshineHTTPS, T>) {
+    if constexpr (std::is_same_v<PrismHTTPS, T>) {
       tree.put("root.mac", platf::get_mac_address(net::addr_to_normalized_string(local_endpoint.address())));
     } else {
       tree.put("root.mac", "00:00:00:00:00:00");
@@ -924,7 +924,7 @@ namespace nvhttp {
     auto current_appid = proc::proc.running();
     tree.put("root.PairStatus", pair_status);
     tree.put("root.currentgame", current_appid);
-    tree.put("root.state", current_appid > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
+    tree.put("root.state", current_appid > 0 ? "PRISM_SERVER_BUSY" : "PRISM_SERVER_FREE");
 
     std::ostringstream data;
 
@@ -954,10 +954,10 @@ namespace nvhttp {
    * @param request HTTP request data from the client.
    */
   void applist(resp_https_t response, req_https_t request) {
-    print_req<SunshineHTTPS>(request);
+    print_req<PrismHTTPS>(request);
 
     // Re-read apps.json and re-enumerate synced Steam games so installs and
-    // uninstalls show up in the client without a Sunshine restart. Only the
+    // uninstalls show up in the client without a Prism restart. Only the
     // app list is replaced; a running app must keep its launch state (a
     // client requests the applist right after backing out of a stream).
     proc::refresh_apps(config::stream.file_apps);
@@ -995,7 +995,7 @@ namespace nvhttp {
    * @param request HTTP request data from the client.
    */
   void launch(bool &host_audio, resp_https_t response, req_https_t request) {
-    print_req<SunshineHTTPS>(request);
+    print_req<PrismHTTPS>(request);
 
     pt::ptree tree;
     bool revert_display_configuration {false};
@@ -1113,7 +1113,7 @@ namespace nvhttp {
    * @param request HTTP request data from the client.
    */
   void resume(bool &host_audio, resp_https_t response, req_https_t request) {
-    print_req<SunshineHTTPS>(request);
+    print_req<PrismHTTPS>(request);
 
     pt::ptree tree;
     auto g = util::fail_guard([&]() {
@@ -1210,7 +1210,7 @@ namespace nvhttp {
    * @param request HTTP request data from the client.
    */
   void cancel(resp_https_t response, req_https_t request) {
-    print_req<SunshineHTTPS>(request);
+    print_req<PrismHTTPS>(request);
 
     pt::ptree tree;
     auto g = util::fail_guard([&]() {
@@ -1241,7 +1241,7 @@ namespace nvhttp {
    * @param request HTTP request data from the client.
    */
   void appasset(resp_https_t response, req_https_t request) {
-    print_req<SunshineHTTPS>(request);
+    print_req<PrismHTTPS>(request);
 
     auto args = request->parse_query_string();
     auto app_image = proc::proc.get_app_image((int) util::from_view(get_arg(args, "appid")));
@@ -1272,9 +1272,9 @@ namespace nvhttp {
 
     auto port_http = net::map_port(PORT_HTTP);
     auto port_https = net::map_port(PORT_HTTPS);
-    auto address_family = net::af_from_enum_string(config::sunshine.address_family);
+    auto address_family = net::af_from_enum_string(config::prism.address_family);
 
-    bool clean_slate = config::sunshine.flags[config::flag::FRESH_STATE];
+    bool clean_slate = config::prism.flags[config::flag::FRESH_STATE];
 
     if (!clean_slate) {
       load_state();
@@ -1362,10 +1362,10 @@ namespace nvhttp {
       tree.put("root.<xmlattr>.status_message"s, "The client is not authorized. Certificate verification failed."s);
     };
 
-    https_server.default_resource["GET"] = not_found<SunshineHTTPS>;
-    https_server.resource["^/serverinfo$"]["GET"] = serverinfo<SunshineHTTPS>;
+    https_server.default_resource["GET"] = not_found<PrismHTTPS>;
+    https_server.resource["^/serverinfo$"]["GET"] = serverinfo<PrismHTTPS>;
     https_server.resource["^/pair$"]["GET"] = [&add_cert](auto resp, auto req) {
-      pair<SunshineHTTPS>(add_cert, resp, req);
+      pair<PrismHTTPS>(add_cert, resp, req);
     };
     https_server.resource["^/applist$"]["GET"] = applist;
     https_server.resource["^/appasset$"]["GET"] = appasset;

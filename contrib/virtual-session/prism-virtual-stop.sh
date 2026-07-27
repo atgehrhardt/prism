@@ -55,7 +55,7 @@ pkill -f "krfb-virtualmonitor --name $VNAME" 2>/dev/null || true
 # Restore the desktop default sink last: sinks for disabled outputs do not
 # exist until the output is back, and PipeWire takes a moment to re-create
 # them, so wait for the target to appear and retry until the switch sticks.
-RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
 RESTORE="${RESTORE:-${physical_sink:-}}"
 if [ -n "$RESTORE" ]; then
   echo "restoring default sink: $RESTORE"

@@ -1,6 +1,6 @@
 # App Examples
 Since not all applications behave the same, we decided to create some examples to help you get started adding games
-and applications to Sunshine.
+and applications to Prism.
 
 > [!TIP]
 > Throughout these examples, any fields not shown are left blank. You can enhance your experience by
@@ -25,77 +25,12 @@ and applications to Sunshine.
 > Steam is launched as a detached command because Steam starts with a process that self updates itself and the original
 > process is killed.
 
-@tabs{
-  @tab{FreeBSD | <!-- -->
-    \| Field                        \| Value                                                \|
-    \|------------------------------\|------------------------------------------------------\|
-    \| Application Name             \| @code{}Steam Big Picture@endcode                     \|
-    \| Command Preporations -> Undo \| @code{}setsid steam steam://close/bigpicture@endcode \|
-    \| Detached Commands            \| @code{}setsid steam steam://open/bigpicture@endcode  \|
-    \| Image                        \| @code{}steam.png@endcode                             \|
-  }
-  @tab{Linux | <!-- -->
-    \| Field                        \| Value                                                \|
-    \|------------------------------\|------------------------------------------------------\|
-    \| Application Name             \| @code{}Steam Big Picture@endcode                     \|
-    \| Command Preporations -> Undo \| @code{}setsid steam steam://close/bigpicture@endcode \|
-    \| Detached Commands            \| @code{}setsid steam steam://open/bigpicture@endcode  \|
-    \| Image                        \| @code{}steam.png@endcode                             \|
-  }
-  @tab{macOS | <!-- -->
-    \| Field                        \| Value                                          \|
-    \|------------------------------\|------------------------------------------------\|
-    \| Application Name             \| @code{}Steam Big Picture@endcode               \|
-    \| Command Preporations -> Undo \| @code{}open steam://close/bigpicture@endcode   \|
-    \| Detached Commands            \| @code{}open steam://open/bigpicture@endcode    \|
-    \| Image                        \| @code{}steam.png@endcode                       \|
-  }
-  @tab{Windows | <!-- -->
-    \| Field                        \| Value                                     \|
-    \|------------------------------\|-------------------------------------------\|
-    \| Application Name             \| @code{}Steam Big Picture@endcode          \|
-    \| Command Preporations -> Undo \| @code{}steam://close/bigpicture@endcode   \|
-    \| Detached Commands            \| @code{}steam://open/bigpicture@endcode    \|
-    \| Image                        \| @code{}steam.png@endcode                  \|
-  }
-}
-
-### Epic Game Store game
-
-> [!NOTE]
-> Using the URI method will be the most consistent between various games.
-
-#### URI
-
-@tabs{
-  @tab{Windows | <!-- -->
-    \| Field            \| Value                                                                                                                                                 \|
-    \|------------------\|-------------------------------------------------------------------------------------------------------------------------------------------------------\|
-    \| Application Name \| @code{}Surviving Mars@endcode                                                                                                                         \|
-    \| Commands         \| @code{}com.epicgames.launcher://apps/d759128018124dcabb1fbee9bb28e178%3A20729b9176c241f0b617c5723e70ec2d%3AOvenbird?action=launch&silent=true@endcode \|
-  }
-}
-
-#### Binary (w/ working directory
-@tabs{
-  @tab{Windows | <!-- -->
-    \| Field             \| Value                                                      \|
-    \|-------------------\|------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                              \|
-    \| Command           \| @code{}MarsEpic.exe@endcode                                \|
-    \| Working Directory \| @code{}"C:\Program Files\Epic Games\SurvivingMars"@endcode \|
-  }
-}
-
-#### Binary (w/o working directory)
-@tabs{
-  @tab{Windows | <!-- -->
-    \| Field             \| Value                                                                   \|
-    \|-------------------\|-------------------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                           \|
-    \| Command           \| @code{}"C:\Program Files\Epic Games\SurvivingMars\MarsEpic.exe"@endcode \|
-  }
-}
+| Field                        | Value                                                |
+|------------------------------|------------------------------------------------------|
+| Application Name             | @code{}Steam Big Picture@endcode                     |
+| Command Preporations -> Undo | @code{}setsid steam steam://close/bigpicture@endcode |
+| Detached Commands            | @code{}setsid steam steam://open/bigpicture@endcode  |
+| Image                        | @code{}steam.png@endcode                             |
 
 ### Steam game
 
@@ -104,104 +39,33 @@ and applications to Sunshine.
 
 #### URI
 
-@tabs{
-  @tab{FreeBSD | <!-- -->
-    \| Field             \| Value                                                \|
-    \|-------------------\|------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                        \|
-    \| Detached Commands \| @code{}setsid steam steam://rungameid/464920@endcode \|
-  }
-  @tab{Linux | <!-- -->
-    \| Field             \| Value                                                \|
-    \|-------------------\|------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                        \|
-    \| Detached Commands \| @code{}setsid steam steam://rungameid/464920@endcode \|
-  }
-  @tab{macOS | <!-- -->
-    \| Field             \| Value                                        \|
-    \|-------------------\|----------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                \|
-    \| Detached Commands \| @code{}open steam://rungameid/464920@endcode \|
-  }
-  @tab{Windows | <!-- -->
-    \| Field             \| Value                                   \|
-    \|-------------------\|-----------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode           \|
-    \| Detached Commands \| @code{}steam://rungameid/464920@endcode \|
-  }
-}
+| Field             | Value                                                |
+|-------------------|------------------------------------------------------|
+| Application Name  | @code{}Surviving Mars@endcode                        |
+| Detached Commands | @code{}setsid steam steam://rungameid/464920@endcode |
 
 #### Binary (w/ working directory
-@tabs{
-  @tab{FreeBSD | <!-- -->
-    \| Field             \| Value                                                        \|
-    \|-------------------\|--------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                \|
-    \| Command           \| @code{}MarsSteam@endcode                                     \|
-    \| Working Directory \| @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars@endcode \|
-  }
-  @tab{Linux | <!-- -->
-    \| Field             \| Value                                                        \|
-    \|-------------------\|--------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                \|
-    \| Command           \| @code{}MarsSteam@endcode                                     \|
-    \| Working Directory \| @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars@endcode \|
-  }
-  @tab{macOS | <!-- -->
-    \| Field             \| Value                                                        \|
-    \|-------------------\|--------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                \|
-    \| Command           \| @code{}MarsSteam@endcode                                     \|
-    \| Working Directory \| @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars@endcode \|
-  }
-  @tab{Windows | <!-- -->
-    \| Field             \| Value                                                                         \|
-    \|-------------------\|-------------------------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                                 \|
-    \| Command           \| @code{}MarsSteam.exe@endcode                                                  \|
-    \| Working Directory \| @code{}"C:\Program Files (x86)\Steam\steamapps\common\Surviving Mars"@endcode \|
-  }
-}
+| Field             | Value                                                        |
+|-------------------|--------------------------------------------------------------|
+| Application Name  | @code{}Surviving Mars@endcode                                |
+| Command           | @code{}MarsSteam@endcode                                     |
+| Working Directory | @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars@endcode |
 
 #### Binary (w/o working directory)
-@tabs{
-  @tab{FreeBSD | <!-- -->
-    \| Field             \| Value                                                                  \|
-    \|-------------------\|------------------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                          \|
-    \| Command           \| @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars/MarsSteam@endcode \|
-  }
-  @tab{Linux | <!-- -->
-    \| Field             \| Value                                                                  \|
-    \|-------------------\|------------------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                          \|
-    \| Command           \| @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars/MarsSteam@endcode \|
-  }
-  @tab{macOS | <!-- -->
-    \| Field             \| Value                                                                  \|
-    \|-------------------\|------------------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                          \|
-    \| Command           \| @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars/MarsSteam@endcode \|
-  }
-  @tab{Windows | <!-- -->
-    \| Field             \| Value                                                                                       \|
-    \|-------------------\|---------------------------------------------------------------------------------------------\|
-    \| Application Name  \| @code{}Surviving Mars@endcode                                                               \|
-    \| Command           \| @code{}"C:\Program Files (x86)\Steam\steamapps\common\Surviving Mars\MarsSteam.exe"@endcode \|
-  }
-}
+| Field             | Value                                                                  |
+|-------------------|------------------------------------------------------------------------|
+| Application Name  | @code{}Surviving Mars@endcode                                          |
+| Command           | @code{}$(HOME)/.steam/steam/SteamApps/common/Survivng Mars/MarsSteam@endcode |
 
 ### Prep Commands
 
 #### Changing Resolution and Refresh Rate
 
-##### Linux
-
 ###### X11
 
 | Prep Step | Command                                                                                                                               |
 |-----------|---------------------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}sh -c "xrandr --output HDMI-1 --mode ${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT} --rate ${SUNSHINE_CLIENT_FPS}"@endcode |
+| Do        | @code{}sh -c "xrandr --output HDMI-1 --mode ${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT} --rate ${PRISM_CLIENT_FPS}"@endcode |
 | Undo      | @code{}xrandr --output HDMI-1 --mode 3840x2160 --rate 120@endcode                                                                     |
 
 > [!TIP]
@@ -210,7 +74,7 @@ and applications to Sunshine.
 >
 > You can update the ``Do`` command to this:
 > ```bash
-> bash -c "${HOME}/scripts/set-custom-res.sh \"${SUNSHINE_CLIENT_WIDTH}\" \"${SUNSHINE_CLIENT_HEIGHT}\" \"${SUNSHINE_CLIENT_FPS}\""
+> bash -c "${HOME}/scripts/set-custom-res.sh \"${PRISM_CLIENT_WIDTH}\" \"${PRISM_CLIENT_HEIGHT}\" \"${PRISM_CLIENT_FPS}\""
 > ```
 >
 > The `set-custom-res.sh` will have this content:
@@ -252,7 +116,7 @@ and applications to Sunshine.
 
 | Prep Step | Command                                                                                                                                  |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}sh -c "wlr-xrandr --output HDMI-1 --mode \"${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}@${SUNSHINE_CLIENT_FPS}Hz\""@endcode |
+| Do        | @code{}sh -c "wlr-xrandr --output HDMI-1 --mode \"${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT}@${PRISM_CLIENT_FPS}Hz\""@endcode |
 | Undo      | @code{}wlr-xrandr --output HDMI-1 --mode 3840x2160@120Hz@endcode                                                                         |
 
 > [!TIP]
@@ -262,14 +126,14 @@ and applications to Sunshine.
 
 | Prep Step | Command                                                                                                                               |
 |-----------|---------------------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}sh -c "xrandr --output HDMI-1 --mode ${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT} --rate ${SUNSHINE_CLIENT_FPS}"@endcode |
+| Do        | @code{}sh -c "xrandr --output HDMI-1 --mode ${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT} --rate ${PRISM_CLIENT_FPS}"@endcode |
 | Undo      | @code{}xrandr --output HDMI-1 --mode 3840x2160 --rate 120@endcode                                                                     |
 
 ###### Gnome (Wayland)
 
 | Prep Step | Command                                                                                                                                                                                               |
 |-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}sh -c "displayconfig-mutter set --connector HDMI-1 --resolution ${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT} --refresh-rate ${SUNSHINE_CLIENT_FPS} --hdr ${SUNSHINE_CLIENT_HDR}"@endcode |
+| Do        | @code{}sh -c "displayconfig-mutter set --connector HDMI-1 --resolution ${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT} --refresh-rate ${PRISM_CLIENT_FPS} --hdr ${PRISM_CLIENT_HDR}"@endcode |
 | Undo      | @code{}displayconfig-mutter set --connector HDMI-1 --resolution 3840x2160 --refresh-rate 120 --hdr false@endcode                                                                                      |
 
 Installation instructions for displayconfig-mutter can be [found here](https://github.com/eaglesemanation/displayconfig-mutter). Alternatives include
@@ -287,7 +151,7 @@ unmaintained and do not support newer Mutter features such as HDR and VRR.
 
 | Prep Step | Command                                                                                                                              |
 |-----------|--------------------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}sh -c "kscreen-doctor output.HDMI-A-1.mode.${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}@${SUNSHINE_CLIENT_FPS}"@endcode |
+| Do        | @code{}sh -c "kscreen-doctor output.HDMI-A-1.mode.${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT}@${PRISM_CLIENT_FPS}"@endcode |
 | Undo      | @code{}kscreen-doctor output.HDMI-A-1.mode.3840x2160@120@endcode                                                                     |
 
 > [!CAUTION]
@@ -311,37 +175,8 @@ unmaintained and do not support newer Mutter features such as HDR and VRR.
 
 | Prep Step | Command                                                                                                                                                                                                                        |
 |-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}sh -c "nvidia-settings -a CurrentMetaMode=\"HDMI-1: nvidia-auto-select { ViewPortIn=${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}, ViewPortOut=${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}+0+0 }\""@endcode |
+| Do        | @code{}sh -c "nvidia-settings -a CurrentMetaMode=\"HDMI-1: nvidia-auto-select { ViewPortIn=${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT}, ViewPortOut=${PRISM_CLIENT_WIDTH}x${PRISM_CLIENT_HEIGHT}+0+0 }\""@endcode |
 | Undo      | @code{}nvidia-settings -a CurrentMetaMode=\"HDMI-1: nvidia-auto-select { ViewPortIn=3840x2160, ViewPortOut=3840x2160+0+0 }"@endcode                                                                                            |
-
-##### macOS
-
-###### displayplacer
-
-> [!NOTE]
-> This example uses the `displayplacer` tool to change the resolution.
-> This tool can be installed following instructions in their
-> [GitHub repository](https://github.com/jakehilborn/displayplacer).
-
-| Prep Step | Command                                                                                                                                                                  |
-|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}sh -c "displayplacer \"id:<screenId> res:${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT} hz:${SUNSHINE_CLIENT_FPS} scaling:on origin:(0,0) degree:0\""@endcode |
-| Undo      | @code{}displayplacer "id:<screenId> res:3840x2160 hz:120 scaling:on origin:(0,0) degree:0"@endcode                                                                       |
-
-##### Windows
-Sunshine has built-in support for changing the resolution and refresh rate on Windows. If you prefer to use a
-third-party tool, you can use *QRes* as an example.
-
-###### QRes
-
-> [!NOTE]
-> This example uses the *QRes* tool to change the resolution and refresh rate.
-> This tool can be downloaded from their [SourceForge repository](https://sourceforge.net/projects/qres).
-
-| Prep Step | Command                                                                                                                   |
-|-----------|---------------------------------------------------------------------------------------------------------------------------|
-| Do        | @code{}cmd /C "FullPath\qres.exe /x:%SUNSHINE_CLIENT_WIDTH% /y:%SUNSHINE_CLIENT_HEIGHT% /r:%SUNSHINE_CLIENT_FPS%"@endcode |
-| Undo      | @code{}FullPath\qres.exe /x:3840 /y:2160 /r:120@endcode                                                                   |
 
 ### Additional Considerations
 
@@ -349,34 +184,7 @@ third-party tool, you can use *QRes* as an example.
 
 > [!CAUTION]
 > Because Flatpak packages run in a sandboxed environment and do not normally have access to the
-> host, the Flatpak of Sunshine requires commands to be prefixed with `flatpak-spawn --host`.
-
-#### Windows
-**Elevating Commands (Windows)**
-
-If you've installed Sunshine as a service (default), you can specify if a command should be elevated with
-administrative privileges. Simply enable the elevated option in the WEB UI, or add it to the JSON configuration.
-This is an option for both prep-cmd and regular commands and will launch the process with the current user without a
-UAC prompt.
-
-**Example**
-```json
-{
-  "name": "Game With AntiCheat that Requires Admin",
-  "output": "",
-  "cmd": "ping 127.0.0.1",
-  "exclude-global-prep-cmd": false,
-  "elevated": true,
-  "prep-cmd": [
-    {
-      "do": "powershell.exe -command \"Start-Streaming\"",
-      "undo": "powershell.exe -command \"Stop-Streaming\"",
-      "elevated": false
-    }
-  ],
-  "image-path": ""
-}
-```
+> host, the Flatpak of Prism requires commands to be prefixed with `flatpak-spawn --host`.
 
 <div class="section_buttons">
 

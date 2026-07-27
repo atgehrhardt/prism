@@ -125,7 +125,7 @@ namespace display_device {
    * This could happen if the display is no longer available or the hardware was changed
    * and the device ids no longer match.
    *
-   * The user then accepts that Sunshine is not able to restore the state and "agrees" to
+   * The user then accepts that Prism is not able to restore the state and "agrees" to
    * do it manually.
    *
    * @return True if persistence was reset, false otherwise.

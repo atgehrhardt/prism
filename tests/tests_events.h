@@ -1,12 +1,12 @@
 /**
  * @file tests/tests_events.h
- * @brief Declarations for SunshineEventListener.
+ * @brief Declarations for PrismEventListener.
  */
 #pragma once
 #include "tests_common.h"
 
-struct SunshineEventListener: BufferedTestEventListener {
-  SunshineEventListener() {
+struct PrismEventListener: BufferedTestEventListener {
+  PrismEventListener() {
     sink = boost::make_shared<sink_t>();
     sink_buffer = boost::make_shared<std::stringstream>();
     sink->locked_backend()->add_stream(sink_buffer);

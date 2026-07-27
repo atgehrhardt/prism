@@ -668,11 +668,11 @@ namespace portal {
       request_count++;
 
       if (out_token) {
-        *out_token = g_strdup_printf("Sunshine%u", request_count);
+        *out_token = g_strdup_printf("Prism%u", request_count);
       }
       if (out_path) {
         g_autofree gchar *sender = get_sender_string(conn);
-        *out_path = g_strdup(std::format("{}{}{}{}", REQUEST_PREFIX, sender, "/Sunshine", request_count).c_str());
+        *out_path = g_strdup(std::format("{}{}{}{}", REQUEST_PREFIX, sender, "/Prism", request_count).c_str());
       }
     }
 
@@ -682,12 +682,12 @@ namespace portal {
       session_count++;
 
       if (out_token) {
-        *out_token = g_strdup_printf("Sunshine%u", session_count);
+        *out_token = g_strdup_printf("Prism%u", session_count);
       }
 
       if (out_path) {
         g_autofree gchar *sender = get_sender_string(conn);
-        *out_path = g_strdup(std::format("{}{}{}{}", SESSION_PREFIX, sender, "/Sunshine", session_count).c_str());
+        *out_path = g_strdup(std::format("{}{}{}{}", SESSION_PREFIX, sender, "/Prism", session_count).c_str());
       }
     }
 
@@ -834,7 +834,7 @@ namespace platf {
     }
 
     if (has_elevated_privileges(true)) {
-      // We're still in the probing phase of Sunshine startup. Dropping portal security early will break KMS.
+      // We're still in the probing phase of Prism startup. Dropping portal security early will break KMS.
       // Just return a dummy screen for now. Display re-enumeration after encoder probing will yield full result.
       display_names.emplace_back("init");
       return display_names;

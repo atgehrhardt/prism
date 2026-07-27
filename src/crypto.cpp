@@ -55,7 +55,7 @@ namespace crypto {
    * @brief Verify the certificate chain.
    * When certificates from two or more instances of Moonlight have been added to x509_store_t,
    * only one of them will be verified by X509_verify_cert, resulting in only a single instance of
-   * Moonlight to be able to use Sunshine
+   * Moonlight to be able to use Prism
    *
    * To circumvent this, x509_store_t instance will be created for each instance of the certificates.
    * @param cert The certificate to verify.
@@ -467,7 +467,7 @@ namespace crypto {
   }
 
   /**
-   * @brief Generate a self-signed certificate and private key for Sunshine pairing.
+   * @brief Generate a self-signed certificate and private key for Prism pairing.
    */
   creds_t gen_creds(const std::string_view &cn, std::uint32_t key_bits) {
     x509_t x509 {X509_new()};

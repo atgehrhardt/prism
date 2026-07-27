@@ -1,6 +1,6 @@
 # API
 
-Sunshine has a RESTful API which can be used to interact with the service.
+Prism has a RESTful API which can be used to interact with the service.
 
 Unless otherwise specified, authentication is required for all API calls. You can authenticate using
 basic authentication with the admin username and password.

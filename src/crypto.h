@@ -141,7 +141,7 @@ namespace crypto {
   bool verify256(const x509_t &x509, const std::string_view &data, const std::string_view &signature);
 
   /**
-   * @brief Generate a self-signed certificate and private key for Sunshine pairing.
+   * @brief Generate a self-signed certificate and private key for Prism pairing.
    *
    * @param cn Common name to place in the generated certificate.
    * @param key_bits Size in bits of the generated RSA key.
@@ -174,7 +174,7 @@ namespace crypto {
   std::string rand_alphabet(std::size_t bytes, const std::string_view &alphabet = std::string_view {"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!%&()=-"});
 
   /**
-   * @brief Owns the certificate chain returned by Sunshine's TLS certificate loader.
+   * @brief Owns the certificate chain returned by Prism's TLS certificate loader.
    */
   class cert_chain_t {
   public:

@@ -34,37 +34,35 @@ if(NOT GLAD_SKIP_PIP_INSTALL)
     # special priority to virtual environments.
     set(Python_FIND_VIRTUALENV STANDARD)  # cmake-lint: disable=C0103
 
-    # On Linux/FreeBSD, search for a sufficiently new system Python (>= 3.8) explicitly.
+    # On Linux, search for a sufficiently new system Python (>= 3.8) explicitly.
     # This is important on distros like OpenSUSE Leap where /usr/bin/python3 is 3.6,
     # but python3.11 or python3.8 may also be installed. Search newest-first so that
     # the best available interpreter is used. The NO_DEFAULT_PATH on the first pass
     # restricts the search to /usr/bin and /usr/local/bin to prefer distro packages
     # over venv/toolchain Pythons (e.g. GitHub Actions setup-python injects its own
-    # python3 first on PATH; Homebrew puts python@3.x in /home/linuxbrew/... on PATH).
-    if(UNIX AND NOT APPLE)
-        foreach(py_candidate python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 python3.8 python3)
-            find_program(_system_python3 "${py_candidate}" PATHS /usr/bin /usr/local/bin NO_DEFAULT_PATH)
-            if(_system_python3)
-                # Verify this interpreter is >= 3.8
-                execute_process(
-                        COMMAND "${_system_python3}" -c
-                            "import sys; sys.exit(0 if sys.version_info >= (3,8) else 1)"
-                        RESULT_VARIABLE _py_version_ok
-                        OUTPUT_QUIET ERROR_QUIET
-                )
-                if(_py_version_ok EQUAL 0)
-                    message(STATUS "glad: using Python interpreter: ${_system_python3}")
-                    set(Python_EXECUTABLE "${_system_python3}"  # cmake-lint: disable=C0103
-                            CACHE FILEPATH "Python interpreter" FORCE)
-                    break()
-                else()
-                    message(STATUS "glad: skipping ${_system_python3} (< 3.8)")
-                    unset(_system_python3 CACHE)
-                endif()
+    # python3 first on PATH).
+    foreach(py_candidate python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 python3.8 python3)
+        find_program(_system_python3 "${py_candidate}" PATHS /usr/bin /usr/local/bin NO_DEFAULT_PATH)
+        if(_system_python3)
+            # Verify this interpreter is >= 3.8
+            execute_process(
+                    COMMAND "${_system_python3}" -c
+                        "import sys; sys.exit(0 if sys.version_info >= (3,8) else 1)"
+                    RESULT_VARIABLE _py_version_ok
+                    OUTPUT_QUIET ERROR_QUIET
+            )
+            if(_py_version_ok EQUAL 0)
+                message(STATUS "glad: using Python interpreter: ${_system_python3}")
+                set(Python_EXECUTABLE "${_system_python3}"  # cmake-lint: disable=C0103
+                        CACHE FILEPATH "Python interpreter" FORCE)
+                break()
+            else()
+                message(STATUS "glad: skipping ${_system_python3} (< 3.8)")
+                unset(_system_python3 CACHE)
             endif()
-            unset(_system_python3 CACHE)
-        endforeach()
-    endif()
+        endif()
+        unset(_system_python3 CACHE)
+    endforeach()
 endif()
 
 # Run find_package(Python) before add_subdirectory() so Python_EXECUTABLE is
@@ -134,11 +132,7 @@ if(NOT GLAD_SKIP_PIP_INSTALL)
                 COMMAND_ERROR_IS_FATAL ANY
         )
 
-        if(WIN32)
-            set(_glad_python_executable "${_glad_python_venv}/Scripts/python.exe")
-        else()
-            set(_glad_python_executable "${_glad_python_venv}/bin/python")
-        endif()
+        set(_glad_python_executable "${_glad_python_venv}/bin/python")
 
         execute_process(
                 COMMAND "${UV_EXECUTABLE}" pip install

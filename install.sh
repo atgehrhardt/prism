@@ -38,7 +38,7 @@ fi
 # --- 3. Build ----------------------------------------------------------------
 log "Building Prism (this takes a while)"
 # Enable CUDA (NVIDIA DMA-BUF/nvenc path) only when a CUDA toolkit is present;
-# on AMD/Intel systems Sunshine simply builds without it.
+# on AMD/Intel systems Prism simply builds without it.
 CUDA_FLAG="OFF"
 CUDA_COMPILER_FLAG=""
 if command -v nvcc >/dev/null; then
@@ -47,7 +47,7 @@ elif [ -x /usr/local/cuda/bin/nvcc ]; then
   CUDA_FLAG="ON"
   CUDA_COMPILER_FLAG="-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc"
 fi
-# Newer distros ship a GCC newer than nvcc supports; permit it (Sunshine's CUDA
+# Newer distros ship a GCC newer than nvcc supports; permit it (Prism's CUDA
 # code is small and builds fine in practice).
 if [ "$CUDA_FLAG" = "ON" ]; then
   CUDA_COMPILER_FLAG="$CUDA_COMPILER_FLAG -DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler"
@@ -56,7 +56,7 @@ read -r -a CUDA_FLAGS <<< "$CUDA_COMPILER_FLAG"
 cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
-  -DSUNSHINE_ENABLE_CUDA="$CUDA_FLAG" \
+  -DPRISM_ENABLE_CUDA="$CUDA_FLAG" \
   "${CUDA_FLAGS[@]}" \
   -DCUDA_FAIL_ON_MISSING=OFF \
   -DBUILD_DOCS=OFF -DBUILD_TESTS=OFF
@@ -98,14 +98,14 @@ install -Dm644 "$SRC_DIR/contrib/virtual-session/prism.service" \
 "$SRC_DIR/contrib/virtual-session/build-kwin-mode.sh"
 
 # --- 6. apps.json (idempotent merge, with backup) ------------------------------
-APPS="$HOME/.config/sunshine/apps.json"
-mkdir -p "$HOME/.config/sunshine"
+APPS="$HOME/.config/prism/apps.json"
+mkdir -p "$HOME/.config/prism"
 if [ -f "$APPS" ]; then
   cp "$APPS" "$APPS.bak.$(date +%s)"
 fi
 python3 - <<'EOF'
 import json, os
-apps_path = os.path.expanduser("~/.config/sunshine/apps.json")
+apps_path = os.path.expanduser("~/.config/prism/apps.json")
 try:
     with open(apps_path) as f: data = json.load(f)
 except Exception:
@@ -129,22 +129,22 @@ with open(apps_path, "w") as f:
 print("apps.json updated")
 EOF
 
-# --- 6b. sunshine.conf: dedicated capture sink --------------------------------
-# Point Sunshine's audio capture at a dedicated "prism-stream" null sink so
+# --- 6b. prism.conf: dedicated capture sink --------------------------------
+# Point Prism's audio capture at a dedicated "prism-stream" null sink so
 # each capture mode can route exactly the right audio into the stream (mirror
 # loops the desktop in; virtual/headless route only session audio). Respect an
 # audio_sink the user set themselves.
-CONF="$HOME/.config/sunshine/sunshine.conf"
+CONF="$HOME/.config/prism/prism.conf"
 touch "$CONF"
 if ! grep -q '^audio_sink' "$CONF"; then
-  log "Setting audio_sink=prism-stream in sunshine.conf"
+  log "Setting audio_sink=prism-stream in prism.conf"
   printf '\naudio_sink = prism-stream\n' >> "$CONF"
 fi
 
 # --- 7. Enable services --------------------------------------------------------
 log "Enabling services"
 systemctl --user daemon-reload
-# udev rule: read access to Sunshine's evdev nodes for the input bridge
+# udev rule: read access to Prism's evdev nodes for the input bridge
 sudo install -Dm644 "$SRC_DIR/contrib/virtual-session/61-prism-input.rules" \
   /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
 

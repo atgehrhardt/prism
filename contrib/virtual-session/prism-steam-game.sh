@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prism: launch a Steam game inside the headless session and exit when the
 # game exits, so the app — and therefore the stream — closes with the game.
-# Sunshine runs this as the app command of synced Steam games; the session's
+# Prism runs this as the app command of synced Steam games; the session's
 # own lightweight Steam client (plain `steam -silent`, no Deck UI) is brought
 # up by prism-headless-start.sh when PRISM_STEAM_APP_ID is set.
 #

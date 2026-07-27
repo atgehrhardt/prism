@@ -73,16 +73,16 @@
     <!-- Restart Prism -->
     <div class="card my-4">
       <div class="card-body">
-        <h2 id="restart">{{ $t('troubleshooting.restart_sunshine') }}</h2>
-        <p>{{ $t('troubleshooting.restart_sunshine_desc') }}</p>
+        <h2 id="restart">{{ $t('troubleshooting.restart_prism') }}</h2>
+        <p>{{ $t('troubleshooting.restart_prism_desc') }}</p>
         <div class="alert alert-success" v-if="restartPressed === true">
           <check-circle :size="18" class="icon"></check-circle>
-          {{ $t('troubleshooting.restart_sunshine_success') }}
+          {{ $t('troubleshooting.restart_prism_success') }}
         </div>
         <div>
           <button class="btn btn-warning" :disabled="restartPressed" @click="restart">
             <refresh-cw :size="18" class="icon"></refresh-cw>
-            {{ $t('troubleshooting.restart_sunshine') }}
+            {{ $t('troubleshooting.restart_prism') }}
           </button>
         </div>
       </div>

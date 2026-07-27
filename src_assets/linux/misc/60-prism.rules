@@ -1,0 +1,12 @@
+# Allows Prism to access /dev/uinput
+KERNEL=="uinput", SUBSYSTEM=="misc", OPTIONS+="static_node=uinput", GROUP="input", MODE="0660", TAG+="uaccess"
+
+# Allows Prism to access /dev/uhid
+KERNEL=="uhid", GROUP="input", MODE="0660", TAG+="uaccess"
+
+# Joypads
+KERNEL=="hidraw*", ATTRS{name}=="Prism PS5 (virtual) pad*", GROUP="input", MODE="0660", TAG+="uaccess"
+SUBSYSTEMS=="input", ATTRS{name}=="Prism X-Box One (virtual) pad*", GROUP="input", MODE="0660", TAG+="uaccess"
+SUBSYSTEMS=="input", ATTRS{name}=="Prism gamepad (virtual) motion sensors*", GROUP="input", MODE="0660", TAG+="uaccess"
+SUBSYSTEMS=="input", ATTRS{name}=="Prism Nintendo (virtual) pad*", GROUP="input", MODE="0660", TAG+="uaccess"
+SUBSYSTEMS=="input", ATTRS{name}=="Prism PS5 (virtual) pad*", GROUP="input", MODE="0660", TAG+="uaccess"

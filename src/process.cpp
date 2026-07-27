@@ -34,14 +34,6 @@
 #include "system_tray.h"
 #include "utility.h"
 
-#ifdef _WIN32
-  // from_utf8() string conversion function
-  #include "platform/windows/utf_utils.h"
-
-  // _SH constants for _wfsopen()
-  #include <share.h>
-#endif
-
 namespace proc {
   using namespace std::literals;
   namespace pt = boost::property_tree;
@@ -114,11 +106,7 @@ namespace proc {
     // Parse the raw command string into parts to get the actual command portion
     std::vector<std::string> parts;
     try {
-#ifdef _WIN32
-      parts = boost::program_options::split_winmain(cmd);
-#else
       parts = boost::program_options::split_unix(cmd);
-#endif
     } catch (boost::escaped_list_error &err) {
       BOOST_LOG(error) << "Boost failed to parse command ["sv << cmd << "] because " << err.what();
       return boost::filesystem::path();
@@ -244,7 +232,7 @@ namespace proc {
    * @brief Run one of Prism's session scripts synchronously, like a prep command.
    *
    * @param script Script file name inside `$HOME/.local/bin`.
-   * @param env Environment for the child process (carries the SUNSHINE_CLIENT_* variables).
+   * @param env Environment for the child process (carries the PRISM_CLIENT_* variables).
    * @param pipe Optional log sink for the script's output.
    * @return 0 on success, -1 on failure.
    */
@@ -368,7 +356,7 @@ namespace proc {
     if (mode != "default"sv) {
       BOOST_LOG(warning) << "[prism] Unknown capture mode '"sv << mode << "'; using default capture"sv;
     }
-    // Mirror (default) capture: Sunshine records the dedicated "prism-stream"
+    // Mirror (default) capture: Prism records the dedicated "prism-stream"
     // capture sink, so desktop audio must be looped into it explicitly.
     return prism_run_session_script("prism-mirror-audio.sh"s, _env, _pipe.get());
   }
@@ -443,42 +431,31 @@ namespace proc {
     _app_prep_it = _app_prep_begin;
 
     // Add Stream-specific environment variables
-    _env["SUNSHINE_APP_ID"] = std::to_string(_app_id);
-    _env["SUNSHINE_APP_NAME"] = _app.name;
-    _env["SUNSHINE_CLIENT_WIDTH"] = std::to_string(launch_session->width);
-    _env["SUNSHINE_CLIENT_HEIGHT"] = std::to_string(launch_session->height);
-    _env["SUNSHINE_CLIENT_FPS"] = std::to_string(launch_session->fps);
-    _env["SUNSHINE_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
-    _env["SUNSHINE_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
-    _env["SUNSHINE_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
-    _env["SUNSHINE_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";
+    _env["PRISM_APP_ID"] = std::to_string(_app_id);
+    _env["PRISM_APP_NAME"] = _app.name;
+    _env["PRISM_CLIENT_WIDTH"] = std::to_string(launch_session->width);
+    _env["PRISM_CLIENT_HEIGHT"] = std::to_string(launch_session->height);
+    _env["PRISM_CLIENT_FPS"] = std::to_string(launch_session->fps);
+    _env["PRISM_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
+    _env["PRISM_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
+    _env["PRISM_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
+    _env["PRISM_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";
     int channelCount = launch_session->surround_info & 65535;
     switch (channelCount) {
       case 2:
-        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "2.0";
+        _env["PRISM_CLIENT_AUDIO_CONFIGURATION"] = "2.0";
         break;
       case 6:
-        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "5.1";
+        _env["PRISM_CLIENT_AUDIO_CONFIGURATION"] = "5.1";
         break;
       case 8:
-        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "7.1";
+        _env["PRISM_CLIENT_AUDIO_CONFIGURATION"] = "7.1";
         break;
     }
-    _env["SUNSHINE_CLIENT_AUDIO_SURROUND_PARAMS"] = launch_session->surround_params;
+    _env["PRISM_CLIENT_AUDIO_SURROUND_PARAMS"] = launch_session->surround_params;
 
     if (!_app.output.empty() && _app.output != "null"sv) {
-#ifdef _WIN32
-      // fopen() interprets the filename as an ANSI string on Windows, so we must convert it
-      // to UTF-16 and use the wchar_t variants for proper Unicode log file path support.
-      auto woutput = utf_utils::from_utf8(_app.output);
-
-      // Use _SH_DENYNO to allow us to open this log file again for writing even if it is
-      // still open from a previous execution. This is required to handle the case of a
-      // detached process executing again while the previous process is still running.
-      _pipe.reset(_wfsopen(woutput.c_str(), L"a", _SH_DENYNO));
-#else
       _pipe.reset(fopen(_app.output.c_str(), "a"));
-#endif
     }
 
     std::error_code ec;
@@ -511,7 +488,7 @@ namespace proc {
       if (ec) {
         BOOST_LOG(error) << "Couldn't run ["sv << cmd.do_cmd << "]: System: "sv << ec.message();
         // We don't want any prep commands failing launch of the desktop.
-        // This is to prevent the issue where users reboot their PC and need to log in with Sunshine.
+        // This is to prevent the issue where users reboot their PC and need to log in with Prism.
         // permission_denied is typically returned when the user impersonation fails, which can happen when user is not signed in yet.
         if (!(_app.cmd.empty() && ec == std::errc::permission_denied)) {
           return -1;
@@ -566,7 +543,6 @@ namespace proc {
   }
 
   int proc_t::running() {
-#ifndef _WIN32
     // On POSIX OSes, we must periodically wait for our children to avoid
     // them becoming zombies. This must be synchronized carefully with
     // calls to bp::wait() and platf::process_group_running() which both
@@ -574,7 +550,6 @@ namespace proc {
     auto reaper = util::fail_guard([]() {
       while (waitpid(-1, nullptr, WNOHANG) > 0);
     });
-#endif
 
     if (placebo) {
       return _app_id;
@@ -643,7 +618,7 @@ namespace proc {
     // Only show the Stopped notification if we actually have an app to stop
     // Since terminate() is always run when a new app has started
     if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+#if defined PRISM_TRAY && PRISM_TRAY >= 1
       system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
 #endif
 
@@ -743,19 +718,6 @@ namespace proc {
               auto var_end = find_match(next, std::end(val_raw));
               auto var_name = std::string {var_begin, var_end};
 
-#ifdef _WIN32
-              // Windows treats environment variable names in a case-insensitive manner,
-              // so we look for a case-insensitive match here. This is critical for
-              // correctly appending to PATH on Windows.
-              auto itr = std::find_if(env.cbegin(), env.cend(), [&](const auto &e) {
-                return boost::iequals(e.get_name(), var_name);
-              });
-              if (itr != env.cend()) {
-                // Use an existing case-insensitive match
-                var_name = itr->get_name();
-              }
-#endif
-
               ss << env[var_name].to_string();
 
               pos = var_end + 1;
@@ -833,7 +795,7 @@ namespace proc {
     }
 
     // check if image is in assets directory
-    if (auto full_image_path = std::filesystem::path(SUNSHINE_ASSETS_DIR) / app_image_path; std::filesystem::exists(full_image_path)) {
+    if (auto full_image_path = std::filesystem::path(PRISM_ASSETS_DIR) / app_image_path; std::filesystem::exists(full_image_path)) {
       // Validate PNG signature
       if (!check_valid_png(full_image_path)) {
         BOOST_LOG(warning) << "Invalid PNG file at path ["sv << full_image_path << ']';
@@ -844,7 +806,7 @@ namespace proc {
 
     if (app_image_path == "./assets/steam.png") {
       // handle old default steam image definition
-      return SUNSHINE_ASSETS_DIR "/steam.png";
+      return PRISM_ASSETS_DIR "/steam.png";
     }
 
     // check if specified image exists
@@ -989,8 +951,8 @@ namespace proc {
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
-          prep_cmds.reserve(config::sunshine.prep_cmds.size());
-          for (auto &prep_cmd : config::sunshine.prep_cmds) {
+          prep_cmds.reserve(config::prism.prep_cmds.size());
+          for (auto &prep_cmd : config::prism.prep_cmds) {
             auto do_cmd = parse_env_val(this_env, prep_cmd.do_cmd);
             auto undo_cmd = parse_env_val(this_env, prep_cmd.undo_cmd);
 
@@ -1043,12 +1005,6 @@ namespace proc {
 
         if (working_dir) {
           ctx.working_dir = parse_env_val(this_env, *working_dir);
-#ifdef _WIN32
-          // The working directory, unlike the command itself, should not be quoted
-          // when it contains spaces. Unlike POSIX, Windows forbids quotes in paths,
-          // so we can safely strip them all out here to avoid confusing the user.
-          boost::erase_all(ctx.working_dir, "\"");
-#endif
         }
 
         if (image_path) {

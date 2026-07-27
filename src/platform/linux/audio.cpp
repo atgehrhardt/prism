@@ -68,7 +68,7 @@ namespace platf {
     util::safe_ptr<pa_simple, pa_simple_free> mic;  ///< PulseAudio simple recording stream for microphone capture.
 
     /**
-     * @brief Deliver a captured audio sample to Sunshine's audio pipeline.
+     * @brief Deliver a captured audio sample to Prism's audio pipeline.
      *
      * @param sample_buf Sample buf.
      * @return Capture status reported to the streaming pipeline.
@@ -120,7 +120,7 @@ namespace platf {
     int status;
 
     mic->mic.reset(
-      pa_simple_new(nullptr, "sunshine", pa_stream_direction_t::PA_STREAM_RECORD, source_name.c_str(), "sunshine-record", &ss, &pa_map, &pa_attr, &status)
+      pa_simple_new(nullptr, "prism", pa_stream_direction_t::PA_STREAM_RECORD, source_name.c_str(), "prism-record", &ss, &pa_map, &pa_attr, &status)
     );
 
     if (!mic->mic) {
@@ -240,7 +240,7 @@ namespace platf {
     }
 
     /**
-     * @brief Forward a PulseAudio integer callback value into a Sunshine alarm.
+     * @brief Forward a PulseAudio integer callback value into a Prism alarm.
      *
      * @param ctx PulseAudio context that emitted the callback.
      * @param i Integer value returned by the PulseAudio operation.
@@ -279,7 +279,7 @@ namespace platf {
     }
 
     /**
-     * @brief PulseAudio server controller that creates and removes Sunshine sinks.
+     * @brief PulseAudio server controller that creates and removes Prism sinks.
      */
     class server_t: public audio_control_t {
       enum ctx_event_e : int {
@@ -297,7 +297,7 @@ namespace platf {
         std::uint32_t stereo = PA_INVALID_INDEX;
         std::uint32_t surround51 = PA_INVALID_INDEX;
         std::uint32_t surround71 = PA_INVALID_INDEX;
-      } index;  ///< PulseAudio module indexes for Sunshine-created null sinks.
+      } index;  ///< PulseAudio module indexes for Prism-created null sinks.
 
       std::unique_ptr<safe::event_t<ctx_event_e>> events;  ///< Event queue receiving PulseAudio context state changes.
       std::unique_ptr<std::function<void(ctx_t::pointer)>> events_cb;  ///< Callback that translates PulseAudio context updates into events.
@@ -305,14 +305,14 @@ namespace platf {
       std::jthread worker;  ///< Thread running the PulseAudio mainloop.
 
       /**
-       * @brief Initialize PulseAudio mainloop, context, and Sunshine null sinks.
+       * @brief Initialize PulseAudio mainloop, context, and Prism null sinks.
        *
        * @return 0 on success; nonzero or negative platform status on failure.
        */
       int init() {
         events = std::make_unique<safe::event_t<ctx_event_e>>();
         loop.reset(pa_mainloop_new());
-        ctx.reset(pa_context_new(pa_mainloop_get_api(loop.get()), "sunshine"));
+        ctx.reset(pa_context_new(pa_mainloop_get_api(loop.get()), "prism"));
 
         events_cb = std::make_unique<std::function<void(ctx_t::pointer)>>([this](ctx_t::pointer ctx) {
           switch (pa_context_get_state(ctx)) {
@@ -392,7 +392,7 @@ namespace platf {
       }
 
       /**
-       * @brief Unload a Sunshine-created PulseAudio null sink.
+       * @brief Unload a Prism-created PulseAudio null sink.
        *
        * @param i PulseAudio introspection info supplied to the callback.
        * @return 0 when the sink is absent or unloaded; nonzero on PulseAudio failure.
@@ -419,14 +419,14 @@ namespace platf {
       }
 
       /**
-       * @brief Query host and virtual sink names available to Sunshine.
+       * @brief Query host and virtual sink names available to Prism.
        *
        * @return Host and virtual sink names when the backend can report them.
        */
       std::optional<sink_t> sink_info() override {
-        constexpr auto stereo = "sink-sunshine-stereo";
-        constexpr auto surround51 = "sink-sunshine-surround51";
-        constexpr auto surround71 = "sink-sunshine-surround71";
+        constexpr auto stereo = "sink-prism-stereo";
+        constexpr auto surround51 = "sink-prism-surround51";
+        constexpr auto surround71 = "sink-prism-surround71";
 
         auto alarm = safe::make_alarm<int>();
 
@@ -447,7 +447,7 @@ namespace platf {
             return;
           }
 
-          // Ensure Sunshine won't create a sink that already exists.
+          // Ensure Prism won't create a sink that already exists.
           if (!std::strcmp(sink_info->name, stereo)) {
             index.stereo = sink_info->owner_module;
 

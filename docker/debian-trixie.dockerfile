@@ -2,19 +2,19 @@
 # artifacts: true
 # platforms: linux/amd64,linux/arm64/v8
 # platforms_pr: linux/amd64
-# no-cache-filters: sunshine-base,artifacts,sunshine
+# no-cache-filters: prism-base,artifacts,prism
 ARG BASE=debian
 ARG TAG=trixie
-FROM ${BASE}:${TAG} AS sunshine-base
+FROM ${BASE}:${TAG} AS prism-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-FROM sunshine-base AS sunshine-deps
+FROM prism-base AS prism-deps
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Copy only the build script and necessary files first for better layer caching
-WORKDIR /build/sunshine/
+WORKDIR /build/prism/
 COPY --link scripts/linux_build.sh ./scripts/linux_build.sh
 COPY --link packaging/linux/patches/ ./packaging/linux/patches/
 
@@ -31,7 +31,7 @@ apt-get clean
 rm -rf /var/lib/apt/lists/*
 _DEPS
 
-FROM sunshine-deps AS sunshine-build
+FROM prism-deps AS prism-build
 
 ARG BRANCH
 ARG BUILD_VERSION
@@ -70,36 +70,36 @@ set -e
 _BUILD
 
 # run tests
-WORKDIR /build/sunshine/build/tests
+WORKDIR /build/prism/build/tests
 RUN <<_TEST
 #!/bin/bash
 set -e
 export DISPLAY=:1
 Xvfb ${DISPLAY} -screen 0 1024x768x24 &
-./test_sunshine --gtest_color=yes
+./test_prism --gtest_color=yes
 _TEST
 
-FROM sunshine-base AS sunshine
+FROM prism-base AS prism
 
 ARG BASE
 ARG TAG
 ARG TARGETARCH
 
 # artifacts to be extracted in CI
-COPY --link --from=sunshine-build /build/sunshine/build/cpack_artifacts/Sunshine.deb /artifacts/sunshine-${BASE}-${TAG}-${TARGETARCH}.deb
+COPY --link --from=prism-build /build/prism/build/cpack_artifacts/Prism.deb /artifacts/prism-${BASE}-${TAG}-${TARGETARCH}.deb
 
 # copy deb from builder
-COPY --link --from=sunshine-build /build/sunshine/build/cpack_artifacts/Sunshine.deb /sunshine.deb
+COPY --link --from=prism-build /build/prism/build/cpack_artifacts/Prism.deb /prism.deb
 
-# install sunshine
-RUN <<_INSTALL_SUNSHINE
+# install prism
+RUN <<_INSTALL_PRISM
 #!/bin/bash
 set -e
 apt-get update -y
-apt-get install -y --no-install-recommends /sunshine.deb
+apt-get install -y --no-install-recommends /prism.deb
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-_INSTALL_SUNSHINE
+_INSTALL_PRISM
 
 # network setup
 EXPOSE 47984-47990/tcp
@@ -123,8 +123,8 @@ RUN <<_SETUP_USER
 set -e
 groupadd -f -g "${PGID}" "${UNAME}"
 useradd -lm -d ${HOME} -s /bin/bash -g "${PGID}" -u "${PUID}" "${UNAME}"
-mkdir -p ${HOME}/.config/sunshine
-ln -s ${HOME}/.config/sunshine /config
+mkdir -p ${HOME}/.config/prism
+ln -s ${HOME}/.config/prism /config
 chown -R ${UNAME} ${HOME}
 _SETUP_USER
 
@@ -132,4 +132,4 @@ USER ${UNAME}
 WORKDIR ${HOME}
 
 # entrypoint
-ENTRYPOINT ["/usr/bin/sunshine"]
+ENTRYPOINT ["/usr/bin/prism"]

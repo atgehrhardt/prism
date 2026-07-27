@@ -36,7 +36,7 @@ namespace platf::gamepad {
    * @return Created xbox one object or status.
    */
   auto create_xbox_one() {
-    return inputtino::XboxOneJoypad::create({.name = inputtino_name_for_seat("Sunshine X-Box One (virtual) pad"sv),
+    return inputtino::XboxOneJoypad::create({.name = inputtino_name_for_seat("Prism X-Box One (virtual) pad"sv),
                                              // https://github.com/torvalds/linux/blob/master/drivers/input/joystick/xpad.c#L147
                                              .vendor_id = 0x045E,
                                              .product_id = 0x02EA,
@@ -49,7 +49,7 @@ namespace platf::gamepad {
    * @return Created switch object or status.
    */
   auto create_switch() {
-    return inputtino::SwitchJoypad::create({.name = inputtino_name_for_seat("Sunshine Nintendo (virtual) pad"sv),
+    return inputtino::SwitchJoypad::create({.name = inputtino_name_for_seat("Prism Nintendo (virtual) pad"sv),
                                             // https://github.com/torvalds/linux/blob/master/drivers/hid/hid-ids.h#L981
                                             .vendor_id = 0x057e,
                                             .product_id = 0x2009,
@@ -70,7 +70,7 @@ namespace platf::gamepad {
       device_mac = std::format("02:00:00:00:00:{:02x}", globalIndex);
     }
 
-    return inputtino::PS5Joypad::create({.name = inputtino_name_for_seat("Sunshine PS5 (virtual) pad"sv), .vendor_id = 0x054C, .product_id = 0x0CE6, .version = 0x8111, .device_phys = device_mac, .device_uniq = device_mac});
+    return inputtino::PS5Joypad::create({.name = inputtino_name_for_seat("Prism PS5 (virtual) pad"sv), .vendor_id = 0x054C, .product_id = 0x0CE6, .version = 0x8111, .device_phys = device_mac, .device_uniq = device_mac});
   }
 
   /**

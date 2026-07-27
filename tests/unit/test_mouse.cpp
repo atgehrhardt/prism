@@ -9,15 +9,8 @@
 struct MouseHIDTest: PlatformTestSuite, testing::WithParamInterface<util::point_t> {
   void SetUp() override {
     BaseTest::SetUp();
-#ifdef _WIN32
-    // TODO: Windows tests are failing, `get_mouse_loc` seems broken and `platf::abs_mouse` too
-    //       the alternative `platf::abs_mouse` method seem to work better during tests,
-    //       but I'm not sure about real work
-    GTEST_SKIP() << "TODO Windows";
-#elif defined(__linux__) || defined(__FreeBSD__)
     // TODO: Inputtino waiting https://github.com/games-on-whales/inputtino/issues/6 is resolved.
     GTEST_SKIP() << "TODO Inputtino";
-#endif
   }
 
   void TearDown() override {
@@ -83,23 +76,12 @@ TEST_P(MouseHIDTest, AbsMoveInputTest) {
   auto old_loc = platf::get_mouse_loc(input);
   BOOST_LOG(tests) << "AbsMoveInputTest:: got current mouse loc: " << old_loc;
 
-#ifdef _WIN32
-  platf::touch_port_t abs_port {
-    0,
-    0,
-    65535,
-    65535
-  };
-#elif defined(__linux__) || defined(__FreeBSD__)
   platf::touch_port_t abs_port {
     0,
     0,
     19200,
     12000
   };
-#else
-  platf::touch_port_t abs_port {};
-#endif
   BOOST_LOG(tests) << "AbsMoveInputTest:: move: " << mouse_pos;
   platf::abs_mouse(input, abs_port, mouse_pos.x, mouse_pos.y);
   std::this_thread::sleep_for(std::chrono::milliseconds(200));

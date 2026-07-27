@@ -1,6 +1,6 @@
 /**
  * @file src/config.h
- * @brief Declarations for the configuration of Sunshine.
+ * @brief Declarations for the configuration of Prism.
  */
 #pragma once
 
@@ -63,9 +63,6 @@ namespace config {
     } sw;  ///< Software encoder options.
 
     nvenc::nvenc_config nv;  ///< NVIDIA NVENC encoder settings.
-    bool nv_realtime_hags;  ///< Enable the NVIDIA realtime HAGS workaround.
-    bool nv_opengl_vulkan_on_dxgi;  ///< Prefer NVIDIA OpenGL/Vulkan-on-DXGI interop.
-    bool nv_sunshine_high_power_mode;  ///< Request NVIDIA high-power mode for Sunshine.
 
     struct {
       int preset;
@@ -80,29 +77,6 @@ namespace config {
       std::optional<int> qsv_cavlc;
       bool qsv_slow_hevc;
     } qsv;  ///< Intel Quick Sync encoder options.
-
-    struct {
-      std::optional<int> amd_usage_h264;
-      std::optional<int> amd_usage_hevc;
-      std::optional<int> amd_usage_av1;
-      std::optional<int> amd_rc_h264;
-      std::optional<int> amd_rc_hevc;
-      std::optional<int> amd_rc_av1;
-      std::optional<int> amd_enforce_hrd;
-      std::optional<int> amd_quality_h264;
-      std::optional<int> amd_quality_hevc;
-      std::optional<int> amd_quality_av1;
-      std::optional<int> amd_preanalysis;
-      std::optional<int> amd_vbaq;
-      int amd_coder;
-    } amd;  ///< AMD AMF encoder options.
-
-    struct {
-      int vt_allow_sw;
-      int vt_require_sw;
-      int vt_realtime;
-      int vt_coder;
-    } vt;  ///< VideoToolbox encoder options.
 
     struct {
       std::optional<int> blbrc;
@@ -134,7 +108,7 @@ namespace config {
       };
 
       /**
-       * @brief Selects how Sunshine prepares the active display before streaming.
+       * @brief Selects how Prism prepares the active display before streaming.
        */
       enum class config_option_e {
         disabled,  ///< Disable the configuration for the device.
@@ -145,7 +119,7 @@ namespace config {
       };
 
       /**
-       * @brief Selects how Sunshine chooses the stream display resolution.
+       * @brief Selects how Prism chooses the stream display resolution.
        */
       enum class resolution_option_e {
         disabled,  ///< Do not change resolution.
@@ -154,7 +128,7 @@ namespace config {
       };
 
       /**
-       * @brief Selects how Sunshine chooses the stream display refresh rate.
+       * @brief Selects how Prism chooses the stream display refresh rate.
        */
       enum class refresh_rate_option_e {
         disabled,  ///< Do not change refresh rate.
@@ -163,7 +137,7 @@ namespace config {
       };
 
       /**
-       * @brief Selects how Sunshine handles HDR state for the stream display.
+       * @brief Selects how Prism handles HDR state for the stream display.
        */
       enum class hdr_option_e {
         disabled,  ///< Do not change HDR settings.
@@ -213,7 +187,6 @@ namespace config {
     std::string virtual_sink;  ///< Virtual audio sink for audio routing
     std::string default_sink;  ///< Sink restored as the system default when a Prism stream ends (prism_default_sink); empty restores the sink recorded at stream start
     bool stream;  ///< Enable audio streaming to clients
-    bool install_steam_drivers;  ///< Install Steam audio drivers for enhanced compatibility
   };
 
   /**
@@ -260,9 +233,9 @@ namespace config {
     std::string pkey;  ///< Private key PEM string or path.
     std::string cert;  ///< Certificate PEM string or path.
 
-    std::string sunshine_name;  ///< Host name advertised to Moonlight clients.
+    std::string prism_name;  ///< Host name advertised to Moonlight clients.
 
-    std::string file_state;  ///< Path to the persisted Sunshine state file.
+    std::string file_state;  ///< Path to the persisted Prism state file.
 
     std::string external_ip;  ///< External address advertised to clients when configured.
   };
@@ -288,8 +261,6 @@ namespace config {
     bool android_back_as_guide;  ///< Map the client Escape key (Android back button) to the gamepad Guide button.
     bool mouse;  ///< Enable mouse input from clients.
     bool controller;  ///< Enable controller input from clients.
-
-    bool always_send_scancodes;  ///< Always send keyboard scancodes when available.
 
     bool high_resolution_scrolling;  ///< Enable high-resolution mouse-wheel events.
     bool native_pen_touch;  ///< Enable native pen and touch injection.
@@ -343,10 +314,10 @@ namespace config {
   };
 
   /**
-   * @brief Top-level Sunshine configuration and credential state.
+   * @brief Top-level Prism configuration and credential state.
    */
-  struct sunshine_t {
-    std::string locale;  ///< Locale selected for Sunshine UI and log messages.
+  struct prism_t {
+    std::string locale;  ///< Locale selected for Prism UI and log messages.
     int min_log_level;  ///< Minimum severity level written to the configured log sink.
     std::bitset<flag::FLAG_SIZE> flags;  ///< Runtime flags parsed from command-line options.
     std::string credentials_file;  ///< Path to the stored pairing credentials file.
@@ -355,7 +326,7 @@ namespace config {
     std::string password;  ///< Password hash or secret for the local Web UI account.
     std::string salt;  ///< Salt used when hashing the Web UI password.
 
-    std::string config_file;  ///< Path to the active Sunshine configuration file.
+    std::string config_file;  ///< Path to the active Prism configuration file.
 
     /**
      * @brief Command-line options parsed before configuration loading.
@@ -366,9 +337,9 @@ namespace config {
       char **argv;  ///< Command-line argument vector.
     } cmd;  ///< Command line used to launch the application.
 
-    std::uint16_t port;  ///< TCP port used by Sunshine services.
+    std::uint16_t port;  ///< TCP port used by Prism services.
     std::string address_family;  ///< Address family requested for listening sockets.
-    std::string bind_address;  ///< Local address Sunshine should bind to.
+    std::string bind_address;  ///< Local address Prism should bind to.
 
     std::string log_file;  ///< Path to the configured log file.
     bool notify_pre_releases;  ///< Notify users about pre-release updates.
@@ -385,7 +356,7 @@ namespace config {
   extern stream_t stream;
   extern nvhttp_t nvhttp;
   extern input_t input;
-  extern sunshine_t sunshine;
+  extern prism_t prism;
 
   /**
    * @brief Parse serialized text into the corresponding runtime representation.
@@ -396,7 +367,7 @@ namespace config {
    */
   int parse(int argc, char *argv[]);
   /**
-   * @brief Parse Sunshine configuration text into key-value entries.
+   * @brief Parse Prism configuration text into key-value entries.
    *
    * @param file_content Raw configuration file contents to parse.
    * @return Parsed configuration key-value entries.

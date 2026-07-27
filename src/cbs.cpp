@@ -126,7 +126,7 @@ namespace cbs {
   }
 
   /**
-   * @brief Build replacement H.264 SPS bytes with Sunshine-required VUI fields.
+   * @brief Build replacement H.264 SPS bytes with Prism-required VUI fields.
    */
   h264_t make_sps_h264(const AVCodecContext *avctx, const AVPacket *packet) {
     cbs::ctx_t ctx;
@@ -185,7 +185,7 @@ namespace cbs {
   }
 
   /**
-   * @brief Build replacement HEVC VPS/SPS bytes with Sunshine-required VUI fields.
+   * @brief Build replacement HEVC VPS/SPS bytes with Prism-required VUI fields.
    */
   hevc_t make_sps_hevc(const AVCodecContext *avctx, const AVPacket *packet) {
     cbs::ctx_t ctx;

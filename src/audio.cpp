@@ -192,8 +192,11 @@ namespace audio {
       sink = &config::audio.sink;
     }
 
-    // Prefer the virtual sink if host playback is disabled or there's no other sink
-    if (ref->sink.null && (!config.flags[config_t::HOST_AUDIO] || sink->empty())) {
+    // Prefer the virtual sink if host playback is disabled or there's no other sink.
+    // Never override an explicitly configured sink: when audio_sink is set, the
+    // user (or Prism's session scripts) owns audio routing, and switching the
+    // default to the virtual null sink would mute the host's desktop audio.
+    if (ref->sink.null && config::audio.sink.empty() && (!config.flags[config_t::HOST_AUDIO] || sink->empty())) {
       auto &null = *ref->sink.null;
       switch (stream.channelCount) {
         case 2:

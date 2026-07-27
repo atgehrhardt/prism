@@ -43,7 +43,7 @@ bl::sources::severity_logger<int> info {2};  ///< Should be informed about.
 bl::sources::severity_logger<int> warning {3};  ///< Strange events.
 bl::sources::severity_logger<int> error {4};  ///< Recoverable errors.
 bl::sources::severity_logger<int> fatal {5};  ///< Unrecoverable errors.
-#ifdef SUNSHINE_TESTS
+#ifdef PRISM_TESTS
 bl::sources::severity_logger<int> tests {10};  ///< Automatic tests output.
 #endif
 
@@ -61,7 +61,7 @@ namespace logging {
   }
 
   /**
-   * @brief Format a Boost.Log record for Sunshine log output.
+   * @brief Format a Boost.Log record for Prism log output.
    */
   void formatter(const boost::log::record_view &view, boost::log::formatting_ostream &os) {
     constexpr const char *message = "Message";
@@ -89,7 +89,7 @@ namespace logging {
       case 5:
         log_type = "Fatal: "sv;
         break;
-#ifdef SUNSHINE_TESTS
+#ifdef PRISM_TESTS
       case 10:
         log_type = "Tests: "sv;
         break;
@@ -136,7 +136,7 @@ namespace logging {
         android_priority = ANDROID_LOG_UNKNOWN;
         break;
     }
-    __android_log_print(android_priority, "Sunshine", "%s", message.c_str());
+    __android_log_print(android_priority, "Prism", "%s", message.c_str());
   }
 
   // custom sink backend for android
@@ -163,7 +163,7 @@ namespace logging {
 
     sink = boost::make_shared<text_sink>();
 
-#ifndef SUNSHINE_TESTS
+#ifndef PRISM_TESTS
     boost::shared_ptr<std::ostream> stream {&std::cout, boost::null_deleter()};
     sink->locked_backend()->add_stream(stream);
 #endif
@@ -265,7 +265,7 @@ namespace logging {
       << std::endl
       << "    --help                    | print help"sv << std::endl
       << "    --creds username password | set user credentials for the Web manager"sv << std::endl
-      << "    --version                 | print the version of sunshine"sv << std::endl
+      << "    --version                 | print the version of prism"sv << std::endl
       << std::endl
       << "    flags"sv << std::endl
       << "        -0 | Read PIN from stdin"sv << std::endl

@@ -13,7 +13,7 @@ VPORT=5999
 LOG="$HOME/.local/state/prism-virtual.log"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
-echo "=== virtual-desktop start $(date -Is) client=${SUNSHINE_CLIENT_WIDTH:-?}x${SUNSHINE_CLIENT_HEIGHT:-?}@${SUNSHINE_CLIENT_FPS:-?} ==="
+echo "=== virtual-desktop start $(date -Is) client=${PRISM_CLIENT_WIDTH:-?}x${PRISM_CLIENT_HEIGHT:-?}@${PRISM_CLIENT_FPS:-?} ==="
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
@@ -25,7 +25,7 @@ KSD="timeout 10 kscreen-doctor"
 exec 9>"$RUNTIME/prism-virtual.lock"
 flock -x -w 90 9 || exit 1
 
-# Recover from a previous session that was never torn down (e.g. sunshine was
+# Recover from a previous session that was never torn down (e.g. prism was
 # killed mid-stream): re-enable any physical outputs it disabled, otherwise
 # KWin sits in a zero-output state where kscreen-doctor hangs.
 if [ -f "$STATE" ]; then
@@ -37,9 +37,9 @@ if [ -f "$STATE" ]; then
   rm -f "$STATE"
 fi
 
-W="${SUNSHINE_CLIENT_WIDTH:-1920}"
-H="${SUNSHINE_CLIENT_HEIGHT:-1080}"
-FPS="${SUNSHINE_CLIENT_FPS:-60}"
+W="${PRISM_CLIENT_WIDTH:-1920}"
+H="${PRISM_CLIENT_HEIGHT:-1080}"
+FPS="${PRISM_CLIENT_FPS:-60}"
 
 # Clean up any previous virtual output.
 pkill -f "krfb-virtualmonitor --name $VNAME" 2>/dev/null || true
@@ -82,7 +82,7 @@ $KSD "output.$VOUT.vrrpolicy.always" 2>/dev/null \
 
 # HDR: mark the virtual output as HDR/WCG capable when the client asked for an
 # HDR stream, so KWin accepts and passes through HDR content.
-if [ "${SUNSHINE_CLIENT_ENABLE_HDR:-false}" = "true" ]; then
+if [ "${PRISM_CLIENT_HDR:-false}" = "true" ]; then
   echo "enabling hdr/wcg on $VOUT"
   for _ in 1 2 3; do
     $KSD "output.$VOUT.hdr.enable" "output.$VOUT.wcg.enable" 2>/dev/null && break
@@ -93,9 +93,9 @@ fi
 # Point this stream's portal capture at the virtual output.
 echo "portal:$VOUT" > "$OVERRIDE_FILE"
 
-# Audio: Sunshine is pointed at a dedicated "prism-stream" capture sink
-# (audio_sink in sunshine.conf). Create it up front so it exists before
-# Sunshine's audio init, then start the audio guard: it routes all session
+# Audio: Prism is pointed at a dedicated "prism-stream" capture sink
+# (audio_sink in prism.conf). Create it up front so it exists before
+# Prism's audio init, then start the audio guard: it routes all session
 # audio through a "prism-virtual" sink into the capture sink and restores the
 # physical default on teardown.
 if ! pactl list short sinks 2>/dev/null | grep -q '^[0-9]*[[:space:]]prism-stream[[:space:]]'; then

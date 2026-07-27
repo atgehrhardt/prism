@@ -28,18 +28,10 @@
 #include <netinet/in.h>
 #include <netinet/udp.h>
 #include <pwd.h>
+#include <sys/capability.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>  // For setpriority
 #include <sys/socket.h>
-
-#if !defined(__FreeBSD__)
-  #include <sys/capability.h>
-  #include <sys/prctl.h>
-#endif
-#ifdef __FreeBSD__
-  #include <net/if_dl.h>  // For sockaddr_dl, LLADDR, and AF_LINK
-  #include <sys/syscall.h>  // For syscall: SYS_thr_self
-  #include <sys/thr.h>  // For thr_self
-#endif
 
 // lib includes
 #include <boost/asio/ip/address.hpp>
@@ -49,7 +41,7 @@
 #include <lizardbyte/common/env.h>
 #include <unistd.h>
 
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
   #include <dirent.h>
   #include <xf86drm.h>
   #include <xf86drmMode.h>
@@ -65,13 +57,13 @@
 #include "vaapi.h"
 
 #ifdef __GNUC__
-  #define SUNSHINE_GNUC_EXTENSION __extension__
+  #define PRISM_GNUC_EXTENSION __extension__
 #else
   /**
-   * @def SUNSHINE_GNUC_EXTENSION
-   * @brief Macro for SUNSHINE GNUC EXTENSION.
+   * @def PRISM_GNUC_EXTENSION
+   * @brief Macro for PRISM GNUC EXTENSION.
    */
-  #define SUNSHINE_GNUC_EXTENSION
+  #define PRISM_GNUC_EXTENSION
 #endif
 
 #ifndef SOL_IP
@@ -137,7 +129,7 @@ namespace dyn {
     for (auto &func : funcs) {
       TUPLE_2D_REF(fn, name, func);
 
-      *fn = SUNSHINE_GNUC_EXTENSION(apiproc) dlsym(handle, name);
+      *fn = PRISM_GNUC_EXTENSION(apiproc) dlsym(handle, name);
 
       if (!*fn && strict) {
         BOOST_LOG(error) << "Couldn't find function: "sv << name;
@@ -163,7 +155,7 @@ namespace platf {
    * as warnings but do not fail the call.
    */
   int open_drm_card_fd(const std::filesystem::path &path, int flags) {
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
     int fd = open(path.c_str(), flags | O_CLOEXEC);
     if (fd < 0) {
       BOOST_LOG(error) << "Couldn't open: "sv << path.string() << ": "sv << strerror(errno);
@@ -223,9 +215,7 @@ namespace platf {
 
     return fd;
 #else
-  #ifndef __FreeBSD__
-    BOOST_LOG(info) << "Sunshine compiled without DRM support. Cannot control Linux DRM master state for "sv << path.string();
-  #endif
+    BOOST_LOG(info) << "Prism compiled without DRM support. Cannot control Linux DRM master state for "sv << path.string();
     return open(path.c_str(), flags | O_CLOEXEC);
 #endif
   }
@@ -267,24 +257,24 @@ namespace platf {
       // May be set if running under a systemd service with the ConfigurationDirectory= option set.
       if (std::string dir; lizardbyte::common::get_env("CONFIGURATION_DIRECTORY", dir) && !dir.empty()) {
         found = true;
-        config_path = fs::path(dir) / "sunshine"sv;
+        config_path = fs::path(dir) / "prism"sv;
       }
       // Otherwise, follow the XDG base directory specification:
       // https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
       if (std::string dir; !found && lizardbyte::common::get_env("XDG_CONFIG_HOME", dir) && !dir.empty()) {
         found = true;
-        config_path = fs::path(dir) / "sunshine"sv;
+        config_path = fs::path(dir) / "prism"sv;
       }
       // As a last resort, use the home directory
       if (!found) {
         migrate_config = false;
-        config_path = homedir / ".config" / "sunshine";
+        config_path = homedir / ".config" / "prism";
       }
 
       // migrate from the old config location if necessary
-      if (std::string migrate_envvar; migrate_config && found && lizardbyte::common::get_env("SUNSHINE_MIGRATE_CONFIG", migrate_envvar) && migrate_envvar == "1") {
+      if (std::string migrate_envvar; migrate_config && found && lizardbyte::common::get_env("PRISM_MIGRATE_CONFIG", migrate_envvar) && migrate_envvar == "1") {
         std::error_code ec;
-        fs::path old_config_path = homedir / ".config" / "sunshine";
+        fs::path old_config_path = homedir / ".config" / "prism";
         if (old_config_path != config_path && fs::exists(old_config_path, ec)) {
           if (!fs::exists(config_path, ec)) {
             std::cout << "Migrating config from "sv << old_config_path << " to "sv << config_path << std::endl;
@@ -364,38 +354,7 @@ namespace platf {
   std::string get_mac_address(const std::string_view &address) {
     auto ifaddrs = get_ifaddrs();
 
-#ifdef __FreeBSD__
-    // On FreeBSD, we need to find the interface name first, then look for its AF_LINK entry
-    std::string interface_name;
-    for (auto pos = ifaddrs.get(); pos != nullptr; pos = pos->ifa_next) {
-      if (pos->ifa_addr && address == from_sockaddr(pos->ifa_addr)) {
-        interface_name = pos->ifa_name;
-        break;
-      }
-    }
-
-    if (!interface_name.empty()) {
-      // Find the AF_LINK entry for this interface to get MAC address
-      for (auto pos = ifaddrs.get(); pos != nullptr; pos = pos->ifa_next) {
-        if (pos->ifa_addr && pos->ifa_addr->sa_family == AF_LINK && interface_name == pos->ifa_name) {
-          auto sdl = (struct sockaddr_dl *) pos->ifa_addr;
-          auto mac = (unsigned char *) LLADDR(sdl);
-
-          // Format MAC address as XX:XX:XX:XX:XX:XX
-          std::ostringstream mac_stream;
-          mac_stream << std::hex << std::setfill('0');
-          for (int i = 0; i < sdl->sdl_alen; i++) {
-            if (i > 0) {
-              mac_stream << ':';
-            }
-            mac_stream << std::setw(2) << (int) mac[i];
-          }
-          return mac_stream.str();
-        }
-      }
-    }
-#else
-    // On Linux, read MAC address from sysfs
+    // Read MAC address from sysfs
     for (auto pos = ifaddrs.get(); pos != nullptr; pos = pos->ifa_next) {
       if (pos->ifa_addr && address == from_sockaddr(pos->ifa_addr)) {
         std::ifstream mac_file("/sys/class/net/"s + pos->ifa_name + "/address");
@@ -406,7 +365,6 @@ namespace platf {
         }
       }
     }
-#endif
 
     BOOST_LOG(warning) << "Unable to find MAC address for "sv << address;
     return "00:00:00:00:00:00"s;
@@ -457,11 +415,7 @@ namespace platf {
    * @brief Apply the requested scheduling priority to the current thread.
    */
   void adjust_thread_priority(thread_priority_e priority) {
-#if defined(__FreeBSD__)
-    pid_t tid = syscall(SYS_thr_self);
-#else
     pid_t tid = syscall(SYS_gettid);
-#endif
     bool success = false;
     int32_t linux_nice;
 
@@ -547,7 +501,7 @@ namespace platf {
   }
 
   /**
-   * @brief Request a Sunshine process restart on exit.
+   * @brief Request a Prism process restart on exit.
    */
   void restart_on_exit() {
     char executable[PATH_MAX];
@@ -572,12 +526,12 @@ namespace platf {
   }
 
   /**
-   * @brief Restart the Sunshine process through the platform launcher.
+   * @brief Restart the Prism process through the platform launcher.
    */
   void restart() {
     // Gracefully clean up and restart ourselves instead of exiting
     atexit(restart_on_exit);
-    lifetime::exit_sunshine(0, true);
+    lifetime::exit_prism(0, true);
   }
 
   bool request_process_group_exit(std::uintptr_t native_handle) {
@@ -1096,7 +1050,7 @@ namespace platf {
       return boost::asio::ip::host_name();
     } catch (boost::system::system_error &err) {
       BOOST_LOG(error) << "Failed to get hostname: "sv << err.what();
-      return "Sunshine"s;
+      return "Prism"s;
     }
   }
 
@@ -1105,22 +1059,22 @@ namespace platf {
      * @brief Enumerates supported source options.
      */
     enum source_e : std::size_t {
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
       NVFBC,  ///< NvFBC
 #endif
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
       WAYLAND,  ///< Wayland
 #endif
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
       KMS,  ///< KMS
 #endif
-#ifdef SUNSHINE_BUILD_X11
+#ifdef PRISM_BUILD_X11
       X11,  ///< X11
 #endif
-#ifdef SUNSHINE_BUILD_KWIN
+#ifdef PRISM_BUILD_KWIN
       KWIN,  ///< KWin ScreenCast
 #endif
-#ifdef SUNSHINE_BUILD_PORTAL
+#ifdef PRISM_BUILD_PORTAL
       PORTAL,  ///< XDG PORTAL
 #endif
       MAX_FLAGS  ///< The maximum number of flags
@@ -1129,7 +1083,7 @@ namespace platf {
 
   static std::bitset<source::MAX_FLAGS> sources;
 
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
   std::vector<std::string> nvfbc_display_names();
   std::shared_ptr<display_t> nvfbc_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
@@ -1138,7 +1092,7 @@ namespace platf {
   }
 #endif
 
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
   /**
    * @brief Enumerate displays available through the Wayland capture backend.
    *
@@ -1165,7 +1119,7 @@ namespace platf {
   }
 #endif
 
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
   std::vector<std::string> kms_display_names(mem_type_e hwdevice_type);
   std::shared_ptr<display_t> kms_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
@@ -1174,7 +1128,7 @@ namespace platf {
   }
 #endif
 
-#ifdef SUNSHINE_BUILD_X11
+#ifdef PRISM_BUILD_X11
   std::vector<std::string> x11_display_names();
   std::shared_ptr<display_t> x11_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
@@ -1183,7 +1137,7 @@ namespace platf {
   }
 #endif
 
-#ifdef SUNSHINE_BUILD_PORTAL
+#ifdef PRISM_BUILD_PORTAL
   std::vector<std::string> portal_display_names();
   std::shared_ptr<display_t> portal_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
@@ -1192,7 +1146,7 @@ namespace platf {
   }
 #endif
 
-#ifdef SUNSHINE_BUILD_KWIN
+#ifdef PRISM_BUILD_KWIN
   bool kwin_available();
   std::vector<std::string> kwin_display_names();
   std::shared_ptr<display_t> kwin_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
@@ -1207,33 +1161,33 @@ namespace platf {
    * @brief List display names accepted by the selected capture backend.
    */
   std::vector<std::string> display_names(mem_type_e hwdevice_type) {
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
     // display using NvFBC only supports mem_type_e::cuda
     if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) {
       return nvfbc_display_names();
     }
 #endif
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
     if (sources[source::WAYLAND]) {
       return wl_display_names();
     }
 #endif
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
     if (sources[source::KMS]) {
       return kms_display_names(hwdevice_type);
     }
 #endif
-#ifdef SUNSHINE_BUILD_X11
+#ifdef PRISM_BUILD_X11
     if (sources[source::X11]) {
       return x11_display_names();
     }
 #endif
-#ifdef SUNSHINE_BUILD_PORTAL
+#ifdef PRISM_BUILD_PORTAL
     if (sources[source::PORTAL]) {
       return portal_display_names();
     }
 #endif
-#ifdef SUNSHINE_BUILD_KWIN
+#ifdef PRISM_BUILD_KWIN
     if (sources[source::KWIN]) {
       return kwin_display_names();
     }
@@ -1260,7 +1214,7 @@ namespace platf {
   }
 
   std::shared_ptr<display_t> display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
     // Prism: per-stream capture override. When $XDG_RUNTIME_DIR/prism-capture-override
     // exists and names a Wayland socket, capture that (headless) compositor via the
     // wlroots backend instead of the session desktop. An app's prep "do" command
@@ -1278,7 +1232,7 @@ namespace platf {
         std::getline(override_file, prism_override);
       }
     }
-  #ifdef SUNSHINE_BUILD_PORTAL
+  #ifdef PRISM_BUILD_PORTAL
     // Portal form: "portal:<output-name>" captures the named output (e.g. a
     // KWin virtual output) through the normal XDG portal backend.
     if (prism_override.rfind("portal:", 0) == 0) {
@@ -1316,7 +1270,7 @@ namespace platf {
     }
 #endif
     // Keep KMS as first element to check before dropping CAP_SYS_ADMIN
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
     if (sources[source::KMS]) {
       BOOST_LOG(info) << "Screencasting with KMS"sv;
       return kms_display(hwdevice_type, display_name, config);
@@ -1328,31 +1282,31 @@ namespace platf {
       drop_elevated_privileges(false);
     }
 
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
     if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) {
       BOOST_LOG(info) << "Screencasting with NvFBC"sv;
       return nvfbc_display(hwdevice_type, display_name, config);
     }
 #endif
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
     if (sources[source::WAYLAND]) {
       BOOST_LOG(info) << "Screencasting with Wayland's protocol"sv;
       return wl_display(hwdevice_type, display_name, config);
     }
 #endif
-#ifdef SUNSHINE_BUILD_X11
+#ifdef PRISM_BUILD_X11
     if (sources[source::X11]) {
       BOOST_LOG(info) << "Screencasting with X11"sv;
       return x11_display(hwdevice_type, display_name, config);
     }
 #endif
-#ifdef SUNSHINE_BUILD_PORTAL
+#ifdef PRISM_BUILD_PORTAL
     if (sources[source::PORTAL]) {
       BOOST_LOG(info) << "Screencasting with XDG portal"sv;
       return portal_display(hwdevice_type, display_name, config);
     }
 #endif
-#ifdef SUNSHINE_BUILD_KWIN
+#ifdef PRISM_BUILD_KWIN
     if (sources[source::KWIN]) {
       BOOST_LOG(info) << "Screencasting with KWin ScreenCast"sv;
       return kwin_display(hwdevice_type, display_name, config);
@@ -1379,49 +1333,49 @@ namespace platf {
     gbm::init();
 
     window_system = window_system_e::NONE;
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
     if (std::string v; lizardbyte::common::get_env("WAYLAND_DISPLAY", v)) {
       window_system = window_system_e::WAYLAND;
     }
 #endif
-#if defined(SUNSHINE_BUILD_X11) || defined(SUNSHINE_BUILD_CUDA)
+#if defined(PRISM_BUILD_X11) || defined(PRISM_BUILD_CUDA)
     if (std::string v; lizardbyte::common::get_env("DISPLAY", v) && window_system != window_system_e::WAYLAND) {
       if (lizardbyte::common::get_env("WAYLAND_DISPLAY", v)) {
-        BOOST_LOG(warning) << "Wayland detected, yet sunshine will use X11 for screencasting, screencasting will only work on XWayland applications"sv;
+        BOOST_LOG(warning) << "Wayland detected, yet prism will use X11 for screencasting, screencasting will only work on XWayland applications"sv;
       }
 
       window_system = window_system_e::X11;
     }
 #endif
 
-#ifdef SUNSHINE_BUILD_CUDA
+#ifdef PRISM_BUILD_CUDA
     if (((config::video.capture.empty() && sources.none()) || config::video.capture == "nvfbc") && verify_nvfbc()) {
       sources[source::NVFBC] = true;
     }
 #endif
-#ifdef SUNSHINE_BUILD_WAYLAND
+#ifdef PRISM_BUILD_WAYLAND
     if (((config::video.capture.empty() && sources.none()) || config::video.capture == "wlr") && verify_wl()) {
       sources[source::WAYLAND] = true;
     }
 #endif
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
     if (((config::video.capture.empty() && sources.none()) || config::video.capture == "kms") && verify_kms()) {
       sources[source::KMS] = true;
     }
 #endif
-#ifdef SUNSHINE_BUILD_X11
+#ifdef PRISM_BUILD_X11
     // We enumerate this capture backend regardless of other suitable sources,
     // since it may be needed as a NvFBC fallback for software encoding on X11.
     if ((config::video.capture.empty() || config::video.capture == "x11") && verify_x11()) {
       sources[source::X11] = true;
     }
 #endif
-#ifdef SUNSHINE_BUILD_PORTAL
+#ifdef PRISM_BUILD_PORTAL
     if ((config::video.capture.empty() || config::video.capture == "portal") && verify_portal()) {
       sources[source::PORTAL] = true;
     }
 #endif
-#ifdef SUNSHINE_BUILD_KWIN
+#ifdef PRISM_BUILD_KWIN
     if (((config::video.capture.empty() && sources.none()) || config::video.capture == "kwin") && verify_kwin()) {
       sources[source::KWIN] = true;
     }
@@ -1464,7 +1418,7 @@ namespace platf {
    * @return Render-node path, or an empty string when no matching node is found.
    */
   std::string find_render_node_with_display() {
-#ifdef SUNSHINE_BUILD_DRM
+#ifdef PRISM_BUILD_DRM
     auto *dir = opendir("/dev/dri");
     if (!dir) {
       return {};
@@ -1519,16 +1473,13 @@ namespace platf {
     return detected.empty() ? "/dev/dri/renderD128" : detected;
   }
 
-#if !defined(__FreeBSD__)
   static constexpr cap_value_t FULL_CAPS[] = {CAP_SYS_ADMIN, CAP_SYS_NICE};
   static constexpr cap_value_t ADMIN_CAPS[] = {CAP_SYS_ADMIN};
 
   constexpr std::span<const cap_value_t> ELEVATED_PRIVILEGES_FULL {FULL_CAPS};  ///< Protocol or platform constant for elevated privileges full.
   constexpr std::span<const cap_value_t> ELEVATED_PRIVILEGES_ADMIN {ADMIN_CAPS};  ///< Protocol or platform constant for elevated privileges admin.
-#endif
 
   bool has_elevated_privileges(bool all_caps) {
-#if !defined(__FreeBSD__)
     const auto caps_to_check = all_caps ? ELEVATED_PRIVILEGES_FULL : ELEVATED_PRIVILEGES_ADMIN;
     const cap_t caps = cap_get_proc();
     if (!caps) {
@@ -1552,12 +1503,10 @@ namespace platf {
       }
     }
     cap_free(caps);
-#endif
     return false;
   }
 
   void drop_elevated_privileges(bool all_caps) {
-#if !defined(__FreeBSD__)
     bool failed = false;
     const auto caps_to_drop = all_caps ? ELEVATED_PRIVILEGES_FULL : ELEVATED_PRIVILEGES_ADMIN;
     const cap_t caps = cap_get_proc();
@@ -1583,6 +1532,5 @@ namespace platf {
     if (!failed) {
       BOOST_LOG(info) << "[misc] drop_elevated_privileges succeeded in dropping capabilities"sv;
     }
-#endif
   }
 }  // namespace platf

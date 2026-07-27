@@ -1,6 +1,6 @@
-# Create a stable Sunshine release
+# Create a stable Prism release
 
-Pre-releases in Sunshine are created automatically on every push event to the `master` branch. These are required
+Pre-releases in Prism are created automatically on every push event to the `master` branch. These are required
 to be created before making a stable release. Below are the instructions for converting a pre-release to stable.
 
 1. Wait for the pre-release to be created.

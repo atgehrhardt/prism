@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and install prism-input-bridge: forwards Sunshine's uinput evdev
+# Build and install prism-input-bridge: forwards Prism's uinput evdev
 # events into the headless labwc session via wlroots virtual-input protocols.
 set -euo pipefail
 

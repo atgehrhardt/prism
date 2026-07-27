@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/LizardByte/Sunshine/master/sunshine.png" />
-  <h1 align="center">Sunshine</h1>
+  <h1 align="center">Prism</h1>
   <h4 align="center">Self-hosted game stream host for Moonlight.</h4>
 </div>
 
@@ -11,7 +11,7 @@
 
 ## ℹ️ About
 
-Sunshine is a self-hosted game stream host for Moonlight.
+Prism is a self-hosted game stream host for Moonlight.
 
 LizardByte has the full documentation hosted on [Read the Docs](https://docs.lizardbyte.dev/projects/sunshine)
 

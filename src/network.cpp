@@ -63,7 +63,7 @@ namespace net {
   }
 
   /**
-   * @brief Convert a Boost address family to Sunshine network enum value.
+   * @brief Convert a Boost address family to Prism network enum value.
    */
   net_e from_address(const std::string_view &view) {
     auto addr = normalize_address(ip::make_address(view));
@@ -140,8 +140,8 @@ namespace net {
 
   std::string get_bind_address(const af_e af) {
     // If bind_address is configured, use it
-    if (!config::sunshine.bind_address.empty()) {
-      return config::sunshine.bind_address;
+    if (!config::prism.bind_address.empty()) {
+      return config::prism.bind_address;
     }
 
     // Otherwise use the wildcard address for the given address family
@@ -223,7 +223,7 @@ namespace net {
 
   std::uint16_t map_port(int port) {
     // calculate the port from the config port
-    auto mapped_port = (std::uint16_t) ((int) config::sunshine.port + port);
+    auto mapped_port = (std::uint16_t) ((int) config::prism.port + port);
 
     // Ensure port is in the range of 1024-65535
     if (mapped_port < 1024 || mapped_port > 65535) {
@@ -236,7 +236,7 @@ namespace net {
   /**
    * @brief Returns a string for use as the instance name for mDNS.
    * @param hostname The hostname to use for instance name generation.
-   * @return Hostname-based instance name or "Sunshine" if hostname is invalid.
+   * @return Hostname-based instance name or "Prism" if hostname is invalid.
    */
   std::string mdns_instance_name(const std::string_view &hostname) {
     // Start with the unmodified hostname
@@ -258,6 +258,6 @@ namespace net {
       }
     }
 
-    return !instancename.empty() ? instancename : "Sunshine";
+    return !instancename.empty() ? instancename : "Prism";
   }
 }  // namespace net

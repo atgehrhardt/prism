@@ -137,15 +137,6 @@ const config = ref(props.config)
       <div class="form-text">{{ $t('config.key_repeat_frequency_desc') }}</div>
     </div>
 
-    <!-- Always send scancodes -->
-    <Checkbox v-if="config.keyboard === 'enabled' && platform === 'windows'"
-              class="mb-3"
-              id="always_send_scancodes"
-              locale-prefix="config"
-              v-model="config.always_send_scancodes"
-              default="true"
-    ></Checkbox>
-
     <!-- Mapping Key AltRight to Key Windows -->
     <Checkbox v-if="config.keyboard === 'enabled'"
               class="mb-3"
