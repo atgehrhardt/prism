@@ -65,6 +65,10 @@ the Moonlight client. A PlayStation controller or a motion-capable client can th
 appear as a virtual DualSense in Steam's Controller Settings. Steam Input may still
 translate that DualSense to Xbox/XInput for individual games; this is expected and
 preserves compatibility with games that do not support native DualSense input.
+Clients that advertise one or more rear controls are automatically exposed as a
+DualSense Edge instead. Their four Moonlight extra-button slots appear on Linux as the
+Edge's Fn1, Fn2, left paddle, and right paddle buttons, so each can be assigned in
+Steam Input. Set `gamepad = ds5-edge` to force that device type.
 
 ## Status
 

@@ -35,6 +35,7 @@ const config = ref(props.config)
 
           <template #linux>
             <option value="ds5">{{ $t("config.gamepad_ds5") }}</option>
+            <option value="ds5-edge">{{ $t("config.gamepad_ds5_edge") }}</option>
             <option value="switch">{{ $t("config.gamepad_switch") }}</option>
             <option value="xone">{{ $t("config.gamepad_xone") }}</option>
           </template>
@@ -50,13 +51,13 @@ const config = ref(props.config)
 
     <!-- Additional options based on gamepad type -->
     <template v-if="config.controller === 'enabled'">
-      <template v-if="config.gamepad === 'ds4' || config.gamepad === 'ds5' || (config.gamepad === 'auto' && platform !== 'macos')">
+      <template v-if="config.gamepad === 'ds4' || config.gamepad === 'ds5' || config.gamepad === 'ds5-edge' || (config.gamepad === 'auto' && platform !== 'macos')">
         <div class="mb-3 accordion">
           <div class="accordion-item">
             <h2 class="accordion-header">
               <button class="accordion-button" type="button" data-bs-toggle="collapse"
                       data-bs-target="#panelsStayOpen-collapseOne">
-                {{ $t(config.gamepad === 'ds4' ? 'config.gamepad_ds4_manual' : (config.gamepad === 'ds5' ? 'config.gamepad_ds5_manual' : 'config.gamepad_auto')) }}
+                {{ $t(config.gamepad === 'ds4' ? 'config.gamepad_ds4_manual' : (config.gamepad === 'ds5' || config.gamepad === 'ds5-edge' ? 'config.gamepad_ds5_manual' : 'config.gamepad_auto')) }}
               </button>
             </h2>
             <div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show"
@@ -89,7 +90,7 @@ const config = ref(props.config)
                   ></Checkbox>
                 </template>
                 <!-- DS5 Option: Controller MAC randomization (on Automatic: Linux only) -->
-                <template v-if="config.gamepad === 'ds5' || (config.gamepad === 'auto' && platform === 'linux')">
+                <template v-if="config.gamepad === 'ds5' || config.gamepad === 'ds5-edge' || (config.gamepad === 'auto' && platform === 'linux')">
                   <Checkbox class="mb-3"
                             id="ds5_inputtino_randomize_mac"
                             locale-prefix="config"

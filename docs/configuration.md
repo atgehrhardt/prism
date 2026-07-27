@@ -368,8 +368,16 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>ds5</td>
-        <td>DualShock 5 controller (PS5)
+        <td>DualSense controller (PS5)
             @note{This option applies to Linux only.}</td>
+    </tr>
+    <tr>
+        <td>ds5-edge</td>
+        <td>DualSense Edge controller (PS5)
+            @note{This option applies to Linux only.}
+            @note{The four Moonlight paddle flags are exposed as Fn1, Fn2, left paddle,
+            and right paddle for mapping in Steam Input. Automatic mode selects this
+            type whenever the client advertises at least one paddle flag.}</td>
     </tr>
     <tr>
         <td>switch</td>

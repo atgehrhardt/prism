@@ -145,7 +145,7 @@ namespace platf {
     caps |= platform_caps::pen_touch;
 
     // We support controller touchpad input only when emulating the PS5 controller
-    if (config::input.gamepad == "ds5"sv || config::input.gamepad == "auto"sv) {
+    if (config::input.gamepad == "ds5"sv || config::input.gamepad == "ds5-edge"sv || config::input.gamepad == "auto"sv) {
       caps |= platform_caps::controller_touch;
     }
 
