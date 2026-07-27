@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      PRISM_COMPILE_DOXYGEN: "true"
       PYTHON_VERSION: "3.14"
 
     steps:
@@ -63,7 +62,7 @@ jobs:
             -S . \
             -B cmake-build-ci \
             -G Ninja \
-            -DBUILD_DOCS=ON \
+            -DBUILD_DOCS=OFF \
             -DBUILD_TESTS=ON \
             -DBUILD_WERROR=ON \
             -DCMAKE_BUILD_TYPE=Release \
