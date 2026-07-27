@@ -22,7 +22,8 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 # never let a single call block the launch forever.
 KSD="timeout 10 kscreen-doctor"
 
-exec 9>"$RUNTIME/prism-virtual.lock"
+# Shared cross-mode capture lock (see prism-headless-start.sh).
+exec 9>"$RUNTIME/prism-capture.lock"
 flock -x -w 90 9 || exit 1
 
 # Recover from a previous session that was never torn down (e.g. prism was

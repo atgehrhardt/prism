@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -264,7 +265,23 @@ namespace proc {
     return 0;
   }
 
+  /**
+   * @brief Serializes Prism capture bring-up and teardown.
+   *
+   * proc_t::prism_capture_begin() and proc_t::prism_capture_end() run on
+   * several threads (nvhttp launch, the app-exit poll, the web UI closeApp
+   * handler); without mutual exclusion a delayed teardown can interleave with
+   * the next bring-up and undo its state (e.g. deleting the capture override
+   * the new session just armed). File-scope rather than a member so proc_t
+   * stays movable; the guarded resources (session scripts, override file)
+   * are process-global anyway.
+   */
+  static std::mutex prism_capture_mutex;
+
   int proc_t::prism_capture_begin() {
+    // Serialize with prism_capture_end(): a delayed teardown from the previous
+    // app must fully finish before this bring-up arms new session state.
+    std::lock_guard<std::mutex> lock(prism_capture_mutex);
     const auto resolved = prism_resolve_capture_mode(_app);
     const std::string &mode = resolved.mode;
     BOOST_LOG(info) << "[prism] Capture mode for app '"sv << _app.name << "': "sv << mode
@@ -362,6 +379,8 @@ namespace proc {
   }
 
   void proc_t::prism_capture_end() {
+    // Serialize with prism_capture_begin(): see the mutex comment there.
+    std::lock_guard<std::mutex> lock(prism_capture_mutex);
     // Use the mode captured at bring-up so teardown is symmetric with it.
     // Fall back to resolving the (possibly stale) app only if begin never ran.
     std::string mode = _prism_active_mode;
