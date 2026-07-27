@@ -1,0 +1,133 @@
+---
+name: Linux
+permissions: {}
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build and test
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PYTHON_VERSION: "3.14"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: >-
+          ./scripts/linux_build.sh
+          --step=deps
+          --skip-cuda
+          --ubuntu-test-repo
+          --num-processors=2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Sync coverage tools
+        run: >-
+          uv sync
+          --locked
+          --python "${PYTHON_VERSION}"
+          --no-python-downloads
+          --no-install-project
+
+      - name: Configure
+        run: |
+          cmake \
+            -S . \
+            -B cmake-build-ci \
+            -G Ninja \
+            -DBUILD_DOCS=OFF \
+            -DBUILD_TESTS=ON \
+            -DBUILD_WERROR=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCUDA_FAIL_ON_MISSING=OFF \
+            -DPRISM_ENABLE_CUDA=OFF
+
+      - name: Build
+        id: build
+        run: cmake --build cmake-build-ci --parallel 2
+
+      - name: Run tests
+        id: test
+        working-directory: cmake-build-ci/tests
+        run: >-
+          xvfb-run
+          --auto-servernum
+          ./test_prism
+          --gtest_color=yes
+          --gtest_output=xml:test-results.xml
+
+      - name: Generate coverage report
+        if: >-
+          always() &&
+          (steps.test.outcome == 'success' || steps.test.outcome == 'failure')
+        run: |
+          uv run --locked --no-sync gcovr \
+            cmake-build-ci \
+            --root src \
+            --exclude-noncode-lines \
+            --exclude-throw-branches \
+            --exclude-unreachable-branches \
+            --gcov-executable "gcov-${GCC_VERSION}" \
+            --xml-pretty \
+            --output cmake-build-ci/coverage.xml
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: linux-test-results
+          path: |
+            cmake-build-ci/coverage.xml
+            cmake-build-ci/tests/test-results.xml
+            cmake-build-ci/tests/test_prism.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && hashFiles('cmake-build-ci/coverage.xml') != '' }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+        with:
+          disable_search: true
+          fail_ci_if_error: true
+          files: cmake-build-ci/coverage.xml
+          report_type: coverage
+          use_oidc: true
+          verbose: true
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && hashFiles('cmake-build-ci/tests/test-results.xml') != '' }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+        with:
+          disable_search: true
+          fail_ci_if_error: true
+          files: cmake-build-ci/tests/test-results.xml
+          report_type: test_results
+          use_oidc: true
+          verbose: true

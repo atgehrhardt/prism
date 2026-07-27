@@ -1,0 +1,163 @@
+---
+name: Fedora smoke
+permissions: {}
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Fedora 44
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          dnf group install -y development-tools
+          dnf install -y \
+            appstream \
+            cmake \
+            desktop-file-utils \
+            gcc \
+            gcc-c++ \
+            git \
+            glslc \
+            libappstream-glib \
+            libcap-devel \
+            libcurl-devel \
+            libdrm-devel \
+            libevdev-devel \
+            libgudev-devel \
+            libnotify-devel \
+            libva-devel \
+            libX11-devel \
+            libxcb-devel \
+            libXcursor-devel \
+            libXfixes-devel \
+            libXi-devel \
+            libXinerama-devel \
+            libXrandr-devel \
+            libXtst-devel \
+            libxkbcommon-devel \
+            mesa-libGL-devel \
+            mesa-libgbm-devel \
+            miniupnpc-devel \
+            ninja-build \
+            npm \
+            numactl-devel \
+            openssl-devel \
+            opus-devel \
+            pipewire-devel \
+            pulseaudio-libs-devel \
+            python3-jinja2 \
+            qt6-qtbase-devel \
+            qt6-qtsvg-devel \
+            rpm-build \
+            systemd-devel \
+            vulkan-loader-devel \
+            wayland-devel \
+            wget \
+            which \
+            xorg-x11-server-Xvfb
+
+      - name: Configure
+        run: |
+          cmake \
+            -S . \
+            -B cmake-build-fedora \
+            -G Ninja \
+            -DBUILD_DOCS=OFF \
+            -DBUILD_TESTS=ON \
+            -DBUILD_WERROR=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCUDA_FAIL_ON_MISSING=OFF \
+            -DPRISM_ASSETS_DIR=share/prism \
+            -DPRISM_ENABLE_CUDA=OFF \
+            -DPRISM_EXECUTABLE_PATH=/usr/bin/prism
+
+      - name: Build
+        run: cmake --build cmake-build-fedora --parallel 2
+
+      - name: Run tests
+        id: test
+        working-directory: cmake-build-fedora/tests
+        run: >-
+          xvfb-run
+          --auto-servernum
+          ./test_prism
+          --gtest_color=yes
+          --gtest_output=xml:test-results.xml
+
+      - name: Stage install
+        run: |
+          stage_dir="${GITHUB_WORKSPACE}/cmake-build-fedora/stage"
+          DESTDIR="${stage_dir}" cmake --install cmake-build-fedora
+          test -x "${stage_dir}/usr/bin/prism"
+          test -d "${stage_dir}/usr/share/prism"
+
+      - name: Stage and verify installer payload
+        run: |
+          stage_dir="${GITHUB_WORKSPACE}/cmake-build-fedora/stage"
+          scripts=(
+            prism-desktop-session.sh
+            prism-headless-audio.sh
+            prism-headless-common.sh
+            prism-headless-exec.sh
+            prism-headless-session.sh
+            prism-headless-start.sh
+            prism-headless-steam.sh
+            prism-headless-stop.sh
+            prism-mirror-audio.sh
+            prism-steam-game.sh
+            prism-steam-restore.sh
+            prism-steamos-start.sh
+            prism-steamos-stop.sh
+            prism-virtual-audio.sh
+            prism-virtual-start.sh
+            prism-virtual-stop.sh
+          )
+          services=(
+            prism-headless-session.service
+            prism-labwc.service
+            prism-steam-restore.service
+            prism.service
+          )
+          for script in "${scripts[@]}"; do
+            install -Dm755 \
+              "contrib/virtual-session/${script}" \
+              "${stage_dir}/usr/bin/${script}"
+            test -x "${stage_dir}/usr/bin/${script}"
+          done
+          for service in "${services[@]}"; do
+            install -Dm644 \
+              "contrib/virtual-session/${service}" \
+              "${stage_dir}/usr/lib/systemd/user/${service}"
+            test -f "${stage_dir}/usr/lib/systemd/user/${service}"
+          done
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: fedora-test-results
+          path: |
+            cmake-build-fedora/tests/test-results.xml
+            cmake-build-fedora/tests/test_prism.log
+          if-no-files-found: warn
+          retention-days: 14
