@@ -8,6 +8,7 @@
 #include <boost/locale.hpp>
 #include <inputtino/input.hpp>
 #include <libevdev/libevdev.h>
+#include <string_view>
 
 // local includes
 #include "inputtino_common.h"
@@ -23,8 +24,29 @@ namespace platf::gamepad {
   enum ControllerType {
     XboxOneWired,  ///< Xbox One Wired Controller
     DualSenseWired,  ///< DualSense Wired Controller
+    DualSenseEdgeWired,  ///< DualSense Edge Wired Controller
     SwitchProWired  ///< Switch Pro Wired Controller
   };
+
+  /**
+   * @brief Select the virtual controller type for client-reported metadata.
+   *
+   * Rear controls take precedence in automatic mode because the DualSense Edge
+   * is the only supported virtual controller that exposes all four extra button
+   * bits to Linux and Steam.
+   *
+   * @param configured_gamepad Configured gamepad name.
+   * @param metadata Controller capabilities reported by the streaming client.
+   * @param motion_as_ds5 Whether motion sensors should select a DualSense.
+   * @param touchpad_as_ds5 Whether touchpad support should select a DualSense.
+   * @return Virtual controller type to create.
+   */
+  ControllerType select_controller_type(
+    std::string_view configured_gamepad,
+    const gamepad_arrival_t &metadata,
+    bool motion_as_ds5,
+    bool touchpad_as_ds5
+  );
 
   /**
    * @brief Allocate and initialize platform input state for a stream.

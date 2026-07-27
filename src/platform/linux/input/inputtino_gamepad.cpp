@@ -3,6 +3,7 @@
  * @brief Definitions for inputtino gamepad input handling.
  */
 // lib includes
+#include <array>
 #include <boost/locale.hpp>
 #include <inputtino/input.hpp>
 #include <libevdev/libevdev.h>
@@ -57,12 +58,13 @@ namespace platf::gamepad {
   }
 
   /**
-   * @brief Create an inputtino DualSense controller.
+   * @brief Create an inputtino DualSense or DualSense Edge controller.
    *
    * @param globalIndex Global index.
-   * @return Created DS5 object or status.
+   * @param edge Whether to expose the controller as a DualSense Edge.
+   * @return Created DualSense object or status.
    */
-  auto create_ds5(int globalIndex) {
+  auto create_ds5(int globalIndex, bool edge = false) {
     std::string device_mac = "";  // Inputtino checks empty() to generate a random MAC
 
     if (!config::input.ds5_inputtino_randomize_mac && globalIndex >= 0 && globalIndex <= 255) {
@@ -70,43 +72,79 @@ namespace platf::gamepad {
       device_mac = std::format("02:00:00:00:00:{:02x}", globalIndex);
     }
 
-    return inputtino::PS5Joypad::create({.name = inputtino_name_for_seat("Prism PS5 (virtual) pad"sv), .vendor_id = 0x054C, .product_id = 0x0CE6, .version = 0x8111, .device_phys = device_mac, .device_uniq = device_mac});
+    return inputtino::PS5Joypad::create({
+      .name = inputtino_name_for_seat(edge ? "Prism DualSense Edge (virtual) pad"sv : "Prism PS5 (virtual) pad"sv),
+      .vendor_id = 0x054C,
+      .product_id = static_cast<std::uint16_t>(edge ? 0x0DF2 : 0x0CE6),
+      .version = 0x8111,
+      .device_phys = device_mac,
+      .device_uniq = device_mac,
+    });
+  }
+
+  /**
+   * @brief Select the virtual controller type for client-reported metadata.
+   */
+  ControllerType select_controller_type(
+    std::string_view configured_gamepad,
+    const gamepad_arrival_t &metadata,
+    bool motion_as_ds5,
+    bool touchpad_as_ds5
+  ) {
+    if (configured_gamepad == "xone"sv) {
+      return XboxOneWired;
+    }
+    if (configured_gamepad == "ds5"sv) {
+      return DualSenseWired;
+    }
+    if (configured_gamepad == "ds5-edge"sv) {
+      return DualSenseEdgeWired;
+    }
+    if (configured_gamepad == "switch"sv) {
+      return SwitchProWired;
+    }
+
+    constexpr auto rear_button_mask = PADDLE1 | PADDLE2 | PADDLE3 | PADDLE4;
+    if (metadata.supportedButtons & rear_button_mask) {
+      return DualSenseEdgeWired;
+    }
+    if (metadata.type == LI_CTYPE_XBOX) {
+      return XboxOneWired;
+    }
+    if (metadata.type == LI_CTYPE_PS) {
+      return DualSenseWired;
+    }
+    if (metadata.type == LI_CTYPE_NINTENDO) {
+      return SwitchProWired;
+    }
+    if (motion_as_ds5 && (metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO))) {
+      return DualSenseWired;
+    }
+    if (touchpad_as_ds5 && (metadata.capabilities & LI_CCAP_TOUCHPAD)) {
+      return DualSenseWired;
+    }
+    return XboxOneWired;
   }
 
   /**
    * @brief Allocate and initialize platform input state for a stream.
    */
   int alloc(input_raw_t *raw, const gamepad_id_t &id, const gamepad_arrival_t &metadata, feedback_queue_t feedback_queue) {
-    ControllerType selectedGamepadType;
+    const auto selectedGamepadType = select_controller_type(
+      config::input.gamepad,
+      metadata,
+      config::input.motion_as_ds4,
+      config::input.touchpad_as_ds4
+    );
 
-    if (config::input.gamepad == "xone"sv) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Xbox One controller (manual selection)"sv;
-      selectedGamepadType = XboxOneWired;
-    } else if (config::input.gamepad == "ds5"sv) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualSense 5 controller (manual selection)"sv;
-      selectedGamepadType = DualSenseWired;
-    } else if (config::input.gamepad == "switch"sv) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Nintendo Pro controller (manual selection)"sv;
-      selectedGamepadType = SwitchProWired;
-    } else if (metadata.type == LI_CTYPE_XBOX) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Xbox One controller (auto-selected by client-reported type)"sv;
-      selectedGamepadType = XboxOneWired;
-    } else if (metadata.type == LI_CTYPE_PS) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 5 controller (auto-selected by client-reported type)"sv;
-      selectedGamepadType = DualSenseWired;
-    } else if (metadata.type == LI_CTYPE_NINTENDO) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Nintendo Pro controller (auto-selected by client-reported type)"sv;
-      selectedGamepadType = SwitchProWired;
-    } else if (config::input.motion_as_ds4 && (metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO))) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 5 controller (auto-selected by motion sensor presence)"sv;
-      selectedGamepadType = DualSenseWired;
-    } else if (config::input.touchpad_as_ds4 && (metadata.capabilities & LI_CCAP_TOUCHPAD)) {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 5 controller (auto-selected by touchpad presence)"sv;
-      selectedGamepadType = DualSenseWired;
-    } else {
-      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Xbox One controller (default)"sv;
-      selectedGamepadType = XboxOneWired;
-    }
+    static constexpr std::array controller_names {
+      "Xbox One"sv,
+      "DualSense"sv,
+      "DualSense Edge"sv,
+      "Nintendo Pro"sv,
+    };
+    BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be a " << controller_names[selectedGamepadType]
+                    << " controller (" << (config::input.gamepad == "auto"sv ? "automatic"sv : "manual"sv) << " selection)"sv;
 
     if (selectedGamepadType == XboxOneWired || selectedGamepadType == SwitchProWired) {
       if (metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO)) {
@@ -118,12 +156,12 @@ namespace platf::gamepad {
       if (metadata.capabilities & LI_CCAP_RGB_LED) {
         BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " has an RGB LED, but it is not usable when emulating a joypad different from DS5"sv;
       }
-    } else if (selectedGamepadType == DualSenseWired) {
+    } else if (selectedGamepadType == DualSenseWired || selectedGamepadType == DualSenseEdgeWired) {
       if (!(metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO))) {
-        BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " is emulating a DualShock 5 controller, but the client gamepad doesn't have motion sensors active"sv;
+        BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " is emulating a DualSense controller, but the client gamepad doesn't have motion sensors active"sv;
       }
       if (!(metadata.capabilities & LI_CCAP_TOUCHPAD)) {
-        BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " is emulating a DualShock 5 controller, but the client gamepad doesn't have a touchpad"sv;
+        BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " is emulating a DualSense controller, but the client gamepad doesn't have a touchpad"sv;
       }
     }
 
@@ -167,11 +205,31 @@ namespace platf::gamepad {
           }
         }
       case DualSenseWired:
+      case DualSenseEdgeWired:
         {
-          auto ds5 = create_ds5(id.globalIndex);
+          const bool edge = selectedGamepadType == DualSenseEdgeWired;
+          auto ds5_result = create_ds5(id.globalIndex, edge);
+          std::unique_ptr<inputtino::PS5Joypad> ds5;
+          std::string creation_error;
+          if (ds5_result) {
+            ds5 = std::make_unique<inputtino::PS5Joypad>(std::move(*ds5_result));
+          } else {
+            creation_error = ds5_result.getErrorMessage();
+          }
+
+          if (!ds5 && edge && config::input.gamepad == "auto"sv) {
+            BOOST_LOG(warning) << "Unable to create virtual DualSense Edge controller: " << creation_error
+                               << "; falling back to a standard DualSense controller"sv;
+            auto fallback_result = create_ds5(id.globalIndex);
+            if (fallback_result) {
+              ds5 = std::make_unique<inputtino::PS5Joypad>(std::move(*fallback_result));
+            } else {
+              creation_error = fallback_result.getErrorMessage();
+            }
+          }
           if (ds5) {
-            (*ds5).set_on_rumble(on_rumble_fn);
-            (*ds5).set_on_led([feedback_queue, idx = id.clientRelativeIndex, gamepad](int r, int g, int b) {
+            ds5->set_on_rumble(on_rumble_fn);
+            ds5->set_on_led([feedback_queue, idx = id.clientRelativeIndex, gamepad](int r, int g, int b) {
               // Don't resend duplicate LED data
               if (gamepad->last_rgb_led.type == platf::gamepad_feedback_e::set_rgb_led && gamepad->last_rgb_led.data.rgb_led.r == r && gamepad->last_rgb_led.data.rgb_led.g == g && gamepad->last_rgb_led.data.rgb_led.b == b) {
                 return;
@@ -182,7 +240,7 @@ namespace platf::gamepad {
               gamepad->last_rgb_led = msg;
             });
 
-            (*ds5).set_on_trigger_effect([feedback_queue, idx = id.clientRelativeIndex](const inputtino::PS5Joypad::TriggerEffect &trigger_effect) {
+            ds5->set_on_trigger_effect([feedback_queue, idx = id.clientRelativeIndex](const inputtino::PS5Joypad::TriggerEffect &trigger_effect) {
               feedback_queue->raise(gamepad_feedback_msg_t::make_adaptive_triggers(idx, trigger_effect.event_flags, trigger_effect.type_left, trigger_effect.type_right, trigger_effect.left, trigger_effect.right));
             });
 
@@ -194,7 +252,7 @@ namespace platf::gamepad {
             raw->gamepads[id.globalIndex] = std::move(gamepad);
             return 0;
           } else {
-            BOOST_LOG(warning) << "Unable to create virtual DualShock 5 controller: " << ds5.getErrorMessage();
+            BOOST_LOG(warning) << "Unable to create virtual DualSense controller: " << creation_error;
             return -1;
           }
         }
@@ -309,6 +367,7 @@ namespace platf::gamepad {
         supported_gamepad_t {"auto", true, ""},
         supported_gamepad_t {"xone", false, ""},
         supported_gamepad_t {"ds5", false, ""},
+        supported_gamepad_t {"ds5-edge", false, ""},
         supported_gamepad_t {"switch", false, ""},
       };
 
@@ -316,6 +375,7 @@ namespace platf::gamepad {
     }
 
     auto ds5 = create_ds5(-1);  // Index -1 will result in a random MAC virtual device, which is fine for probing
+    auto ds5_edge = create_ds5(-1, true);
     auto switchPro = create_switch();
     auto xOne = create_xbox_one();
 
@@ -323,6 +383,7 @@ namespace platf::gamepad {
       supported_gamepad_t {"auto", true, ""},
       supported_gamepad_t {"xone", static_cast<bool>(xOne), !xOne ? xOne.getErrorMessage() : ""},
       supported_gamepad_t {"ds5", static_cast<bool>(ds5), !ds5 ? ds5.getErrorMessage() : ""},
+      supported_gamepad_t {"ds5-edge", static_cast<bool>(ds5_edge), !ds5_edge ? ds5_edge.getErrorMessage() : ""},
       supported_gamepad_t {"switch", static_cast<bool>(switchPro), !switchPro ? switchPro.getErrorMessage() : ""},
     };
 
