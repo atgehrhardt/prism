@@ -168,6 +168,7 @@
     "audio_sink_placeholder_macos": "BlackHole 2ch",
     "audio_sink_placeholder_windows": "Speakers (High Definition Audio Device)",
     "prism_default_sink": "Default Sink on Stream End",
+    "prism_default_sink_restore": "Restore the sink that was default when the stream started",
     "prism_default_sink_desc": "The audio sink Prism restores as the system default when any stream (mirror, virtual, or headless) ends. Leave blank to restore whichever sink was default when the stream started.",
     "av1_mode": "AV1 Support",
     "av1_mode_0": "Prism will advertise support for AV1 based on encoder capabilities (recommended)",

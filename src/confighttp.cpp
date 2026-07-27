@@ -1369,6 +1369,62 @@ namespace confighttp {
   }
 
   /**
+   * @brief List available audio sinks (Linux only).
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   *
+   * Returns a JSON array of objects with `name` and `description` fields,
+   * parsed from `pactl list sinks`. On non-Linux platforms or on failure,
+   * an empty array is returned.
+   *
+   * @api_examples{/api/audio-sinks| GET| null}
+   */
+  void getAudioSinks(const resp_https_t &response, const req_https_t &request) {
+    if (!authenticate(response, request)) {
+      return;
+    }
+
+    print_req(request);
+
+    nlohmann::json output_tree = nlohmann::json::array();
+#ifdef __linux__
+    namespace bp = boost::process::v1;
+    try {
+      bp::ipstream out;
+      bp::child pactl(bp::search_path("pactl"), bp::args({"list", "sinks"}), bp::std_out > out);
+      std::string line;
+      std::string name;
+      std::string description;
+      const auto flush = [&output_tree, &name, &description]() {
+        if (!name.empty()) {
+          output_tree.push_back({
+            {"name", name},
+            {"description", description.empty() ? name : description},
+          });
+          name.clear();
+          description.clear();
+        }
+      };
+      while (std::getline(out, line)) {
+        boost::trim(line);
+        if (line.starts_with("Sink #")) {
+          flush();
+        } else if (line.starts_with("Name: ")) {
+          name = line.substr(6);
+        } else if (line.starts_with("Description: ")) {
+          description = line.substr(13);
+        }
+      }
+      flush();
+      pactl.wait();
+    } catch (std::exception &e) {
+      BOOST_LOG(warning) << "GetAudioSinks: "sv << e.what();
+    }
+#endif
+    send_response(response, output_tree);
+  }
+
+  /**
    * @brief Update existing credentials.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
@@ -1911,6 +1967,7 @@ namespace confighttp {
     // rest api
     server.resource["^/api/browse$"]["GET"] = browseDirectory;
     server.resource["^/api/apps$"]["GET"] = getApps;
+    server.resource["^/api/audio-sinks$"]["GET"] = getAudioSinks;
     server.resource["^/api/apps$"]["POST"] = saveApp;
     server.resource["^/api/apps/capture$"]["POST"] = bulkSetCaptureMode;
     server.resource["^/api/apps/([0-9]+)$"]["DELETE"] = deleteApp;
