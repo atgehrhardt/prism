@@ -76,9 +76,11 @@ RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshi
 RESTORE="${RESTORE:-${physical_sink:-}}"
 if [ -n "$RESTORE" ]; then
   echo "restoring default sink: $RESTORE"
-  for _ in $(seq 1 10); do
-    pactl set-default-sink "$RESTORE" 2>/dev/null || true
-    [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
+  for _ in $(seq 1 20); do
+    if pactl list short sinks 2>/dev/null | grep -q "[[:space:]]${RESTORE}[[:space:]]"; then
+      pactl set-default-sink "$RESTORE" 2>/dev/null || true
+      [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
+    fi
     sleep 0.5
   done
   echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"

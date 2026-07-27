@@ -43,9 +43,11 @@ if [ "$ACTION" = "stop" ]; then
     # PipeWire/WirePlumber can move the default while the loopback is being
     # torn down, so retry and verify instead of firing once.
     echo "restoring default sink: $RESTORE"
-    for _ in $(seq 1 10); do
-      pactl set-default-sink "$RESTORE" 2>/dev/null || true
-      [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
+    for _ in $(seq 1 20); do
+      if pactl list short sinks 2>/dev/null | grep -q "[[:space:]]${RESTORE}[[:space:]]"; then
+        pactl set-default-sink "$RESTORE" 2>/dev/null || true
+        [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
+      fi
       sleep 0.5
     done
     echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
