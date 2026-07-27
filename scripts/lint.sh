@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
-# Local mirror of the GitHub "common lint" workflow (LizardByte/.github).
-# Run by the pre-push hook in .githooks/; can also be run manually:
+# Repository-owned implementation of the GitHub "Common Lint" workflow.
+# Run by CI and the pre-push hook in .githooks/; it can also be run manually:
 #   scripts/lint.sh
 #
-# Tooling is bootstrapped into .lint-venv/ (gitignored) on first run.
+# Version-pinned tooling is bootstrapped into .lint-venv/ (gitignored).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 VENV="$REPO_ROOT/.lint-venv"
-CLANG_FORMAT_VERSION=20
+CLANG_FORMAT_VERSION=20.1.8
+YAMLLINT_VERSION=1.38.0
+CMAKELANG_VERSION=0.6.13
+FLAKE8_VERSION=7.3.0
+SHELLCHECK_VERSION=0.10.0
+SHELLCHECK_SHA256=6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87
+ACTIONLINT_VERSION=1.7.12
+ACTIONLINT_SHA256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+HADOLINT_VERSION=2.14.0
+HADOLINT_SHA256=6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47
 FAILED=0
 
 run() { # run <name> <cmd...>
@@ -25,27 +34,74 @@ run() { # run <name> <cmd...>
 }
 
 # --- bootstrap tools ---------------------------------------------------------
-if [ ! -x "$VENV/bin/clang-format" ]; then
+TOOL_VERSIONS="$CLANG_FORMAT_VERSION:$YAMLLINT_VERSION:$CMAKELANG_VERSION:$FLAKE8_VERSION"
+if [ ! -x "$VENV/bin/clang-format" ] ||
+  [ ! -f "$VENV/.tool-versions" ] ||
+  [ "$(cat "$VENV/.tool-versions")" != "$TOOL_VERSIONS" ]; then
   echo "Bootstrapping lint tools into .lint-venv ..."
   python3 -m venv "$VENV"
   "$VENV/bin/pip" -q install --upgrade pip
-  "$VENV/bin/pip" -q install "clang-format==${CLANG_FORMAT_VERSION}.*" yamllint cmakelang flake8
+  "$VENV/bin/pip" -q install \
+    "clang-format==${CLANG_FORMAT_VERSION}" \
+    "yamllint==${YAMLLINT_VERSION}" \
+    "cmakelang==${CMAKELANG_VERSION}" \
+    "flake8==${FLAKE8_VERSION}"
+  printf '%s\n' "$TOOL_VERSIONS" > "$VENV/.tool-versions"
 fi
 PATH="$VENV/bin:$PATH"
 
-if ! command -v shellcheck >/dev/null 2>&1; then
-  if [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ]; then
-    echo "Downloading shellcheck ..."
-    curl -sSL https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz \
-      | tar -xJ -C "$VENV/bin" --strip-components=1 shellcheck-v0.10.0/shellcheck
-  else
-    echo "WARNING: shellcheck not found; skipping shell lint" >&2
+download() { # download <url> <output> <sha256>
+  local url="$1"
+  local output="$2"
+  local sha256="$3"
+  curl -fsSL --retry 3 "$url" -o "$output"
+  printf '%s  %s\n' "$sha256" "$output" | sha256sum --check
+}
+
+if [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ]; then
+  if [ ! -x "$VENV/bin/shellcheck" ] ||
+    ! "$VENV/bin/shellcheck" --version | grep -q "version: ${SHELLCHECK_VERSION}"; then
+    echo "Downloading shellcheck ${SHELLCHECK_VERSION} ..."
+    shellcheck_archive="$VENV/shellcheck.tar.xz"
+    download \
+      "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+      "$shellcheck_archive" \
+      "$SHELLCHECK_SHA256"
+    tar -xJf "$shellcheck_archive" -C "$VENV/bin" \
+      --strip-components=1 "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
   fi
+
+  if [ ! -x "$VENV/bin/actionlint" ] ||
+    [ "$("$VENV/bin/actionlint" -version | head -n 1)" != "$ACTIONLINT_VERSION" ]; then
+    echo "Downloading actionlint ${ACTIONLINT_VERSION} ..."
+    actionlint_archive="$VENV/actionlint.tar.gz"
+    download \
+      "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+      "$actionlint_archive" \
+      "$ACTIONLINT_SHA256"
+    tar -xzf "$actionlint_archive" -C "$VENV/bin" actionlint
+  fi
+
+  if [ ! -x "$VENV/bin/hadolint" ] ||
+    ! "$VENV/bin/hadolint" --version | grep -q " ${HADOLINT_VERSION}$"; then
+    echo "Downloading hadolint ${HADOLINT_VERSION} ..."
+    download \
+      "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-x86_64" \
+      "$VENV/bin/hadolint" \
+      "$HADOLINT_SHA256"
+    chmod +x "$VENV/bin/hadolint"
+  fi
+else
+  for tool in shellcheck actionlint hadolint; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      echo "WARNING: ${tool} not found; skipping its checks" >&2
+    fi
+  done
 fi
 
 # Paths not present in CI checkouts (submodules, build output, deps)
 SUBMODULES=$(git config --file .gitmodules --get-regexp path 2>/dev/null | awk '{print $2}' || true)
-PRUNE=( -path ./node_modules -o -path ./cmake-build-prism -o -path ./.lint-venv -o -path './.git' )
+PRUNE=( -path ./node_modules -o -path './cmake-build-*' -o -path ./.lint-venv -o -path './.git' )
 for s in $SUBMODULES; do
   PRUNE+=( -o -path "./$s" )
 done
@@ -71,6 +127,11 @@ if [ ${#CPP_FILES[@]} -gt 0 ]; then
   run clang-format clang-format --dry-run --style=file --Werror "${CPP_FILES[@]}"
 fi
 
+# --- GitHub Actions -----------------------------------------------------------
+if command -v actionlint >/dev/null 2>&1; then
+  run actionlint actionlint -color
+fi
+
 # --- shellcheck ---------------------------------------------------------------
 if command -v shellcheck >/dev/null 2>&1; then
   mapfile -t SH_FILES < <(find_tree '*.sh' '*.bash')
@@ -80,18 +141,36 @@ if command -v shellcheck >/dev/null 2>&1; then
 fi
 
 # --- yamllint -----------------------------------------------------------------
-YAMLLINT_CONFIG=.yamllint.yml
-if [ ! -f "$YAMLLINT_CONFIG" ]; then
-  YAMLLINT_CONFIG="$VENV/.yamllint.yml"
-  [ -f "$YAMLLINT_CONFIG" ] || curl -sS https://raw.githubusercontent.com/LizardByte/.github/master/.yamllint.yml -o "$YAMLLINT_CONFIG"
-fi
 mapfile -t YML_FILES < <(find_tree '*.yml' '*.yaml')
-run yamllint yamllint --config-file "$YAMLLINT_CONFIG" --format=standard --strict "${YML_FILES[@]}" .clang-format
+run yamllint yamllint --config-file .yamllint.yml --format=standard --strict "${YML_FILES[@]}" .clang-format
 
 # --- cmake-lint ---------------------------------------------------------------
 mapfile -t CMAKE_FILES < <(find_tree 'CMakeLists.txt' '*.cmake')
 if [ ${#CMAKE_FILES[@]} -gt 0 ]; then
   run cmake-lint cmake-lint --line-width 120 --tab-size 4 "${CMAKE_FILES[@]}"
+fi
+
+# --- Python -------------------------------------------------------------------
+mapfile -t PYTHON_FILES < <(find_tree '*.py')
+if [ ${#PYTHON_FILES[@]} -gt 0 ]; then
+  run flake8 flake8 "${PYTHON_FILES[@]}"
+fi
+
+# --- Docker -------------------------------------------------------------------
+if command -v hadolint >/dev/null 2>&1; then
+  mapfile -t DOCKER_FILES < <(find_tree 'Dockerfile' '*.dockerfile')
+  if [ ${#DOCKER_FILES[@]} -gt 0 ]; then
+    run hadolint hadolint \
+      --failure-threshold style \
+      --no-color \
+      --ignore DL3008 \
+      --ignore DL3013 \
+      --ignore DL3016 \
+      --ignore DL3018 \
+      --ignore DL3028 \
+      --ignore DL3059 \
+      "${DOCKER_FILES[@]}"
+  fi
 fi
 
 # --- trailing whitespace ------------------------------------------------------

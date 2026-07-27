@@ -15,7 +15,7 @@ It is recommended to use one of the following compilers:
 
 #### Linux
 Dependencies vary depending on the distribution. You can reference our
-[linux_build.sh](https://github.com/LizardByte/Prism/blob/master/scripts/linux_build.sh) script for a list of
+[linux_build.sh](https://github.com/atgehrhardt/prism/blob/master/scripts/linux_build.sh) script for a list of
 dependencies we use in Debian-based, Fedora-based and Arch-based distributions. Please submit a PR if you would like to extend the
 script to support other distributions.
 
@@ -24,10 +24,10 @@ If you are using KMS, patching the Prism binary with `setcap` is required. Some 
 from source and using the binary directly, this will also work:
 
 ```bash
-sudo cp build/prism /tmp
+sudo cp cmake-build-prism/prism /tmp
 sudo setcap cap_sys_admin,cap_sys_nice+p /tmp/prism
 sudo getcap /tmp/prism
-sudo mv /tmp/prism build/prism
+sudo mv /tmp/prism cmake-build-prism/prism
 ```
 
 ##### CUDA Toolkit
@@ -48,39 +48,39 @@ Ensure [git](https://git-scm.com) is installed on your system, then clone the re
 ```bash
 git clone https://github.com/atgehrhardt/prism.git --recurse-submodules
 cd prism
-mkdir build
+mkdir cmake-build-prism
 ```
 
 ### Build
 
 ```bash
-cmake -B build -G Ninja -S .
-ninja -C build
+cmake -B cmake-build-prism -G Ninja -S .
+ninja -C cmake-build-prism
 ```
 
 > [!TIP]
 > Available build options can be found in
-> [options.cmake](https://github.com/LizardByte/Prism/blob/master/cmake/prep/options.cmake).
+> [options.cmake](https://github.com/atgehrhardt/prism/blob/master/cmake/prep/options.cmake).
 
 ### Package
 
 ```bash
-cpack -G DEB --config ./build/CPackConfig.cmake
+cpack -G DEB --config ./cmake-build-prism/CPackConfig.cmake
 ```
 
 or
 
 ```bash
-cpack -G RPM --config ./build/CPackConfig.cmake
+cpack -G RPM --config ./cmake-build-prism/CPackConfig.cmake
 ```
 
-### Remote Build
-It may be beneficial to build remotely in some cases. This will enable easier building on different operating systems.
+### Remote Validation
+The `Linux` workflow runs automatically for pull requests and commits on `master`. It can also be started manually
+from the GitHub Actions page with `workflow_dispatch`. The `linux-test-results` artifact contains the Google Test XML,
+coverage XML, and test log; the workflow validates the build but does not publish release binaries.
 
-1. Fork the project
-2. Activate workflows
-3. Trigger the *CI* workflow manually
-4. Download the artifacts/binaries from the workflow run summary
+The scheduled `Fedora smoke` workflow additionally builds and tests in Fedora 44, performs a staged installation, and
+verifies the files consumed by the Fedora installer.
 
 <div class="section_buttons">
 
