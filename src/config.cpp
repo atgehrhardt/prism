@@ -797,6 +797,7 @@ namespace config {
   audio_t audio {
     {},  // audio_sink
     {},  // virtual_sink
+    {},  // prism_default_sink
     true,  // stream audio
     true,  // install_steam_drivers
   };
@@ -856,7 +857,7 @@ namespace config {
 
     true,  // keyboard enabled
     true,  // right alt to windows key enabled
-    false,  // android back as guide
+    true,  // android back as guide
     true,  // mouse enabled
     true,  // controller enabled
     true,  // always send scancodes
@@ -1706,6 +1707,7 @@ namespace config {
 
     string_f(vars, "audio_sink", audio.sink);
     string_f(vars, "virtual_sink", audio.virtual_sink);
+    string_f(vars, "prism_default_sink", audio.default_sink);
     bool_f(vars, "stream_audio", audio.stream);
     bool_f(vars, "install_steam_audio_drivers", audio.install_steam_drivers);
 

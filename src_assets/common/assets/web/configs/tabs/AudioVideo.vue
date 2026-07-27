@@ -1,5 +1,5 @@
 <script setup>
-import {ref} from 'vue'
+import {onMounted, ref} from 'vue'
 import {$tp} from '../../platform-i18n'
 import PlatformLayout from '../../PlatformLayout.vue'
 import AdapterNameSelector from './audiovideo/AdapterNameSelector.vue'
@@ -14,6 +14,25 @@ const props = defineProps([
 ])
 
 const config = ref(props.config)
+
+const audioSinks = ref([])
+
+onMounted(async () => {
+  try {
+    const r = await fetch('./api/audio-sinks')
+    if (r.ok) {
+      const sinks = await r.json()
+      // Keep a manually-entered sink that no longer exists selectable.
+      const current = config.value.prism_default_sink
+      if (current && !sinks.some((s) => s.name === current)) {
+        sinks.push({name: current, description: current})
+      }
+      audioSinks.value = sinks
+    }
+  } catch (e) {
+    // Leave audioSinks empty; the UI falls back to a text input.
+  }
+})
 </script>
 
 <template>
@@ -46,6 +65,26 @@ const config = ref(props.config)
       </div>
     </div>
 
+
+    <PlatformLayout :platform="platform">
+      <template #linux>
+        <!-- Prism Default Sink -->
+        <div class="mb-3">
+          <label for="prism_default_sink" class="form-label">{{ $t('config.prism_default_sink') }}</label>
+          <select v-if="audioSinks.length > 0" class="form-select" id="prism_default_sink"
+                  v-model="config.prism_default_sink">
+            <option value="">{{ $t('config.prism_default_sink_restore') }}</option>
+            <option v-for="sink in audioSinks" :key="sink.name" :value="sink.name">
+              {{ sink.description }} ({{ sink.name }})
+            </option>
+          </select>
+          <input v-else type="text" class="form-control" id="prism_default_sink"
+                 :placeholder="$tp('config.prism_default_sink_placeholder', 'alsa_output.pci-0000_09_00.3.analog-stereo')"
+                 v-model="config.prism_default_sink" />
+          <div class="form-text">{{ $t('config.prism_default_sink_desc') }}</div>
+        </div>
+      </template>
+    </PlatformLayout>
 
     <PlatformLayout :platform="platform">
       <template #windows>

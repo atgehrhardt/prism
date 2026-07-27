@@ -24,7 +24,7 @@ flock -x -w 90 9 || echo "virtual-stop: lock timeout, proceeding anyway"
 rm -f "$OVERRIDE_FILE"
 
 # Tear down audio routing: stop the guard, unload the loopback and the
-# session sink, and restore the physical default sink.
+# session sink.
 pkill -f prism-virtual-audio.sh 2>/dev/null || true
 ASTATE="$RUNTIME/prism-virtual-audio.state"
 if [ -f "$ASTATE" ]; then
@@ -35,12 +35,6 @@ if [ -f "$ASTATE" ]; then
   fi
   if [ -n "${sink_module:-}" ]; then
     pactl unload-module "$sink_module" 2>/dev/null || true
-  fi
-  if [ -n "${physical_sink:-}" ]; then
-    # A user-configured prism_default_sink wins over the recorded physical sink.
-    RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
-    RESTORE="${RESTORE:-$physical_sink}"
-    pactl set-default-sink "$RESTORE" 2>/dev/null || true
   fi
   rm -f "$ASTATE"
 fi
@@ -57,4 +51,21 @@ fi
 
 # Destroy the virtual output (it disappears when krfb-virtualmonitor exits).
 pkill -f "krfb-virtualmonitor --name $VNAME" 2>/dev/null || true
+
+# Restore the desktop default sink last: sinks for disabled outputs do not
+# exist until the output is back, and PipeWire takes a moment to re-create
+# them, so wait for the target to appear and retry until the switch sticks.
+RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+RESTORE="${RESTORE:-${physical_sink:-}}"
+if [ -n "$RESTORE" ]; then
+  echo "restoring default sink: $RESTORE"
+  for _ in $(seq 1 20); do
+    if pactl list short sinks 2>/dev/null | grep -q "[[:space:]]${RESTORE}[[:space:]]"; then
+      pactl set-default-sink "$RESTORE" 2>/dev/null || true
+      [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
+    fi
+    sleep 0.5
+  done
+  echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
+fi
 echo "virtual desktop torn down"

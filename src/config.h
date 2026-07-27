@@ -211,6 +211,7 @@ namespace config {
   struct audio_t {
     std::string sink;  ///< Audio output device/sink to use for audio capture
     std::string virtual_sink;  ///< Virtual audio sink for audio routing
+    std::string default_sink;  ///< Sink restored as the system default when a Prism stream ends (prism_default_sink); empty restores the sink recorded at stream start
     bool stream;  ///< Enable audio streaming to clients
     bool install_steam_drivers;  ///< Install Steam audio drivers for enhanced compatibility
   };

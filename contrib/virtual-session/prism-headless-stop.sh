@@ -64,21 +64,27 @@ if [ -f "$ASTATE" ]; then
   if [ -n "${loop_module:-}" ]; then
     pactl unload-module "$loop_module" 2>/dev/null || true
   fi
-  # If Sunshine's capture sink is still the default, hand the desktop back to
-  # the configured prism_default_sink, falling back to the physical output.
-  if [ -n "${physical_sink:-}" ]; then
-    cur="$(pactl get-default-sink 2>/dev/null || true)"
-    case "$cur" in
-      prism-stream | sink-sunshine-*)
-        RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
-        RESTORE="${RESTORE:-$physical_sink}"
-        pactl set-default-sink "$RESTORE" 2>/dev/null || true ;;
-    esac
-  fi
   rm -f "$ASTATE"
 fi
 pactl list short modules 2>/dev/null | grep 'sink_name=prism-headless' | cut -f1 \
   | while read -r m; do pactl unload-module "$m" 2>/dev/null || true; done
+
+# Hand the desktop back to the configured prism_default_sink, falling back to
+# the recorded physical output. PipeWire/WirePlumber can move the default
+# while the session sink is being torn down, so retry and verify.
+RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/sunshine/sunshine.conf" 2>/dev/null | tail -1)"
+RESTORE="${RESTORE:-${physical_sink:-}}"
+if [ -n "$RESTORE" ]; then
+  echo "restoring default sink: $RESTORE"
+  for _ in $(seq 1 20); do
+    if pactl list short sinks 2>/dev/null | grep -q "[[:space:]]${RESTORE}[[:space:]]"; then
+      pactl set-default-sink "$RESTORE" 2>/dev/null || true
+      [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
+    fi
+    sleep 0.5
+  done
+  echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
+fi
 
 rm -f "$STATE"
 
