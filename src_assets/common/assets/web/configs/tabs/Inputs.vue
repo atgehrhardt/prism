@@ -161,7 +161,7 @@ const config = ref(props.config)
               id="android_back_as_guide"
               locale-prefix="config"
               v-model="config.android_back_as_guide"
-              default="false"
+              default="true"
     ></Checkbox>
 
     <!-- Enable Mouse Input -->

@@ -48,6 +48,19 @@ const config = ref(props.config)
 
 
     <PlatformLayout :platform="platform">
+      <template #linux>
+        <!-- Prism Default Sink -->
+        <div class="mb-3">
+          <label for="prism_default_sink" class="form-label">{{ $t('config.prism_default_sink') }}</label>
+          <input type="text" class="form-control" id="prism_default_sink"
+                 :placeholder="$tp('config.prism_default_sink_placeholder', 'alsa_output.pci-0000_09_00.3.analog-stereo')"
+                 v-model="config.prism_default_sink" />
+          <div class="form-text">{{ $t('config.prism_default_sink_desc') }}</div>
+        </div>
+      </template>
+    </PlatformLayout>
+
+    <PlatformLayout :platform="platform">
       <template #windows>
         <!-- Virtual Sink -->
         <div class="mb-3">

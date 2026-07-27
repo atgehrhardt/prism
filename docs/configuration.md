@@ -665,7 +665,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Default</td>
         <td colspan="2">@code{}
-            disabled
+            enabled
             @endcode</td>
     </tr>
     <tr>
@@ -884,6 +884,30 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Example</td>
         <td colspan="2">@code{}
             virtual_sink = Steam Streaming Speakers
+            @endcode</td>
+    </tr>
+</table>
+
+### prism_default_sink
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Linux only. The PipeWire/PulseAudio sink Prism restores as the system default whenever a stream
+            (mirror, virtual display, or headless) ends. When empty, Prism restores whichever sink was the
+            default when the stream started.
+            @tip{Find sink names with `pactl list sinks short`.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">n/a</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            prism_default_sink = alsa_output.pci-0000_09_00.3.analog-stereo
             @endcode</td>
     </tr>
 </table>
