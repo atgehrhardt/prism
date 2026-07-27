@@ -42,6 +42,13 @@ build/
 cmake-*/
 docs/doxyconfig*
 
+# Generated runtime, test, and packaging artifacts
+/AppDir/
+/squashfs-root/
+/prism_state.json
+/test_*.log
+/write_file_test_*.txt
+
 # npm
 node_modules/
 
