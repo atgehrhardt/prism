@@ -249,8 +249,9 @@ fails before that point, the transaction rolls back instead of silently capturin
 desktop.
 
 Teardown records that the private labwc compositor must be reset. The next headless
-startup performs that reset and waits for the input bridge to reconnect, so it is safe
-to launch a replacement stream immediately without waiting for desktop Steam.
+startup performs that reset, waits for the input bridge to reconnect, and confirms the
+headless output remains stable before attaching gamescope. This makes it safe to launch
+a replacement stream immediately without waiting for desktop Steam.
 
 After a Steam headless stream, `prism-steam-restore.service` waits five seconds before
 returning Steam to the desktop. Starting another headless Steam stream during that grace

@@ -167,6 +167,10 @@ if ! wlr-randr --output HEADLESS-1 --custom-mode "${W}x${H}@${FPS}" >/dev/null 2
   echo "ERROR: could not set HEADLESS-1 to ${W}x${H}@${FPS}" >&2
   exit 1
 fi
+if ! prism_wait_labwc_settled HEADLESS-1; then
+  echo "ERROR: private labwc output did not settle after configuration" >&2
+  exit 1
+fi
 prism_clear_labwc_reset_required
 
 if [ "$STEAM" = "1" ]; then

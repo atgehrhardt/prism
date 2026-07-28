@@ -76,6 +76,23 @@ if prism_labwc_reset_required; then
   exit 1
 fi
 
+LABWC_POLLS="$TEST_ROOT/labwc-polls"
+# shellcheck disable=SC2317 # Called indirectly by the sourced readiness helper.
+wlr-randr() {
+  printf '.\n' >> "$LABWC_POLLS"
+  if [ "$(wc -l < "$LABWC_POLLS")" -le 2 ]; then
+    return 1
+  fi
+  printf '%s\n' 'HEADLESS-1 "Headless output 1"'
+}
+# shellcheck disable=SC2317 # Called indirectly by the sourced readiness helper.
+sleep() {
+  :
+}
+prism_wait_labwc_settled HEADLESS-1
+[ "$(wc -l < "$LABWC_POLLS")" -eq 14 ]
+unset -f wlr-randr sleep
+
 printf '%s\n' 'session_id=43' >> "$STATE"
 if prism_state_valid "$STATE"; then
   echo "duplicate state key was incorrectly accepted" >&2
