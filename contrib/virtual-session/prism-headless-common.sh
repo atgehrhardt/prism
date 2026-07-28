@@ -144,6 +144,27 @@ prism_clear_labwc_reset_required() {
   rm -f "$PRISM_LABWC_RESET_FILE"
 }
 
+# Wait for labwc's headless output to remain observable long enough for nested
+# compositors to attach reliably after a service restart.
+prism_wait_labwc_settled() {
+  local output_name="${1:-HEADLESS-1}"
+  local consecutive=0
+
+  for _ in $(seq 1 60); do
+    if wlr-randr 2>/dev/null | grep -q "^${output_name}"; then
+      consecutive=$((consecutive + 1))
+      if [ "$consecutive" -ge 12 ]; then
+        return 0
+      fi
+    else
+      consecutive=0
+    fi
+    sleep 0.25
+  done
+
+  return 1
+}
+
 prism_run_owned_app() {
   local unit="${1:?app unit required}"
   local command_line="${2:?app command required}"

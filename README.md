@@ -169,8 +169,9 @@ rm -rf ~/.config/prism ~/.cache/prism
   without global process-name killing. Headless Steam and its games also run in a
   bubblewrap mount namespace that hides host controller device nodes while leaving
   Prism's dynamically created virtual controllers visible. After teardown, the next
-  headless startup resets the private labwc compositor before attaching gamescope; this
-  prevents stale client state from blocking an immediate replacement stream. The ownership calls are isolated in
+  headless startup resets the private labwc compositor and waits for its output to remain
+  stable before attaching gamescope; this prevents stale or partially initialized client
+  state from blocking an immediate replacement stream. The ownership calls are isolated in
   `prism-headless-common.sh` for a future non-systemd backend.
 - **Virtual display** (`contrib/virtual-session/prism-virtual-*.sh`): creates/removes the
   KWin virtual output via `krfb-virtualmonitor` (KWin gates virtual outputs behind its
