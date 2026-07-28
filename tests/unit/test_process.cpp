@@ -15,6 +15,55 @@
 
 namespace fs = std::filesystem;
 
+class SessionCleanupTest: public BaseTest {
+protected:
+  void SetUp() override {
+    BaseTest::SetUp();
+    test_dir = fs::temp_directory_path() / "prism_session_cleanup_test";
+    fs::remove_all(test_dir);
+    fs::create_directories(test_dir);
+    setenv("PRISM_SESSION_DIR", test_dir.string().c_str(), 1);
+  }
+
+  void TearDown() override {
+    unsetenv("PRISM_SESSION_DIR");
+    fs::remove_all(test_dir);
+    BaseTest::TearDown();
+  }
+
+  /**
+   * @brief Create an executable synthetic cleanup helper.
+   *
+   * @param exit_code Exit status returned by the helper.
+   */
+  void writeCleanupHelper(const int exit_code) const {
+    const fs::path helper = test_dir / "prism-session-cleanup.sh";
+    std::ofstream file(helper);
+    file << "#!/usr/bin/env sh\nexit " << exit_code << '\n';
+    file.close();
+    fs::permissions(
+      helper,
+      fs::perms::owner_read | fs::perms::owner_write | fs::perms::owner_exec
+    );
+  }
+
+  fs::path test_dir;
+};
+
+TEST_F(SessionCleanupTest, SuccessfulCleanupAllowsStartup) {
+  writeCleanupHelper(0);
+  EXPECT_EQ(proc::reconcile_stale_capture_state(), 0);
+}
+
+TEST_F(SessionCleanupTest, FailedCleanupBlocksStartup) {
+  writeCleanupHelper(23);
+  EXPECT_EQ(proc::reconcile_stale_capture_state(), -1);
+}
+
+TEST_F(SessionCleanupTest, MissingCleanupHelperBlocksStartup) {
+  EXPECT_EQ(proc::reconcile_stale_capture_state(), -1);
+}
+
 class ProcessPNGTest: public BaseTest {
 protected:
   void SetUp() override {

@@ -144,6 +144,21 @@ const auto HEADLESS_HELPER_TEST = std::format(
   PRISM_SOURCE_DIR,
   PRISM_SOURCE_DIR
 );
+const auto AUDIO_HELPER_TEST = std::format(
+  "bash {}/tests/integration/test_audio_common.sh {}",
+  PRISM_SOURCE_DIR,
+  PRISM_SOURCE_DIR
+);
+const auto SESSION_CLEANUP_TEST = std::format(
+  "bash {}/tests/integration/test_session_cleanup.sh {}",
+  PRISM_SOURCE_DIR,
+  PRISM_SOURCE_DIR
+);
+const auto INSTALL_POLICY_TEST = std::format(
+  "bash {}/tests/integration/test_install_policy.sh {}",
+  PRISM_SOURCE_DIR,
+  PRISM_SOURCE_DIR
+);
 
 #ifdef UDEVADM_EXECUTABLE
   #define UDEV_TESTS \
@@ -175,6 +190,24 @@ INSTANTIATE_TEST_SUITE_P(
       "linux",
       true,
       "Headless lifecycle helper tests"
+    },
+    ExternalCommandTestData {
+      AUDIO_HELPER_TEST,
+      "linux",
+      true,
+      "Audio lifecycle helper tests"
+    },
+    ExternalCommandTestData {
+      SESSION_CLEANUP_TEST,
+      "linux",
+      true,
+      "Crash recovery reconciliation tests"
+    },
+    ExternalCommandTestData {
+      INSTALL_POLICY_TEST,
+      "linux",
+      true,
+      "Installer and recovery payload policy tests"
     },
     // Cross-platform failing test
     ExternalCommandTestData {

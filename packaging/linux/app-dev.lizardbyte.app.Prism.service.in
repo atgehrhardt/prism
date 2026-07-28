@@ -9,6 +9,7 @@ After=graphical-session.target xdg-desktop-autostart.target xdg-desktop-portal.s
 ExecStartPre=/bin/sleep 5
 @PRISM_SERVICE_START_COMMAND@
 @PRISM_SERVICE_STOP_COMMAND@
+@PRISM_SERVICE_CLEANUP_COMMAND@
 Restart=on-failure
 RestartSec=5s
 

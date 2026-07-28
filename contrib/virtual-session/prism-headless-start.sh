@@ -77,6 +77,7 @@ PHYSICAL_SINK=""
 
 rollback() {
   local rc=$?
+  local provisional_loop audio_cleanup_failed=0
   trap - EXIT
   [ "$READY" = "1" ] && return "$rc"
   echo "headless startup failed; rolling back"
@@ -86,9 +87,13 @@ rollback() {
   if [ "$SESSION_STARTED" = "1" ]; then
     prism_mark_labwc_reset_required || true
   fi
-  prism_unload_module "$SESSION_SINK_MODULE"
-  prism_unload_named_sink_modules prism-headless
-  rm -f "$STATE" "$ASTATE" "$ENV_FILE"
+  provisional_loop="$(prism_audio_state_get "$ASTATE" loop_module 2>/dev/null || true)"
+  prism_unload_module "$provisional_loop" || audio_cleanup_failed=1
+  prism_unload_loopback_modules prism-headless.monitor prism-stream || audio_cleanup_failed=1
+  prism_unload_module "$SESSION_SINK_MODULE" || audio_cleanup_failed=1
+  prism_unload_named_sink_modules prism-headless || audio_cleanup_failed=1
+  rm -f "$STATE" "$ENV_FILE"
+  [ "$audio_cleanup_failed" -ne 0 ] || rm -f "$ASTATE"
   prism_restore_default_sink "$PHYSICAL_SINK" || true
   [ "$STEAM" = "1" ] && prism_schedule_steam_restore
   return "$rc"
@@ -106,6 +111,7 @@ prism_stop_unit "$PRISM_STEAM_RESTORE_UNIT" || {
 OLD_VERSION="$(prism_state_get "$STATE" version 2>/dev/null || true)"
 OLD_SESSION_MODULE="$(prism_state_get "$STATE" session_sink_module 2>/dev/null || true)"
 OLD_LOOP_MODULE="$(prism_state_get "$STATE" loop_module 2>/dev/null || true)"
+OLD_AUDIO_LOOP_MODULE="$(prism_audio_state_get "$ASTATE" loop_module 2>/dev/null || true)"
 OLD_APP_UNIT="$(prism_state_get "$STATE" app_unit 2>/dev/null || true)"
 if [ -f "$STATE" ] || prism_unit_live "$PRISM_HEADLESS_UNIT" ||
   prism_unit_has_pids "$PRISM_HEADLESS_UNIT"; then
@@ -121,12 +127,14 @@ case "$OLD_APP_UNIT" in
 esac
 prism_stop_headless_app_units || exit 1
 prism_stop_unit "$PRISM_HEADLESS_UNIT" || exit 1
-prism_unload_module "$OLD_LOOP_MODULE"
-prism_unload_module "$OLD_SESSION_MODULE"
+prism_unload_module "$OLD_LOOP_MODULE" || exit 1
+prism_unload_module "$OLD_AUDIO_LOOP_MODULE" || exit 1
+prism_unload_loopback_modules prism-headless.monitor prism-stream || exit 1
+prism_unload_module "$OLD_SESSION_MODULE" || exit 1
 if { [ -f "$STATE" ] && [ "$OLD_VERSION" != "2" ]; } || prism_legacy_headless_present; then
   prism_cleanup_legacy_headless
 fi
-prism_unload_named_sink_modules prism-headless
+prism_unload_named_sink_modules prism-headless || exit 1
 rm -f "$STATE" "$ASTATE" "$ENV_FILE" "$OVERRIDE_FILE"
 
 if prism_labwc_reset_required; then

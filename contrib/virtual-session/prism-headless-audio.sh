@@ -13,6 +13,26 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 exec >>"$LOG" 2>&1
 PHYSICAL="${1:-}"
+LOOP_ID=""
+
+cleanup() {
+  local rc=$?
+  local cleanup_rc=0
+
+  trap - EXIT INT TERM
+  prism_unload_module "$LOOP_ID" || cleanup_rc=1
+  if [ "$cleanup_rc" -eq 0 ]; then
+    prism_audio_remove_owned_state "$STATE" "$LOOP_ID"
+  fi
+  if [ "$rc" -eq 0 ] && [ "$cleanup_rc" -ne 0 ]; then
+    rc=$cleanup_rc
+  fi
+  exit "$rc"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 echo "=== headless-audio $(date -Is) physical=${PHYSICAL:-?} unit=$PRISM_HEADLESS_UNIT ==="
 
 CAPTURE_SINK=""
@@ -47,7 +67,7 @@ if [ -n "$PHYSICAL" ]; then
   pactl set-default-sink "$PHYSICAL" >/dev/null 2>&1 || true
 fi
 
-if ! prism_atomic_write "$STATE" <<EOF
+if ! prism_audio_atomic_write "$STATE" <<EOF
 loop_module=$LOOP_ID
 physical_sink=$PHYSICAL
 EOF

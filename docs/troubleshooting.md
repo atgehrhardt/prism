@@ -257,6 +257,56 @@ After a Steam headless stream, `prism-steam-restore.service` waits five seconds 
 returning Steam to the desktop. Starting another headless Steam stream during that grace
 period cancels the restore and avoids a shutdown/relaunch cycle.
 
+### Audio is loud, clipped, or distorted in virtual/headless mode
+
+Each active capture mode must have exactly one `module-loopback` feeding the reserved
+`prism-stream` sink. Idle Prism should have zero such loopbacks. Multiple identical routes
+sum the same signal and cause amplification and clipping; Prism does not compensate with a
+volume reduction or format conversion.
+
+Inspect the current routes with:
+
+```bash
+pactl list short modules | grep 'module-loopback' | grep 'sink=prism-stream'
+```
+
+Stop the user service and run the idempotent reconciler if duplicates remain:
+
+```bash
+systemctl --user stop prism.service
+~/.local/bin/prism-session-cleanup.sh
+```
+
+Expected counts are zero while idle and after teardown, and exactly one during a mirror,
+portal, virtual, or headless stream.
+
+### Prism delays restart after a crash
+
+Prism intentionally reconciles per-stream resources before opening any listener. If a
+confirmed headless process/scope, virtual monitor/output, session sink, loopback, recorded
+physical output, or supported Prism virtual gamepad remains, startup fails closed and
+`Restart=on-failure` retries. This can briefly delay restart while KWin re-enables only the
+physical outputs recorded as disabled by Prism.
+
+Inspect recovery status and logs with:
+
+```bash
+systemctl --user status prism.service
+journalctl --user -u prism.service -b
+tail -n 200 ~/.local/state/prism-recovery.log
+cat "$XDG_RUNTIME_DIR/prism-virtual-desktop.state"
+```
+
+Do not delete a retained virtual-desktop state file unless you have manually restored every
+output listed in it; that file is the evidence used for the next safe retry.
+
+Prism's uinput and UHID gamepads are owned by the creating process's open kernel file
+descriptors. When that process exits or crashes, the kernel destroys those devices.
+Recovery waits for udev to settle and checks only Prism's exact supported virtual-gamepad
+name prefixes. It never deletes arbitrary `/dev/input` or `/dev/hidraw` nodes; a remaining
+confirmed Prism device blocks a second server instance until the kernel/udev teardown
+finishes.
+
 ### KMS Streaming fails
 KMS screencasting requires elevated privileges which are not allowed for Flatpak or AppImage packages.
 This means that you must install Prism using the native package format of your distribution, if available.

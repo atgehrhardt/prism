@@ -295,39 +295,90 @@ namespace proc {
   }
 
   /**
+   * @brief Resolve an installed session helper.
+   *
+   * @param script Session helper file name without directory components.
+   * @return Executable helper path, or an empty path when it is unavailable.
+   */
+  static std::filesystem::path prism_session_script_path(const std::string &script) {
+    if (script.empty() || script == "."sv || script == ".."sv ||
+        script.find('/') != std::string::npos || script.find('\\') != std::string::npos) {
+      return {};
+    }
+
+    const auto executable_script = [&script](const std::filesystem::path &directory) {
+      const auto candidate = directory / script;
+      std::error_code error;
+      const auto status = std::filesystem::status(candidate, error);
+      if (error || !std::filesystem::is_regular_file(status)) {
+        return std::filesystem::path {};
+      }
+      const auto permissions = status.permissions();
+      constexpr auto executable = std::filesystem::perms::owner_exec |
+                                  std::filesystem::perms::group_exec |
+                                  std::filesystem::perms::others_exec;
+      return (permissions & executable) == std::filesystem::perms::none ?
+               std::filesystem::path {} :
+               candidate;
+    };
+
+    if (const char *override_dir = std::getenv("PRISM_SESSION_DIR");
+        override_dir != nullptr && *override_dir != '\0') {
+      return executable_script(override_dir);
+    }
+
+    if (auto candidate = executable_script(PRISM_SESSION_DIR); !candidate.empty()) {
+      return candidate;
+    }
+    if (const char *home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+      return executable_script(std::filesystem::path(home) / ".local/bin");
+    }
+    return {};
+  }
+
+  /**
    * @brief Run one of Prism's session scripts synchronously, like a prep command.
    *
-   * @param script Script file name inside `$HOME/.local/bin`.
+   * @param script Session helper file name.
    * @param env Environment for the child process (carries the PRISM_CLIENT_* variables).
    * @param pipe Optional log sink for the script's output.
    * @return 0 on success, -1 on failure.
    */
   static int prism_run_session_script(const std::string &script, boost::process::v1::environment &env, FILE *pipe) {
-    const char *home = std::getenv("HOME");
-    if (home == nullptr || *home == '\0') {
-      BOOST_LOG(error) << "[prism] HOME is not set; cannot run "sv << script;
+    const auto script_path = prism_session_script_path(script);
+    if (script_path.empty()) {
+      BOOST_LOG(error) << "[prism] Session helper is unavailable: "sv << script;
       return -1;
     }
-    const std::string script_path = std::string(home) + "/.local/bin/" + script;
     std::error_code ec;
-    boost::filesystem::path working_dir = find_working_directory(script_path, env);
-    BOOST_LOG(info) << "[prism] Executing: ["sv << script_path << ']';
-    auto child = platf::run_command(false, true, script_path, working_dir, env, pipe, ec, nullptr);
+    const std::string command = script_path.string();
+    boost::filesystem::path working_dir = find_working_directory(command, env);
+    BOOST_LOG(info) << "[prism] Executing: ["sv << command << ']';
+    auto child = platf::run_command(false, true, command, working_dir, env, pipe, ec, nullptr);
     if (ec) {
-      BOOST_LOG(error) << "[prism] Couldn't run ["sv << script_path << "]: System: "sv << ec.message();
+      BOOST_LOG(error) << "[prism] Couldn't run ["sv << command << "]: System: "sv << ec.message();
       return -1;
     }
     child.wait(ec);
     if (ec) {
-      BOOST_LOG(error) << "[prism] ["sv << script_path << "] wait failed with error code ["sv << ec << ']';
+      BOOST_LOG(error) << "[prism] ["sv << command << "] wait failed with error code ["sv << ec << ']';
       return -1;
     }
     auto ret = child.exit_code();
     if (ret != 0) {
-      BOOST_LOG(error) << "[prism] ["sv << script_path << "] exited with code ["sv << ret << ']';
+      BOOST_LOG(error) << "[prism] ["sv << command << "] exited with code ["sv << ret << ']';
       return -1;
     }
     return 0;
+  }
+
+  int reconcile_stale_capture_state() {
+#ifdef __linux__
+    boost::process::v1::environment environment = boost::this_process::environment();
+    return prism_run_session_script("prism-session-cleanup.sh"s, environment, nullptr);
+#else
+    return 0;
+#endif
   }
 
   /**
