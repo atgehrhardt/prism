@@ -21,6 +21,32 @@ OVERRIDE_FILE="$RUNTIME/prism-capture-override"
 STATE="$RUNTIME/prism-virtual-audio.state"
 LOG="$HOME/.local/state/prism-virtual.log"
 SESSION_SINK="prism-virtual"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=contrib/virtual-session/prism-audio-common.sh
+. "$SCRIPT_DIR/prism-audio-common.sh"
+
+SINK_MODULE=""
+LOOP_ID=""
+
+cleanup() {
+  local rc=$?
+  local cleanup_rc=0
+
+  trap - EXIT INT TERM
+  prism_unload_module "$LOOP_ID" || cleanup_rc=1
+  prism_unload_module "$SINK_MODULE" || cleanup_rc=1
+  if [ "$cleanup_rc" -eq 0 ]; then
+    prism_audio_remove_owned_state "$STATE" "$LOOP_ID"
+  fi
+  if [ "$rc" -eq 0 ] && [ "$cleanup_rc" -ne 0 ]; then
+    rc=$cleanup_rc
+  fi
+  exit "$rc"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 exec >>"$LOG" 2>&1
 echo "=== virtual-audio $(date -Is) physical=${1:-?} ==="
 
@@ -58,6 +84,9 @@ echo "capture sink: $CAPTURE_SINK"
 SINK_MODULE="$(pactl load-module module-null-sink sink_name="$SESSION_SINK" \
   sink_properties=device.description="Prism Virtual Display" 2>/dev/null || true)"
 echo "session sink module: ${SINK_MODULE:-failed}"
+case "$SINK_MODULE" in
+  '' | *[!0-9]*) echo "ERROR: could not create virtual audio sink"; exit 1 ;;
+esac
 
 pactl set-default-sink "$SESSION_SINK" 2>/dev/null || true
 pactl list short sink-inputs 2>/dev/null | cut -f1 | while read -r input_id; do
@@ -69,17 +98,24 @@ done
 # Loop the session sink into the capture sink so apps are heard on the stream.
 LOOP_ID="$(pactl load-module module-loopback source="$SESSION_SINK.monitor" sink="$CAPTURE_SINK" latency_msec=20 2>/dev/null || true)"
 echo "loopback module: ${LOOP_ID:-failed}"
+case "$LOOP_ID" in
+  '' | *[!0-9]*) echo "ERROR: could not create virtual audio loopback"; exit 1 ;;
+esac
 
 # Keep the session sink and its monitor unsuspended; null sinks with no active
 # input otherwise suspend and the loopback goes silent.
 pactl suspend-sink "$SESSION_SINK" 0 2>/dev/null || true
 pactl suspend-source "$SESSION_SINK.monitor" 0 2>/dev/null || true
 
-{
-  echo "loop_module=${LOOP_ID:-}"
-  echo "sink_module=${SINK_MODULE:-}"
-  echo "physical_sink=$PHYSICAL"
-} > "$STATE"
+if ! prism_audio_atomic_write "$STATE" <<EOF
+loop_module=$LOOP_ID
+sink_module=$SINK_MODULE
+physical_sink=$PHYSICAL
+EOF
+then
+  echo "ERROR: could not publish virtual audio state"
+  exit 1
+fi
 
 # Watchdog: Prism may switch the default sink to its capture sink at stream
 # start (after the moves above); keep putting the default back on the session

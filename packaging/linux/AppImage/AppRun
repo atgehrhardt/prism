@@ -7,6 +7,8 @@ HERE="$(dirname "$(readlink -f "${0}")")"
 PRISM_PATH=/usr/bin/prism
 PRISM_BIN_HERE=$HERE/usr/bin/prism
 PRISM_SHARE_HERE=$HERE/usr/share/prism
+PRISM_SESSION_DIR=$HERE/usr/libexec/prism
+export PRISM_SESSION_DIR
 
 # Set APPDIR when running directly from the AppDir:
 if [ -z "$APPDIR" ]; then
@@ -90,9 +92,17 @@ if [ "x$1" == "xremove" ] || [ "x$1" == "x--remove" ] || [ "x$1" == "x-r" ] ; th
     exit $?
 fi
 
+if [ "x$1" == "x--internal" ]; then
+    if [ "x${2:-}" != "xsession-cleanup" ] || [ "$#" -ne 2 ]; then
+        echo "Unknown internal component" >&2
+        exit 64
+    fi
+    exec "$PRISM_SESSION_DIR/prism-session-cleanup.sh"
+fi
+
 # create config directory if it doesn't exist
 # https://github.com/LizardByte/Sunshine/issues/324
 mkdir -p ~/.config/prism
 
 # run prism
-"$PRISM_BIN_HERE" $@
+"$PRISM_BIN_HERE" "$@"

@@ -3,6 +3,28 @@
 install(DIRECTORY "${PRISM_SOURCE_ASSETS_DIR}/linux/assets/"
         DESTINATION "${PRISM_ASSETS_DIR}")
 
+install(PROGRAMS
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-audio-common.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-desktop-session.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-audio.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-common.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-exec.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-session.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-start.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-steam.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-stop.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-labwc-link-socket.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-mirror-audio.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-session-cleanup.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steam-game.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steam-restore.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steamos-start.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steamos-stop.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-virtual-audio.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-virtual-start.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-virtual-stop.sh"
+        DESTINATION "${PRISM_SESSION_DIR}")
+
 # copy assets (excluding shaders) to build directory, for running without install
 file(COPY "${PRISM_SOURCE_ASSETS_DIR}/linux/assets/"
         DESTINATION "${CMAKE_BINARY_DIR}/assets"

@@ -46,7 +46,9 @@ Fresh installs include four ready-made apps:
 
 ### Steam game sync
 
-Installed Steam games are synced into the app list automatically (`src/steam_games.*`
+Steam is an **optional dependency**. It is required only for Steam game discovery and
+synchronization, the **Steam Headless** entry, and launching synchronized Steam games.
+When Steam is installed, its games are synced into the app list automatically (`src/steam_games.*`
 parses `libraryfolders.vdf` + `appmanifest_*.acf`; Proton/runtimes are filtered out).
 The list is re-synced on every client applist request, so installs and uninstalls show
 up without a restart, and box art is pulled from Steam's library cache (converted to PNG
@@ -99,6 +101,12 @@ PipeWire distro with KDE Plasma 6, everything should work.
 ```bash
 curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
 ```
+
+The Fedora source installer uses only Fedora's enabled repositories. It does not install
+Steam or enable third-party repositories; in particular, RPM Fusion is no longer required
+solely to satisfy Steam. Install Steam separately if you want Steam discovery, synchronized
+game launching, or Steam Headless. The default Steam Headless entry remains visible and
+reports a clear runtime error if selected without Steam installed.
 
 Installs dependencies, builds Prism, and sets up:
 
@@ -182,7 +190,9 @@ rm -rf ~/.config/prism ~/.cache/prism
   an exclusive `EVIOCGRAB` only during headless streams.
 - **Audio separation** (`contrib/virtual-session/prism-*-audio.sh`): Sunshine captures a
   dedicated `prism-stream` null sink (`audio_sink` in `prism.conf`, set by `install.sh`),
-  and each capture mode routes the right audio into it. **Mirror/portal** streams loop the
+  and each capture mode routes the right audio into it. Exactly one active loopback may
+  feed `prism-stream` for the current capture mode; startup and teardown remove tracked
+  modules and exact duplicate routes before creating a replacement. **Mirror/portal** streams loop the
   physical sink's monitor in (stock behavior: audio on stream and host speakers).
   **Virtual display** selects a `prism-virtual` sink as the system default for the session
   (physical outputs are off, so everything belongs on the stream) and loops it in.
@@ -193,6 +203,14 @@ rm -rf ~/.config/prism ~/.cache/prism
   `prism.conf` to force a specific default sink whenever any stream ends
   (e.g. your speakers, if the physical output varies); without it the sink
   recorded at stream start is restored.
+- **Crash recovery** (`contrib/virtual-session/prism-session-cleanup.sh`): Prism reconciles
+  stale headless units/scopes, virtual displays, session sinks, loopbacks, overrides, and
+  supported virtual gamepads synchronously before initializing display, input, encoders,
+  discovery, or network listeners. Both native and AppImage user services also run the
+  reconciler as `ExecStopPost` after graceful exits and crashes. Confirmed resources that
+  cannot be removed block startup and are retried by systemd; failed physical-output
+  restoration remains recorded so intentionally disabled, unrecorded outputs are never
+  changed.
 - **`prism-kwin-mode`** (`contrib/virtual-session/prism-kwin-mode.c`): native
   kde-output-management-v2 client for output modes/HDR/custom modes (used by the optional
   `prism-desktop-session.sh` for physical-display switching; not wired up by default).

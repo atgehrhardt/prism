@@ -110,11 +110,17 @@ jobs:
           DESTDIR="${stage_dir}" cmake --install cmake-build-fedora
           test -x "${stage_dir}/usr/bin/prism"
           test -d "${stage_dir}/usr/share/prism"
+          test -x "${stage_dir}/usr/libexec/prism/prism-audio-common.sh"
+          test -x "${stage_dir}/usr/libexec/prism/prism-session-cleanup.sh"
+          grep -Fq \
+            "ExecStopPost=/usr/libexec/prism/prism-session-cleanup.sh" \
+            "${stage_dir}/usr/lib/systemd/user/app-dev.lizardbyte.app.Prism.service"
 
       - name: Stage and verify installer payload
         run: |
           stage_dir="${GITHUB_WORKSPACE}/cmake-build-fedora/stage"
           scripts=(
+            prism-audio-common.sh
             prism-desktop-session.sh
             prism-headless-audio.sh
             prism-headless-common.sh
@@ -123,7 +129,9 @@ jobs:
             prism-headless-start.sh
             prism-headless-steam.sh
             prism-headless-stop.sh
+            prism-labwc-link-socket.sh
             prism-mirror-audio.sh
+            prism-session-cleanup.sh
             prism-steam-game.sh
             prism-steam-restore.sh
             prism-steamos-start.sh

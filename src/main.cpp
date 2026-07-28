@@ -156,6 +156,11 @@ int main(int argc, char *argv[]) {
     return fn->second(argv[0], config::prism.cmd.argc, config::prism.cmd.argv);
   }
 
+  if (proc::reconcile_stale_capture_state() != 0) {
+    BOOST_LOG(fatal) << "Stale Prism capture resources could not be reconciled; startup is blocked"sv;
+    return 8;
+  }
+
   // Adding guard here first as it also performs recovery after crash,
   // otherwise people could theoretically end up without display output.
   // It also should be destroyed before forced shutdown to expedite the cleanup.

@@ -124,6 +124,16 @@ namespace proc {
   );
 
   /**
+   * @brief Remove stale resources owned by a prior Linux capture session.
+   *
+   * Linux runs `prism-session-cleanup.sh` synchronously. Other platforms
+   * perform no work and return success.
+   *
+   * @return Zero when reconciliation completed, otherwise `-1`.
+   */
+  int reconcile_stale_capture_state();
+
+  /**
    * @brief Resolve the effective Prism capture mode for an application.
    *
    * Uses the app's `prism-capture` value when set; otherwise falls back to a

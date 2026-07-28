@@ -18,6 +18,9 @@ RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 STATE="$RUNTIME/prism-mirror-audio.state"
 LOG="$HOME/.local/state/prism.log"
 CAPTURE_SINK="prism-stream"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=contrib/virtual-session/prism-audio-common.sh
+. "$SCRIPT_DIR/prism-audio-common.sh"
 mkdir -p "$(dirname "$LOG")"
 
 ACTION="${PRISM_AUDIO_ACTION:-start}"
@@ -26,16 +29,11 @@ if [ "$ACTION" = "stop" ]; then
   exec >>"$LOG" 2>&1
   echo "=== mirror-audio stop $(date -Is) ==="
   pkill -f 'prism-mirror-audio.sh.*prism-mirror-watchdog' 2>/dev/null || true
-  PHYSICAL=""
-  if [ -f "$STATE" ]; then
-    # shellcheck source=/dev/null
-    . "$STATE" 2>/dev/null || true
-    if [ -n "${loop_module:-}" ]; then
-      pactl unload-module "$loop_module" 2>/dev/null || true
-    fi
-    PHYSICAL="${physical_sink:-}"
-    rm -f "$STATE"
-  fi
+  loop_module="$(prism_audio_state_get "$STATE" loop_module 2>/dev/null || true)"
+  PHYSICAL="$(prism_audio_state_get "$STATE" physical_sink 2>/dev/null || true)"
+  prism_unload_module "$loop_module" || exit 1
+  prism_unload_prism_capture_loopbacks || exit 1
+  rm -f "$STATE"
   # A user-configured prism_default_sink wins over the recorded physical sink.
   RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
   RESTORE="${RESTORE:-$PHYSICAL}"
@@ -89,6 +87,13 @@ fi
 exec >>"$LOG" 2>&1
 echo "=== mirror-audio start $(date -Is) ==="
 
+# A prior server crash can leave a detached watchdog and one or more routes.
+pkill -f 'prism-mirror-audio.sh.*prism-mirror-watchdog' 2>/dev/null || true
+OLD_LOOP_MODULE="$(prism_audio_state_get "$STATE" loop_module 2>/dev/null || true)"
+prism_unload_module "$OLD_LOOP_MODULE" || exit 1
+prism_unload_prism_capture_loopbacks || exit 1
+rm -f "$STATE"
+
 # Physical output the desktop was using before the stream.
 PHYSICAL="$(pactl get-default-sink 2>/dev/null || true)"
 echo "physical sink: ${PHYSICAL:-none}"
@@ -107,9 +112,9 @@ if [ -n "$PHYSICAL" ]; then
   echo "loopback module: ${LOOP_ID:-failed}"
 fi
 
-{
-  echo "loop_module=${LOOP_ID:-}"
-  echo "physical_sink=$PHYSICAL"
-} > "$STATE"
+prism_audio_atomic_write "$STATE" <<EOF
+loop_module=$LOOP_ID
+physical_sink=$PHYSICAL
+EOF
 
 setsid "$0" prism-mirror-watchdog "$PHYSICAL" >/dev/null 2>&1 &

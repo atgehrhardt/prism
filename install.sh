@@ -21,14 +21,18 @@ sudo dnf install -y \
   libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
   numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
   wayland-devel libxkbcommon-devel python3-jinja2 bubblewrap \
-  gamescope labwc wlr-randr steam kscreen krfb mangohud
+  gamescope labwc wlr-randr kscreen krfb mangohud
 
 # --- 2. Source --------------------------------------------------------------
 if [ -d "$SRC_DIR/.git" ]; then
-  log "Updating existing checkout in $SRC_DIR"
-  git -C "$SRC_DIR" fetch origin "$BRANCH"
-  git -C "$SRC_DIR" checkout "$BRANCH"
-  git -C "$SRC_DIR" reset --hard "origin/$BRANCH"
+  if [ -n "$(git -C "$SRC_DIR" status --porcelain --untracked-files=all)" ]; then
+    log "Using existing checkout in $SRC_DIR without updating because it has local changes"
+  else
+    log "Updating existing checkout in $SRC_DIR"
+    git -C "$SRC_DIR" fetch origin "$BRANCH"
+    git -C "$SRC_DIR" checkout "$BRANCH"
+    git -C "$SRC_DIR" merge --ff-only "origin/$BRANCH"
+  fi
   git -C "$SRC_DIR" submodule update --init --recursive
 else
   log "Cloning Prism into $SRC_DIR"
@@ -78,6 +82,7 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
 log "Installing Prism scripts and systemd user units"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-start.sh"   "$HOME/.local/bin/prism-steamos-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-stop.sh"    "$HOME/.local/bin/prism-steamos-stop.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-audio-common.sh"    "$HOME/.local/bin/prism-audio-common.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-common.sh" "$HOME/.local/bin/prism-headless-common.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-exec.sh"   "$HOME/.local/bin/prism-headless-exec.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-start.sh"  "$HOME/.local/bin/prism-headless-start.sh"
@@ -91,7 +96,9 @@ install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-start.sh"   "$HOM
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-stop.sh"    "$HOME/.local/bin/prism-virtual-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-audio.sh"   "$HOME/.local/bin/prism-virtual-audio.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-mirror-audio.sh"    "$HOME/.local/bin/prism-mirror-audio.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-session-cleanup.sh" "$HOME/.local/bin/prism-session-cleanup.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-desktop-session.sh" "$HOME/.local/bin/prism-desktop-session.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-labwc-link-socket.sh" "$HOME/.local/bin/prism-labwc-link-socket.sh"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-labwc.service" \
   "$HOME/.config/systemd/user/prism-labwc.service"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-headless-session.service" \
@@ -157,8 +164,10 @@ systemctl --user daemon-reload
 sudo install -Dm644 "$SRC_DIR/contrib/virtual-session/61-prism-input.rules" \
   /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
 
-systemctl --user enable --now prism-labwc.service prism-input-bridge.service
-systemctl --user enable --now prism.service
+systemctl --user enable prism-labwc.service prism-input-bridge.service prism.service
+systemctl --user start prism-labwc.service
+systemctl --user start prism-input-bridge.service
+systemctl --user start prism.service
 
 log "Done. Open https://$(hostname -I | awk '{print $1}'):47990 to pair Moonlight."
 log "Apps available: Desktop (Mirror), Desktop (Virtual), Desktop Headless, Steam Headless."

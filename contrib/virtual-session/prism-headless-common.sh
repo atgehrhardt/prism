@@ -5,6 +5,10 @@
 # cgroup details here so a future ownership backend can implement the same
 # operations without changing capture, Steam, or audio routing.
 
+PRISM_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=contrib/virtual-session/prism-audio-common.sh
+. "$PRISM_COMMON_DIR/prism-audio-common.sh"
+
 PRISM_HEADLESS_UNIT="${PRISM_HEADLESS_UNIT:-prism-headless-session.service}"
 PRISM_STEAM_RESTORE_UNIT="${PRISM_STEAM_RESTORE_UNIT:-prism-steam-restore.service}"
 PRISM_PROC_ROOT="${PRISM_PROC_ROOT:-/proc}"
@@ -293,25 +297,6 @@ prism_atomic_write() {
   mv -f "$temporary" "$target"
 }
 
-prism_unload_module() {
-  local module="${1:-}"
-  case "$module" in
-    '' | *[!0-9]*) return 0 ;;
-  esac
-  pactl unload-module "$module" >/dev/null 2>&1 || true
-}
-
-prism_unload_named_sink_modules() {
-  local sink="${1:?sink required}"
-  local module
-
-  pactl list short modules 2>/dev/null |
-    awk -v name="sink_name=$sink" 'index($0, name) {print $1}' |
-    while read -r module; do
-      prism_unload_module "$module"
-    done
-}
-
 prism_restore_default_sink() {
   local sink="${1:-}"
 
@@ -383,7 +368,7 @@ prism_legacy_headless_pids() {
 prism_cleanup_legacy_headless() {
   local runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
   local state="$runtime/prism-headless.state"
-  local version pid
+  local version pid remaining=0
   local -a legacy_pids=()
 
   version="$(prism_state_get "$state" version 2>/dev/null || true)"
@@ -410,5 +395,17 @@ prism_cleanup_legacy_headless() {
   for pid in "${legacy_pids[@]}"; do
     kill -KILL "$pid" >/dev/null 2>&1 || true
   done
+  for _ in $(seq 1 20); do
+    remaining=0
+    for pid in "${legacy_pids[@]}"; do
+      kill -0 "$pid" >/dev/null 2>&1 && remaining=1
+    done
+    [ "$remaining" = "0" ] && break
+    sleep 0.1
+  done
+  if [ "$remaining" != "0" ]; then
+    echo "ERROR: a Prism-owned legacy process remains active" >&2
+    return 1
+  fi
   rm -f "$state" "$runtime/prism-headless-audio.state"
 }
