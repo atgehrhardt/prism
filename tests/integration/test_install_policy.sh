@@ -9,6 +9,7 @@ NATIVE_SERVICE="$SOURCE_DIR/contrib/virtual-session/prism.service"
 SERVICE_TEMPLATE="$SOURCE_DIR/packaging/linux/app-dev.lizardbyte.app.Prism.service.in"
 APP_RUN="$SOURCE_DIR/packaging/linux/AppImage/AppRun"
 LINUX_CMAKE="$SOURCE_DIR/cmake/packaging/linux.cmake"
+LINUX_BUILD="$SOURCE_DIR/scripts/linux_build.sh"
 MAIN_CPP="$SOURCE_DIR/src/main.cpp"
 
 DNF_TRANSACTION="$(
@@ -52,6 +53,12 @@ grep -Fq 'virtual-keyboard-unstable-v1' \
   "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
 grep -Fq 'PkgConfig::XKBCOMMON' \
   "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
+ARCH_BUILD_DEPS="$(sed -n '/^function add_arch_deps()/,/^}/p' "$LINUX_BUILD")"
+DEBIAN_BUILD_DEPS="$(sed -n '/^function add_debian_based_deps()/,/^}/p' "$LINUX_BUILD")"
+FEDORA_BUILD_DEPS="$(sed -n '/^function add_fedora_deps()/,/^}/p' "$LINUX_BUILD")"
+grep -Fq "'libxkbcommon'" <<< "$ARCH_BUILD_DEPS"
+grep -Fq '"libxkbcommon-dev"' <<< "$DEBIAN_BUILD_DEPS"
+grep -Fq '"libxkbcommon-devel"' <<< "$FEDORA_BUILD_DEPS"
 grep -Fq 'systemctl --user restart prism.service' "$INSTALLER"
 grep -Fq 'disable --now prism-input-bridge.service prism-labwc.service' "$INSTALLER"
 if grep -Eq 'prism-labwc-link-socket.sh.*install -D|enable .*prism-(labwc|input-bridge)' "$INSTALLER"; then
