@@ -167,7 +167,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>headless</td>
-        <td>Headless gamescope session</td>
+        <td>Private headless labwc session</td>
     </tr>
     <tr>
         <td>portal:&lt;output&gt;</td>

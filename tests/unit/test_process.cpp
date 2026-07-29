@@ -488,66 +488,125 @@ protected:
     state << content;
   }
 
+  /**
+   * @brief Return a complete valid version-four state.
+   *
+   * @param session_id Session identifier written into ownership fields.
+   * @return Serialized state content.
+   */
+  static std::string validState(const std::string &session_id = "42") {
+    return "version=4\n"
+           "session_id=" +
+           session_id +
+           "\n"
+           "backend=systemd\n"
+           "unit=prism-headless-session.service\n"
+           "input_unit=prism-input-bridge.service\n"
+           "steam_unit=prism-headless-steam.service\n"
+           "app_unit=prism-headless-app-" +
+           session_id +
+           ".scope\n"
+           "steam=1\n"
+           "wayland_display=wayland-0\n"
+           "output_name=HEADLESS-1\n"
+           "x_display=:9\n"
+           "width=2560\n"
+           "height=1440\n"
+           "framerate=120\n"
+           "physical_sink=speakers\n"
+           "capture_sink_module=\n"
+           "session_sink_module=123\n"
+           "loop_module=456\n";
+  }
+
   fs::path state_path;  ///< Temporary state file used by the test.
 };
 
 TEST_F(HeadlessStateTest, AcceptsCompleteMatchingState) {
-  writeState(
-    "version=2\n"
-    "session_id=42\n"
-    "backend=systemd\n"
-    "unit=prism-headless-session.service\n"
-    "app_unit=prism-headless-app-42.scope\n"
-    "steam=1\n"
-    "wayland_display=gamescope-7\n"
-    "x_display=:9\n"
-    "physical_sink=speakers\n"
-    "capture_sink_module=\n"
-    "session_sink_module=123\n"
-    "loop_module=456\n"
-  );
+  writeState(validState());
 
   const auto state = proc::prism_read_headless_state(state_path, "42");
   ASSERT_TRUE(state.has_value());
-  EXPECT_EQ(state->version, 2);
+  EXPECT_EQ(state->version, 4);
   EXPECT_EQ(state->session_id, "42");
   EXPECT_TRUE(state->steam);
-  EXPECT_EQ(state->wayland_display, "gamescope-7");
+  EXPECT_EQ(state->steam_unit, "prism-headless-steam.service");
+  EXPECT_EQ(state->wayland_display, "wayland-0");
+  EXPECT_EQ(state->output_name, "HEADLESS-1");
   EXPECT_EQ(state->x_display, ":9");
+  EXPECT_EQ(state->width, 2560);
   EXPECT_EQ(state->session_sink_module, "123");
 }
 
 TEST_F(HeadlessStateTest, RejectsAnotherLaunchSession) {
-  writeState(
-    "version=2\nsession_id=41\nbackend=systemd\n"
-    "unit=prism-headless-session.service\napp_unit=prism-headless-app-41.scope\nsteam=0\n"
-    "wayland_display=gamescope-0\nx_display=:2\nphysical_sink=\n"
-    "capture_sink_module=\nsession_sink_module=123\nloop_module=456\n"
-  );
+  writeState(validState("41"));
   EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
 }
 
 TEST_F(HeadlessStateTest, RejectsLegacyOrIncompleteState) {
-  writeState("steam=1\nwayland_display=gamescope-0\nx_display=:2\n");
+  writeState("version=3\nsteam=1\nwayland_display=gamescope-0\nx_display=:2\n");
   EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
 }
 
 TEST_F(HeadlessStateTest, RejectsGuessedOrMalformedDisplays) {
-  writeState(
-    "version=2\nsession_id=42\nbackend=systemd\n"
-    "unit=prism-headless-session.service\napp_unit=prism-headless-app-42.scope\nsteam=0\n"
-    "wayland_display=wayland-prism\nx_display=desktop\nphysical_sink=\n"
-    "capture_sink_module=\nsession_sink_module=123\nloop_module=456\n"
-  );
+  auto malformed = validState();
+  malformed.replace(malformed.find("wayland-0"), std::string("wayland-0").size(), "wayland-prism");
+  malformed.replace(malformed.find(":9"), 2, "desktop");
+  writeState(malformed);
   EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
 }
 
 TEST_F(HeadlessStateTest, RejectsDuplicateKeys) {
-  writeState(
-    "version=2\nsession_id=42\nsession_id=43\nbackend=systemd\n"
-    "unit=prism-headless-session.service\napp_unit=prism-headless-app-42.scope\nsteam=0\n"
-    "wayland_display=gamescope-0\nx_display=:2\nphysical_sink=\n"
-    "capture_sink_module=\nsession_sink_module=123\nloop_module=456\n"
-  );
+  writeState(validState() + "session_id=43\n");
   EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+}
+
+TEST_F(HeadlessStateTest, RejectsUnknownOrOutOfRangeFields) {
+  auto oversized = validState();
+  oversized.replace(oversized.find("width=2560"), std::string("width=2560").size(), "width=16385");
+  writeState(oversized);
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+
+  writeState(validState() + "unknown=value\n");
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+
+  auto oversized_display = validState();
+  oversized_display.replace(oversized_display.find("x_display=:9"), std::string("x_display=:9").size(), "x_display=:128");
+  writeState(oversized_display);
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+}
+
+TEST_F(HeadlessStateTest, RejectsWrongOwnedUnitsAndOutput) {
+  auto wrong_unit = validState();
+  wrong_unit.replace(
+    wrong_unit.find("steam_unit=prism-headless-steam.service"),
+    std::string("steam_unit=prism-headless-steam.service").size(),
+    "steam_unit=steam.service"
+  );
+  writeState(wrong_unit);
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+
+  auto wrong_output = validState();
+  wrong_output.replace(
+    wrong_output.find("output_name=HEADLESS-1"),
+    std::string("output_name=HEADLESS-1").size(),
+    "output_name=HEADLESS-2"
+  );
+  writeState(wrong_output);
+  EXPECT_FALSE(proc::prism_read_headless_state(state_path, "42").has_value());
+}
+
+TEST(WlrootsCaptureOverrideTest, AcceptsExactContract) {
+  const auto session = proc::prism_parse_wlroots_capture_override("wlroots:session-42");
+  ASSERT_TRUE(session.has_value());
+  EXPECT_EQ(*session, "session-42");
+}
+
+TEST(WlrootsCaptureOverrideTest, RejectsMalformedOrDifferentContracts) {
+  EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("").has_value());
+  EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("portal:HEADLESS-1").has_value());
+  EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("wlroots:").has_value());
+  EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("wlroots:bad/session").has_value());
+  EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("wlroots:session\nextra").has_value());
+  EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("wlroots:" + std::string(129, 'a')).has_value());
 }

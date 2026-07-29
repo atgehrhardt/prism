@@ -21,7 +21,7 @@ sudo dnf install -y \
   libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
   numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
   wayland-devel libxkbcommon-devel python3-jinja2 bubblewrap \
-  gamescope labwc wlr-randr kscreen krfb mangohud
+  kscreen krfb labwc wlr-randr xorg-x11-server-Xwayland
 
 # --- 2. Source --------------------------------------------------------------
 if [ -d "$SRC_DIR/.git" ]; then
@@ -80,6 +80,18 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
 
 # --- 5. Session stack ---------------------------------------------------------
 log "Installing Prism scripts and systemd user units"
+# Stop and remove obsolete persistent/nested units before installing the
+# transient single-compositor labwc stack.
+systemctl --user disable --now prism-input-bridge.service prism-labwc.service \
+  >/dev/null 2>&1 || true
+rm -f "$HOME/.config/systemd/user/prism-labwc.service" \
+  "$HOME/.local/bin/prism-labwc-link-socket.sh" \
+  "$HOME/.local/bin/prism-gamescope-query" \
+  "$HOME/.config/systemd/user/default.target.wants/prism-labwc.service" \
+  "$HOME/.config/systemd/user/default.target.wants/prism-input-bridge.service"
+rm -rf "$HOME/.config/systemd/user/prism-labwc.service.wants"
+
+install -Dm755 "$SRC_DIR/cmake-build-prism/prism-input-bridge" "$HOME/.local/bin/prism-input-bridge"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-start.sh"   "$HOME/.local/bin/prism-steamos-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-stop.sh"    "$HOME/.local/bin/prism-steamos-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-audio-common.sh"    "$HOME/.local/bin/prism-audio-common.sh"
@@ -89,28 +101,28 @@ install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-start.sh"  "$HOM
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-stop.sh"   "$HOME/.local/bin/prism-headless-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-session.sh" "$HOME/.local/bin/prism-headless-session.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-steam.sh"  "$HOME/.local/bin/prism-headless-steam.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-steam-session.sh" "$HOME/.local/bin/prism-headless-steam-session.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-audio.sh"  "$HOME/.local/bin/prism-headless-audio.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steam-game.sh"      "$HOME/.local/bin/prism-steam-game.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steam-restore.sh"   "$HOME/.local/bin/prism-steam-restore.sh"
+install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-common.sh"  "$HOME/.local/bin/prism-virtual-common.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-start.sh"   "$HOME/.local/bin/prism-virtual-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-stop.sh"    "$HOME/.local/bin/prism-virtual-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-audio.sh"   "$HOME/.local/bin/prism-virtual-audio.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-mirror-audio.sh"    "$HOME/.local/bin/prism-mirror-audio.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-session-cleanup.sh" "$HOME/.local/bin/prism-session-cleanup.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-desktop-session.sh" "$HOME/.local/bin/prism-desktop-session.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-labwc-link-socket.sh" "$HOME/.local/bin/prism-labwc-link-socket.sh"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-labwc.service" \
-  "$HOME/.config/systemd/user/prism-labwc.service"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-headless-session.service" \
   "$HOME/.config/systemd/user/prism-headless-session.service"
+install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-input-bridge.service" \
+  "$HOME/.config/systemd/user/prism-input-bridge.service"
+install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-headless-steam.service" \
+  "$HOME/.config/systemd/user/prism-headless-steam.service"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-steam-restore.service" \
   "$HOME/.config/systemd/user/prism-steam-restore.service"
 install -Dm644 "$SRC_DIR/contrib/virtual-session/prism.service" \
   "$HOME/.config/systemd/user/prism.service"
 
-# Build and install the uinput -> labwc virtual-input bridge (also installs
-# prism-input-bridge.service and runs systemctl --user daemon-reload).
-"$SRC_DIR/contrib/virtual-session/build-input-bridge.sh"
 "$SRC_DIR/contrib/virtual-session/build-kwin-mode.sh"
 
 # --- 6. apps.json (idempotent merge, with backup) ------------------------------
@@ -164,10 +176,8 @@ systemctl --user daemon-reload
 sudo install -Dm644 "$SRC_DIR/contrib/virtual-session/61-prism-input.rules" \
   /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
 
-systemctl --user enable prism-labwc.service prism-input-bridge.service prism.service
-systemctl --user start prism-labwc.service
-systemctl --user start prism-input-bridge.service
-systemctl --user start prism.service
+systemctl --user enable prism.service
+systemctl --user restart prism.service
 
 log "Done. Open https://$(hostname -I | awk '{print $1}'):47990 to pair Moonlight."
 log "Apps available: Desktop (Mirror), Desktop (Virtual), Desktop Headless, Steam Headless."

@@ -35,21 +35,14 @@ if [ "$ACTION" = "stop" ]; then
   prism_unload_prism_capture_loopbacks || exit 1
   rm -f "$STATE"
   # A user-configured prism_default_sink wins over the recorded physical sink.
-  RESTORE="$(sed -n 's/^prism_default_sink *= *//p' "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
-  RESTORE="${RESTORE:-$PHYSICAL}"
+  PREFERRED_RESTORE="$(sed -n 's/^prism_default_sink *= *//p' \
+    "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
+  RESTORE="$(prism_audio_choose_restore_sink \
+    "$PREFERRED_RESTORE" "$PHYSICAL" 2>/dev/null || true)"
   if [ -n "$RESTORE" ]; then
-    # PipeWire/WirePlumber can move the default while the loopback is being
-    # torn down, so retry and verify instead of firing once.
-    echo "restoring default sink: $RESTORE"
-    for _ in $(seq 1 20); do
-      if pactl list short sinks 2>/dev/null | grep -q "[[:space:]]${RESTORE}[[:space:]]"; then
-        pactl set-default-sink "$RESTORE" 2>/dev/null || true
-        [ "$(pactl get-default-sink 2>/dev/null || true)" = "$RESTORE" ] && break
-      fi
-      sleep 0.5
-    done
-    echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
+    prism_restore_default_sink "$RESTORE" || true
   fi
+  echo "default sink now: $(pactl get-default-sink 2>/dev/null || true)"
   exit 0
 fi
 

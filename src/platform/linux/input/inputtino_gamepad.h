@@ -49,6 +49,18 @@ namespace platf::gamepad {
   );
 
   /**
+   * @brief Return the udev-compatible name for a virtual DualSense device.
+   *
+   * All DualSense variants retain the `Prism PS5 (virtual) pad` prefix so
+   * existing installed udev rules grant Steam access to their input and
+   * hidraw nodes.
+   *
+   * @param edge Whether the device represents a DualSense Edge.
+   * @return Base device name passed to inputtino.
+   */
+  std::string_view dualsense_device_name(bool edge);
+
+  /**
    * @brief Allocate and initialize platform input state for a stream.
    *
    * @param raw Platform-specific input backend state.

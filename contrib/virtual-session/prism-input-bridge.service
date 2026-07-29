@@ -1,12 +1,13 @@
 [Unit]
-Description=Prism virtual input bridge (uinput -> headless labwc)
-After=prism-labwc.service
-PartOf=prism-labwc.service
+Description=Prism virtual input bridge for private labwc
+After=prism-headless-session.service
+BindsTo=prism-headless-session.service
+PartOf=prism-headless-session.service
 
 [Service]
+Type=simple
+EnvironmentFile=%t/prism-headless-input.env
 ExecStart=%h/.local/bin/prism-input-bridge
 Restart=on-failure
-RestartSec=2
-
-[Install]
-WantedBy=prism-labwc.service
+RestartSec=1
+TimeoutStopSec=10

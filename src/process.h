@@ -13,7 +13,10 @@
 #endif
 
 // standard includes
+#include <cstdint>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 
 // lib includes
@@ -100,15 +103,32 @@ namespace proc {
     std::string session_id;  ///< Launch-session identifier that owns the state.
     std::string backend;  ///< Session ownership backend, currently `systemd`.
     std::string unit;  ///< Backend unit that owns all headless processes.
+    std::string input_unit;  ///< Unit that owns the labwc virtual-input bridge.
+    std::string steam_unit;  ///< Unit that owns Steam and Steam-launched games.
     std::string app_unit;  ///< Scope that owns the post-start application command.
     bool steam;  ///< Whether the owned session runs Steam.
-    std::string wayland_display;  ///< Owned gamescope Wayland socket name.
-    std::string x_display;  ///< Owned gamescope Xwayland display.
+    std::string wayland_display;  ///< Owned labwc Wayland socket name.
+    std::string output_name;  ///< Owned wlroots output selected for capture.
+    std::string x_display;  ///< Owned labwc Xwayland display.
+    int width;  ///< Headless output width.
+    int height;  ///< Headless output height.
+    int framerate;  ///< Headless output refresh rate.
     std::string physical_sink;  ///< Desktop sink recorded before session startup.
     std::string capture_sink_module;  ///< Capture sink module created by startup, if any.
     std::string session_sink_module;  ///< Headless sink module created by startup.
     std::string loop_module;  ///< Headless-to-capture loopback module.
   };
+
+  /**
+   * @brief Parse a strict private-labwc capture override.
+   *
+   * @param capture_override Complete one-line capture override.
+   * @return The validated session identifier, or `std::nullopt` when the
+   *         override is not an exact `wlroots:<session-id>` contract.
+   */
+  std::optional<std::string> prism_parse_wlroots_capture_override(
+    std::string_view capture_override
+  );
 
   /**
    * @brief Read and validate an atomically published headless state file.

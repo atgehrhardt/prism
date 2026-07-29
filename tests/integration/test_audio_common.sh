@@ -8,6 +8,8 @@ trap 'rm -rf "$TEST_ROOT"' EXIT
 export PATH="$TEST_ROOT/bin:$PATH"
 export PRISM_TEST_MODULES="$TEST_ROOT/modules"
 export PRISM_TEST_UNLOADS="$TEST_ROOT/unloads"
+export PRISM_TEST_SINKS="$TEST_ROOT/sinks"
+export PRISM_TEST_DEFAULT_SINK="$TEST_ROOT/default-sink"
 mkdir -p "$TEST_ROOT/bin"
 
 cat > "$TEST_ROOT/bin/pactl" <<'EOF'
@@ -16,6 +18,18 @@ set -euo pipefail
 case "${1:-} ${2:-} ${3:-}" in
   "list short modules")
     cat "$PRISM_TEST_MODULES"
+    ;;
+  "list short sinks")
+    cat "$PRISM_TEST_SINKS"
+    ;;
+  "get-default-sink  ")
+    cat "$PRISM_TEST_DEFAULT_SINK"
+    ;;
+  set-default-sink\ *)
+    sink="${2:?sink required}"
+    awk -v wanted="$sink" '$2 == wanted {found=1} END {exit !found}' \
+      "$PRISM_TEST_SINKS"
+    printf '%s\n' "$sink" > "$PRISM_TEST_DEFAULT_SINK"
     ;;
   "unload-module "*)
     module="${2:?module required}"
@@ -49,9 +63,26 @@ cat > "$PRISM_TEST_MODULES" <<'EOF'
 21	module-loopback	source=prism-virtual.monitor sink=prism-stream
 EOF
 : > "$PRISM_TEST_UNLOADS"
+printf '%s\n' \
+  $'30\tspeakers\tPipeWire' \
+  $'31\theadphones\tPipeWire' \
+  $'32\tprism-stream\tPipeWire' \
+  > "$PRISM_TEST_SINKS"
+printf '%s\n' headphones > "$PRISM_TEST_DEFAULT_SINK"
 
 # shellcheck source=/dev/null
 . "$SOURCE_DIR/contrib/virtual-session/prism-audio-common.sh"
+
+prism_audio_sink_available speakers
+if prism_audio_sink_available missing; then
+  echo "missing audio sink was accepted" >&2
+  exit 1
+fi
+[ "$(prism_audio_choose_restore_sink missing speakers)" = "speakers" ]
+[ "$(prism_audio_choose_restore_sink headphones speakers)" = "headphones" ]
+[ "$(prism_audio_choose_restore_sink missing missing)" = "headphones" ]
+prism_restore_default_sink speakers
+[ "$(cat "$PRISM_TEST_DEFAULT_SINK")" = "speakers" ]
 
 prism_unload_loopback_modules prism-headless.monitor prism-stream
 [ "$(tr '\n' ' ' < "$PRISM_TEST_UNLOADS")" = "10 11 " ]

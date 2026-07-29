@@ -154,10 +154,24 @@ const auto SESSION_CLEANUP_TEST = std::format(
   PRISM_SOURCE_DIR,
   PRISM_SOURCE_DIR
 );
+const auto VIRTUAL_SESSION_TEST = std::format(
+  "bash {}/tests/integration/test_virtual_session.sh {}",
+  PRISM_SOURCE_DIR,
+  PRISM_SOURCE_DIR
+);
 const auto INSTALL_POLICY_TEST = std::format(
   "bash {}/tests/integration/test_install_policy.sh {}",
   PRISM_SOURCE_DIR,
   PRISM_SOURCE_DIR
+);
+/**
+ * @brief Controlled private-labwc virtual-input integration command.
+ */
+const auto INPUT_BRIDGE_TEST = std::format(
+  "bash {}/tests/integration/test_input_bridge.sh {} {}",
+  PRISM_SOURCE_DIR,
+  PRISM_SOURCE_DIR,
+  PRISM_TEST_BIN_DIR "/.."
 );
 
 #ifdef UDEVADM_EXECUTABLE
@@ -204,10 +218,22 @@ INSTANTIATE_TEST_SUITE_P(
       "Crash recovery reconciliation tests"
     },
     ExternalCommandTestData {
+      VIRTUAL_SESSION_TEST,
+      "linux",
+      true,
+      "Virtual display lifecycle tests"
+    },
+    ExternalCommandTestData {
       INSTALL_POLICY_TEST,
       "linux",
       true,
       "Installer and recovery payload policy tests"
+    },
+    ExternalCommandTestData {
+      INPUT_BRIDGE_TEST,
+      "linux",
+      true,
+      "Private-labwc virtual-input bridge tests"
     },
     // Cross-platform failing test
     ExternalCommandTestData {

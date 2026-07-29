@@ -94,3 +94,11 @@ TEST(InputtinoGamepadSelection, DefaultsToXboxWithoutSelectionSignals) {
     platf::gamepad::XboxOneWired
   );
 }
+
+TEST(InputtinoGamepadSelection, DualSenseNamesRetainUdevCompatiblePrefix) {
+  constexpr auto udev_prefix = "Prism PS5 (virtual) pad"sv;
+
+  EXPECT_EQ(platf::gamepad::dualsense_device_name(false), udev_prefix);
+  EXPECT_EQ(platf::gamepad::dualsense_device_name(true), "Prism PS5 (virtual) pad (DualSense Edge)"sv);
+  EXPECT_TRUE(platf::gamepad::dualsense_device_name(true).starts_with(udev_prefix));
+}

@@ -88,6 +88,7 @@ done
 while [ -f "$OVERRIDE_FILE" ] && prism_unit_live "$PRISM_HEADLESS_UNIT"; do
   CONTROL_GROUP="$(prism_unit_control_group "$PRISM_HEADLESS_UNIT")"
   APP_CONTROL_GROUP="$(prism_unit_control_group "${PRISM_HEADLESS_APP_UNIT:-missing.scope}")"
+  STEAM_CONTROL_GROUP="$(prism_unit_control_group "${PRISM_HEADLESS_STEAM_UNIT:-missing.service}")"
   [ -n "$CONTROL_GROUP" ] || break
 
   if [ -n "$PHYSICAL" ]; then
@@ -128,11 +129,9 @@ while [ -f "$OVERRIDE_FILE" ] && prism_unit_live "$PRISM_HEADLESS_UNIT"; do
     /prism.session.id = / { gsub(/"/, "", $3); session = $3 }
     END { emit() }
   ' | while read -r input_id pid current_sink stream_session; do
-    [ -d "/proc/$pid" ] || continue
-    if prism_pid_in_control_group "$pid" "$CONTROL_GROUP" ||
-      { [ -n "$APP_CONTROL_GROUP" ] &&
-        prism_pid_in_control_group "$pid" "$APP_CONTROL_GROUP"; } ||
-      [ "$stream_session" = "${PRISM_SESSION_ID:-}" ]; then
+    if prism_audio_stream_owned \
+      "${PRISM_SESSION_ID:-}" "$stream_session" "$pid" \
+      "$CONTROL_GROUP" "$APP_CONTROL_GROUP" "$STEAM_CONTROL_GROUP"; then
       if [ "$current_sink" != "$SESSION_SINK" ]; then
         pactl move-sink-input "$input_id" "$SESSION_SINK" >/dev/null 2>&1 || true
       fi

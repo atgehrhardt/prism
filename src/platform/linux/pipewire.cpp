@@ -17,6 +17,7 @@
 // local includes
 #include "cuda.h"
 #include "graphics.h"
+#include "pipewire_utils.h"
 #include "src/main.h"
 #include "src/platform/common.h"
 #include "src/video.h"
@@ -74,6 +75,17 @@ namespace pipewire {
   }};
 
   /**
+   * @brief PipeWire metadata copied before a mapped producer buffer is returned.
+   */
+  struct frame_metadata_t {
+    std::chrono::steady_clock::time_point frame_timestamp {};  ///< Time at which PipeWire delivered the frame.
+    std::optional<std::uint64_t> pts;  ///< PipeWire presentation timestamp.
+    std::optional<std::uint64_t> seq;  ///< PipeWire sequence number.
+    std::optional<bool> damage;  ///< Whether PipeWire reported nonempty damage.
+    std::optional<std::uint32_t> flags;  ///< PipeWire chunk flags.
+  };
+
+  /**
    * @brief PipeWire capture state shared with callback threads.
    */
   struct shared_state_t {
@@ -81,9 +93,10 @@ namespace pipewire {
     std::atomic<int> negotiated_height {0};  ///< Height negotiated with PipeWire for the stream.
     std::atomic<int> color_primaries {0};  ///< PipeWire color-primaries metadata for the stream.
     std::atomic<int> transfer_function {0};  ///< PipeWire transfer-function metadata for the stream.
+    std::atomic<bool> using_dmabuf {false};  ///< Whether the negotiated stream supplies DMA-BUF frames.
     std::atomic<bool> stream_dead {false};  ///< Whether the PipeWire stream has been destroyed.
-    pw_stream_state previous_state;  ///< Previous PipeWire stream state reported by callbacks.
-    pw_stream_state current_state;  ///< Current PipeWire stream state reported by callbacks.
+    pw_stream_state previous_state {PW_STREAM_STATE_UNCONNECTED};  ///< Previous PipeWire stream state reported by callbacks.
+    pw_stream_state current_state {PW_STREAM_STATE_UNCONNECTED};  ///< Current PipeWire stream state reported by callbacks.
     std::string err_msg;  ///< Last PipeWire error message reported by the stream.
   };
 
@@ -91,16 +104,19 @@ namespace pipewire {
    * @brief PipeWire stream handle, format, and shared state pointer.
    */
   struct stream_data_t {
-    struct pw_stream *stream;  ///< PipeWire stream handle used for screencast frames.
-    struct spa_hook stream_listener;  ///< Hook registering callbacks on the PipeWire stream.
-    struct spa_video_info format;  ///< Negotiated PipeWire video format.
-    struct pw_buffer *current_buffer;  ///< PipeWire buffer currently exposed to the capture thread.
-    uint64_t drm_format;  ///< DRM format.
+    struct pw_stream *stream = nullptr;  ///< PipeWire stream handle used for screencast frames.
+    struct spa_hook stream_listener {};  ///< Hook registering callbacks on the PipeWire stream.
+    struct spa_video_info format {};  ///< Negotiated PipeWire video format.
+    struct pw_buffer *current_buffer = nullptr;  ///< PipeWire buffer currently exposed to the capture thread.
+    uint64_t drm_format = 0;  ///< DRM format.
     std::shared_ptr<shared_state_t> shared;  ///< State shared between PipeWire callbacks and the capture backend.
     std::mutex frame_mutex;  ///< Synchronizes access to the current PipeWire frame.
     std::condition_variable frame_cv;  ///< Signals arrival or release of a PipeWire frame.
-    size_t local_stride = 0;  ///< Local stride.
+    std::int32_t local_stride = 0;  ///< Signed byte stride reported for the current mapped frame.
     bool frame_ready = false;  ///< Whether a PipeWire frame is ready to consume.
+    bool mapped_frame_ready = false;  ///< Whether the staging storage contains a mapped frame.
+    bool logged_mapped_layout = false;  ///< Whether the mapped-buffer geometry has been logged for this stream.
+    frame_metadata_t mapped_metadata;  ///< Metadata detached from the returned mapped producer buffer.
     // Two distinct memory pools
     std::vector<uint8_t> buffer_a;  ///< First staging buffer used for CPU-copy PipeWire frames.
     std::vector<uint8_t> buffer_b;  ///< Second staging buffer used for CPU-copy PipeWire frames.
@@ -127,12 +143,19 @@ namespace pipewire {
    * @brief Pipewire image assembled for encoding.
    */
   struct img_descriptor_t: public egl::img_descriptor_t {
-    ~img_descriptor_t() override {
-      if (data) {
-        delete[] data;
-        data = nullptr;
-      }
+    /**
+     * @brief Reset borrowed frame pointers and owned DMA-BUF descriptors.
+     */
+    void reset_frame() {
+      egl::img_descriptor_t::reset();
+      data = nullptr;
+      pts.reset();
+      seq.reset();
+      pw_damage.reset();
+      pw_flags.reset();
     }
+
+    std::vector<std::uint8_t> pixels;  ///< Stable copy of the current mapped PipeWire frame.
   };
 
   /**
@@ -142,12 +165,23 @@ namespace pipewire {
   public:
     pipewire_t():
         loop(pw_thread_loop_new("Pipewire thread", nullptr)) {
+      if (loop == nullptr) {
+        BOOST_LOG(error) << "[pipewire] Failed to create PipeWire thread loop"sv;
+        return;
+      }
       BOOST_LOG(debug) << "[pipewire] Start PW thread loop"sv;
-      pw_thread_loop_start(loop);
+      if (pw_thread_loop_start(loop) < 0) {
+        BOOST_LOG(error) << "[pipewire] Failed to start PipeWire thread loop"sv;
+        pw_thread_loop_destroy(loop);
+        loop = nullptr;
+      }
     }
 
     ~pipewire_t() {
       BOOST_LOG(debug) << "[pipewire] Destroying pipewire_t"sv;
+      if (loop == nullptr) {
+        return;
+      }
       pw_thread_loop_lock(loop);
 
       // Lock the frame mutex to stop fill_img
@@ -237,6 +271,9 @@ namespace pipewire {
      * @return 0 on success; nonzero or negative platform status on failure.
      */
     int init(const int stream_fd, const uint32_t stream_node, const uint64_t stream_object_serial, std::shared_ptr<shared_state_t> shared_state) {
+      if (loop == nullptr) {
+        return -1;
+      }
       fd = stream_fd;
       node = stream_node;
       object_serial = stream_object_serial;
@@ -256,10 +293,12 @@ namespace pipewire {
           pw_core_add_listener(core, &core_listener, &core_events, nullptr);
         } else {
           BOOST_LOG(debug) << "[pipewire] Failed to connect to PW core. Error: "sv << errno << "(" << strerror(errno) << ")"sv;
+          pw_thread_loop_unlock(loop);
           return -1;
         }
       } else {
         BOOST_LOG(debug) << "[pipewire] Failed to setup PW context. Error: "sv << errno << "(" << strerror(errno) << ")"sv;
+        pw_thread_loop_unlock(loop);
         return -1;
       }
 
@@ -277,9 +316,22 @@ namespace pipewire {
      * @param dmabuf_infos Dmabuf infos.
      * @param n_dmabuf_infos N dmabuf infos.
      * @param display_is_nvidia Display is nvidia.
+     * @param allow_dmabuf Whether the selected capture source permits DMA-BUF negotiation.
      * @return 0 when the PipeWire stream is configured; nonzero on negotiation failure.
      */
-    int ensure_stream(const platf::mem_type_e mem_type, const uint32_t width, const uint32_t height, const uint32_t refresh_rate, const struct dmabuf_format_info_t *dmabuf_infos, const int n_dmabuf_infos, const bool display_is_nvidia) {
+    int ensure_stream(
+      const platf::mem_type_e mem_type,
+      const uint32_t width,
+      const uint32_t height,
+      const uint32_t refresh_rate,
+      const struct dmabuf_format_info_t *dmabuf_infos,
+      const int n_dmabuf_infos,
+      const bool display_is_nvidia,
+      const bool allow_dmabuf
+    ) {
+      if (loop == nullptr) {
+        return -1;
+      }
       pw_thread_loop_lock(loop);
       int result = 0;
       if (!stream_data.stream) {
@@ -293,6 +345,11 @@ namespace pipewire {
 
         BOOST_LOG(debug) << "[pipewire] Create PW stream"sv;
         stream_data.stream = pw_stream_new(core, "Prism Video Capture", props);
+        if (stream_data.stream == nullptr) {
+          BOOST_LOG(error) << "[pipewire] Failed to create PipeWire stream"sv;
+          pw_thread_loop_unlock(loop);
+          return -1;
+        }
         pw_stream_add_listener(stream_data.stream, &stream_data.stream_listener, &stream_events, &stream_data);
 
         std::array<uint8_t, SPA_POD_BUFFER_SIZE> buffer;
@@ -305,9 +362,10 @@ namespace pipewire {
         // Use DMA-BUF for VAAPI, or for CUDA when the display GPU is NVIDIA (pure NVIDIA system).
         // On hybrid GPU systems (Intel+NVIDIA), DMA-BUFs come from the Intel GPU and cannot
         // be imported into CUDA, so we fall back to memory buffers in that case.
-        bool use_dmabuf = n_dmabuf_infos > 0 && (mem_type == platf::mem_type_e::vaapi ||
-                                                 mem_type == platf::mem_type_e::vulkan ||
-                                                 (mem_type == platf::mem_type_e::cuda && display_is_nvidia));
+        bool use_dmabuf = allow_dmabuf && n_dmabuf_infos > 0 &&
+                          (mem_type == platf::mem_type_e::vaapi ||
+                           mem_type == platf::mem_type_e::vulkan ||
+                           (mem_type == platf::mem_type_e::cuda && display_is_nvidia));
         if (use_dmabuf) {
           for (int i = 0; i < n_dmabuf_infos; i++) {
             auto format_param = build_format_parameter(&pod_builder, width, height, refresh_rate, dmabuf_infos[i].format, dmabuf_infos[i].modifiers, dmabuf_infos[i].n_modifiers);
@@ -366,25 +424,41 @@ namespace pipewire {
      * @param img_descriptor Image descriptor receiving timestamps, sequence, and damage flags.
      * @param buf Raw byte buffer used for serialization.
      */
-    static void fill_img_metadata(egl::img_descriptor_t *img_descriptor, struct spa_buffer *buf) {
-      img_descriptor->frame_timestamp = std::chrono::steady_clock::now();
-
+    static frame_metadata_t read_frame_metadata(struct spa_buffer *buf) {
+      frame_metadata_t metadata {
+        .frame_timestamp = std::chrono::steady_clock::now(),
+      };
       struct spa_meta_header *h = static_cast<struct spa_meta_header *>(
         spa_buffer_find_meta_data(buf, SPA_META_Header, sizeof(*h))
       );
       if (h) {
-        img_descriptor->seq = h->seq;
-        img_descriptor->pts = h->pts;
+        metadata.seq = h->seq;
+        metadata.pts = h->pts;
       }
 
       if (buf->n_datas > 0) {
-        img_descriptor->pw_flags = buf->datas[0].chunk->flags;
+        metadata.flags = buf->datas[0].chunk->flags;
       }
 
       struct spa_meta_region *damage = static_cast<struct spa_meta_region *>(
         spa_buffer_find_meta_data(buf, SPA_META_VideoDamage, sizeof(*damage))
       );
-      img_descriptor->pw_damage = (damage && damage->region.size.width > 0 && damage->region.size.height > 0) ? std::optional<bool>(true) : std::nullopt;
+      metadata.damage = (damage && damage->region.size.width > 0 && damage->region.size.height > 0) ? std::optional<bool>(true) : std::nullopt;
+      return metadata;
+    }
+
+    /**
+     * @brief Apply detached PipeWire metadata to an image descriptor.
+     *
+     * @param img_descriptor Image descriptor receiving the metadata.
+     * @param metadata Metadata copied from the producer buffer.
+     */
+    static void apply_frame_metadata(egl::img_descriptor_t *img_descriptor, const frame_metadata_t &metadata) {
+      img_descriptor->frame_timestamp = metadata.frame_timestamp;
+      img_descriptor->pts = metadata.pts;
+      img_descriptor->seq = metadata.seq;
+      img_descriptor->pw_damage = metadata.damage;
+      img_descriptor->pw_flags = metadata.flags;
     }
 
     /**
@@ -411,13 +485,23 @@ namespace pipewire {
      *
      * @param img Image or frame object to read from or populate.
      */
-    void fill_img(platf::img_t *img) {
+    void fill_img(img_descriptor_t *img) {
       pw_thread_loop_lock(loop);
       std::scoped_lock lock(stream_data.frame_mutex);
 
       if (stream_data.shared && stream_data.shared->stream_dead.load()) {
         img->data = nullptr;
         close_img_fds(static_cast<egl::img_descriptor_t *>(img));
+        pw_thread_loop_unlock(loop);
+        return;
+      }
+
+      if (stream_data.mapped_frame_ready) {
+        apply_frame_metadata(img, stream_data.mapped_metadata);
+        copy_frame_storage(*stream_data.front_buffer, img->pixels);
+        img->data = img->pixels.data();
+        img->row_pitch = stream_data.local_stride;
+        stream_data.mapped_frame_ready = false;
         pw_thread_loop_unlock(loop);
         return;
       }
@@ -430,13 +514,9 @@ namespace pipewire {
 
       struct spa_buffer *buf = stream_data.current_buffer->buffer;
       if (buf->datas[0].chunk->size != 0) {
-        auto *img_descriptor = static_cast<egl::img_descriptor_t *>(img);
-        fill_img_metadata(img_descriptor, buf);
+        apply_frame_metadata(img, read_frame_metadata(buf));
         if (buf->datas[0].type == SPA_DATA_DmaBuf) {
-          fill_img_dmabuf(img_descriptor, buf, stream_data);
-        } else {
-          img->data = stream_data.front_buffer->data();
-          img->row_pitch = stream_data.local_stride;
+          fill_img_dmabuf(img, buf, stream_data);
         }
       }
 
@@ -453,14 +533,14 @@ namespace pipewire {
     }
 
   private:
-    struct pw_thread_loop *loop;
-    struct pw_context *context;
-    struct pw_core *core;
-    struct spa_hook core_listener;
+    struct pw_thread_loop *loop = nullptr;
+    struct pw_context *context = nullptr;
+    struct pw_core *core = nullptr;
+    struct spa_hook core_listener {};
     struct stream_data_t stream_data;
-    int fd;
-    uint32_t node;
-    uint64_t object_serial;
+    int fd = -1;
+    uint32_t node = PW_ID_ANY;
+    uint64_t object_serial = SPA_ID_INVALID;
     bool negotiate_maxframerate_ = true;
 
     struct spa_pod *build_format_parameter(struct spa_pod_builder *b, uint32_t width, uint32_t height, uint32_t refresh_rate, int32_t format, uint64_t *modifiers, int n_modifiers) {
@@ -539,6 +619,7 @@ namespace pipewire {
             {
               std::scoped_lock lock(d->frame_mutex);
               d->frame_ready = false;
+              d->mapped_frame_ready = false;
               d->current_buffer = nullptr;
               d->shared->stream_dead.store(true);
               d->shared->current_state = state;
@@ -586,33 +667,53 @@ namespace pipewire {
       // 2. Fast Path: DMA-BUF
       if (b->buffer->datas[0].type == SPA_DATA_DmaBuf) {
         std::scoped_lock lock(d->frame_mutex);
-        if (d->current_buffer) {
-          pw_stream_queue_buffer(d->stream, d->current_buffer);
-        }
-        d->current_buffer = b;
+        replace_pending_buffer(d->current_buffer, b, [d](struct pw_buffer *replaced) {
+          pw_stream_queue_buffer(d->stream, replaced);
+        });
         d->frame_ready = true;
       }
       // 3. Optimized Path: Software/MemPtr
       else if (b->buffer->datas[0].data != nullptr) {
-        size_t size = b->buffer->datas[0].chunk->size;
+        auto *data = static_cast<std::uint8_t *>(b->buffer->datas[0].data);
+        const auto max_size = static_cast<std::size_t>(b->buffer->datas[0].maxsize);
+        const auto stride = b->buffer->datas[0].chunk->stride;
+        const auto offset = max_size == 0 ? 0 :
+                                            static_cast<std::size_t>(b->buffer->datas[0].chunk->offset) % max_size;
+        const auto available_size = max_size == 0 ?
+                                      static_cast<std::size_t>(b->buffer->datas[0].chunk->size) :
+                                      max_size - offset;
+        const auto size = std::min<std::size_t>(
+          b->buffer->datas[0].chunk->size,
+          available_size
+        );
+        const auto metadata = read_frame_metadata(b->buffer);
+        if (!d->logged_mapped_layout) {
+          BOOST_LOG(info) << "[pipewire] Mapped frame layout: size="sv << size
+                          << " maxsize="sv << max_size
+                          << " offset="sv << offset
+                          << " stride="sv << stride
+                          << " dimensions="sv << d->format.info.raw.size.width << 'x'
+                          << d->format.info.raw.size.height;
+          d->logged_mapped_layout = true;
+        }
 
         // Perform the copy to the BACK buffer while NOT holding the lock
-        if (d->back_buffer->size() < size) {
-          d->back_buffer->resize(size);
-        }
-        std::memcpy(d->back_buffer->data(), b->buffer->datas[0].data, size);
+        d->back_buffer->resize(size);
+        std::memcpy(d->back_buffer->data(), data + offset, size);
 
         {
           // Lock only for the pointer swap and state update
           std::scoped_lock lock(d->frame_mutex);
           std::swap(d->front_buffer, d->back_buffer);
 
-          d->local_stride = b->buffer->datas[0].chunk->stride;
+          d->local_stride = stride;
           d->frame_ready = true;
-          d->current_buffer = b;
+          d->mapped_metadata = metadata;
+          d->mapped_frame_ready = true;
         }
 
-        // Release the PW buffer immediately after copy
+        // The mapped bytes and metadata are now Prism-owned, so return the
+        // producer buffer without waiting for conversion or encoding.
         pw_stream_queue_buffer(d->stream, b);
       }
 
@@ -623,6 +724,7 @@ namespace pipewire {
       const auto d = static_cast<struct stream_data_t *>(user_data);
 
       d->current_buffer = nullptr;
+      d->mapped_frame_ready = false;
 
       if (param == nullptr || id != SPA_PARAM_Format) {
         return;
@@ -679,10 +781,16 @@ namespace pipewire {
       uint32_t buffer_types = 0;
       if (spa_pod_find_prop(param, nullptr, SPA_FORMAT_VIDEO_modifier) != nullptr && d->drm_format) {
         BOOST_LOG(info) << "[pipewire] using DMA-BUF buffers"sv;
+        if (d->shared) {
+          d->shared->using_dmabuf.store(true);
+        }
         buffer_types |= 1 << SPA_DATA_DmaBuf;
       } else {
         BOOST_LOG(info) << "[pipewire] using memory buffers"sv;
-        buffer_types |= 1 << SPA_DATA_MemPtr;
+        if (d->shared) {
+          d->shared->using_dmabuf.store(false);
+        }
+        buffer_types |= (1 << SPA_DATA_MemFd) | (1 << SPA_DATA_MemPtr);
       }
 
       // Ack the buffer type and metadata
@@ -690,7 +798,7 @@ namespace pipewire {
       std::array<const struct spa_pod *, 3> params;
       int n_params = 0;
       struct spa_pod_builder pod_builder = SPA_POD_BUILDER_INIT(buffer.data(), buffer.size());
-      auto buffer_param = static_cast<const struct spa_pod *>(spa_pod_builder_add_object(&pod_builder, SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers, SPA_PARAM_BUFFERS_dataType, SPA_POD_Int(buffer_types)));
+      auto buffer_param = static_cast<const struct spa_pod *>(spa_pod_builder_add_object(&pod_builder, SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers, SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int(buffer_types)));
       params[n_params] = buffer_param;
       n_params++;
       auto meta_param = static_cast<const struct spa_pod *>(spa_pod_builder_add_object(&pod_builder, SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta, SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header), SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header))));
@@ -790,14 +898,31 @@ namespace pipewire {
     }
 
     /**
+     * @brief Decide whether a source may negotiate DMA-BUF frames.
+     *
+     * @param display_is_nvidia Whether EGL capability discovery selected the NVIDIA driver.
+     * @return True when the source and driver combination supports the DMA-BUF import path.
+     */
+    virtual bool allow_dmabuf_capture(bool display_is_nvidia [[maybe_unused]]) const {
+      return true;
+    }
+
+    /**
      * @brief Initialize the PipeWire display backend for a selected stream.
      *
      * @param hwdevice_type Hardware device type requested for capture or encode.
      * @param display_name Display name.
      * @param config Configuration values to apply.
+     * @param dmabuf_wayland_display Optional explicit Wayland socket used for
+     * DMA-BUF capability discovery.
      * @return 0 on success; nonzero or negative platform status on failure.
      */
-    int init(platf::mem_type_e hwdevice_type, const std::string &display_name, const ::video::config_t &config) {
+    int init(
+      platf::mem_type_e hwdevice_type,
+      const std::string &display_name,
+      const ::video::config_t &config,
+      const char *dmabuf_wayland_display = nullptr
+    ) {
       // calculate frame interval we should capture at
       framerate = config.framerate;
       delay = ::video::capture_frame_interval(config);
@@ -809,8 +934,12 @@ namespace pipewire {
       }
       mem_type = hwdevice_type;
 
-      if (get_dmabuf_modifiers() < 0) {
+      if (get_dmabuf_modifiers(dmabuf_wayland_display) < 0) {
         return -1;
+      }
+      allow_dmabuf = allow_dmabuf_capture(display_is_nvidia);
+      if (!allow_dmabuf && n_dmabuf_infos > 0) {
+        BOOST_LOG(info) << "[pipewire] DMA-BUF capture disabled for this source and driver; using mapped buffers"sv;
       }
 
       int pipewire_fd = -1;
@@ -836,6 +965,7 @@ namespace pipewire {
         shared_state->negotiated_height.store(0);
         shared_state->color_primaries.store(0);
         shared_state->transfer_function.store(0);
+        shared_state->using_dmabuf.store(false);
       }
 
       if (pipewire.init(pipewire_fd, pipewire_node, pipewire_object_serial, shared_state) < 0) {
@@ -844,7 +974,7 @@ namespace pipewire {
       }
 
       // Start PipeWire now so format negotiation can proceed before capture start
-      if (pipewire.ensure_stream(mem_type, width, height, framerate, dmabuf_infos.data(), n_dmabuf_infos, display_is_nvidia) < 0) {
+      if (pipewire.ensure_stream(mem_type, width, height, framerate, dmabuf_infos.data(), n_dmabuf_infos, display_is_nvidia, allow_dmabuf) < 0) {
         BOOST_LOG(error) << "[pipewire] Failed to ensure pipewire stream. pipewire_t::init() failed.";
         return -1;
       }
@@ -861,6 +991,15 @@ namespace pipewire {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         timeout_ms -= 10;
+      }
+      if ((negotiated_w <= 0 || negotiated_h <= 0) && requires_negotiated_dimensions()) {
+        BOOST_LOG(error) << "[pipewire] Timed out waiting for a negotiated stream format"sv;
+        return -1;
+      }
+      if (negotiated_w > 0 && negotiated_h > 0 && !accept_negotiated_dimensions(negotiated_w, negotiated_h)) {
+        BOOST_LOG(error) << "[pipewire] Negotiated dimensions "sv << negotiated_w << 'x' << negotiated_h
+                         << " do not match the selected display"sv;
+        return -1;
       }
       // Set width and height to the values negotiated by pipewire
       if (negotiated_w > 0 && negotiated_h > 0 && (negotiated_w != width || negotiated_h != height)) {
@@ -904,8 +1043,8 @@ namespace pipewire {
           return platf::capture_e::interrupted;
         }
 
-        auto *img_egl = static_cast<egl::img_descriptor_t *>(img_out.get());
-        img_egl->reset();
+        auto *img_egl = static_cast<img_descriptor_t *>(img_out.get());
+        img_egl->reset_frame();
         pipewire.fill_img(img_egl);
 
         // Check if we got valid data (either DMA-BUF fd or memory pointer), then filter duplicates
@@ -952,10 +1091,33 @@ namespace pipewire {
       return false;  // Return to default stream dead handling.
     }
 
+    /**
+     * @brief Validate the dimensions negotiated by PipeWire.
+     *
+     * @param negotiated_width Negotiated stream width.
+     * @param negotiated_height Negotiated stream height.
+     * @return True when the subclass accepts the negotiated dimensions.
+     */
+    virtual bool accept_negotiated_dimensions(
+      int negotiated_width [[maybe_unused]],
+      int negotiated_height [[maybe_unused]]
+    ) const {
+      return true;
+    }
+
+    /**
+     * @brief Report whether stream-format negotiation is mandatory.
+     *
+     * @return False by default for portal and compositor compatibility.
+     */
+    virtual bool requires_negotiated_dimensions() const {
+      return false;
+    }
+
     platf::capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
       auto next_frame = std::chrono::steady_clock::now();
 
-      if (pipewire.ensure_stream(mem_type, width, height, framerate, dmabuf_infos.data(), n_dmabuf_infos, display_is_nvidia) < 0) {
+      if (pipewire.ensure_stream(mem_type, width, height, framerate, dmabuf_infos.data(), n_dmabuf_infos, display_is_nvidia, allow_dmabuf) < 0) {
         BOOST_LOG(error) << "[pipewire] Failed to ensure pipewire stream. capture() failed with error.";
         return platf::capture_e::error;
       }
@@ -1028,24 +1190,25 @@ namespace pipewire {
     std::unique_ptr<platf::avcodec_encode_device_t> make_avcodec_encode_device(platf::pix_fmt_e pix_fmt) override {
 #ifdef PRISM_BUILD_VAAPI
       if (mem_type == platf::mem_type_e::vaapi) {
-        return va::make_avcodec_encode_device(width, height, n_dmabuf_infos > 0);
+        return va::make_avcodec_encode_device(width, height, shared_state->using_dmabuf.load());
       }
 #endif
 
 #ifdef PRISM_BUILD_VULKAN
-      if (mem_type == platf::mem_type_e::vulkan && n_dmabuf_infos > 0) {
+      if (mem_type == platf::mem_type_e::vulkan && shared_state->using_dmabuf.load()) {
         return vk::make_avcodec_encode_device_vram(width, height, 0, 0);
       }
 #endif
 
 #ifdef PRISM_BUILD_CUDA
       if (mem_type == platf::mem_type_e::cuda) {
-        if (display_is_nvidia && n_dmabuf_infos > 0) {
+        if (display_is_nvidia && shared_state->using_dmabuf.load()) {
           // Display GPU is NVIDIA - can use DMA-BUF directly
           return cuda::make_avcodec_gl_encode_device(width, height, 0, 0);
         } else {
           // Hybrid system (Intel display + NVIDIA encode) - use memory buffer path
           // DMA-BUFs from Intel GPU cannot be imported into CUDA
+          BOOST_LOG(info) << "[pipewire] Using CUDA conversion for mapped frames"sv;
           return cuda::make_avcodec_encode_device(width, height, false);
         }
       }
@@ -1061,8 +1224,15 @@ namespace pipewire {
      * @return Capture status reported to the streaming pipeline.
      */
     int dummy_img(platf::img_t *img) override {
-      // Empty images are recognized as dummies by the zero sequence number
-      return 0;
+      auto *descriptor = dynamic_cast<img_descriptor_t *>(img);
+      if (descriptor == nullptr) {
+        return -1;
+      }
+
+      // The zero sequence number remains the fallback marker for DMA-BUF
+      // devices. Mapped-frame devices additionally require valid pixels for
+      // the software conversion performed by the initial encoder probe.
+      return fill_black_bgr0_frame(descriptor, descriptor->pixels);
     }
 
     /**
@@ -1199,8 +1369,15 @@ namespace pipewire {
       }
     }
 
-    int get_dmabuf_modifiers() {
-      if (wl_display.init() < 0) {
+    /**
+     * @brief Query DMA-BUF formats from a specific Wayland compositor.
+     *
+     * @param wayland_display_name Explicit Wayland socket, or null for the
+     * process default.
+     * @return Zero on success, otherwise a negative error.
+     */
+    int get_dmabuf_modifiers(const char *wayland_display_name) {
+      if (wl_display.init(wayland_display_name) < 0) {
         return -1;
       }
 
@@ -1247,16 +1424,17 @@ namespace pipewire {
       return 0;
     }
 
-    platf::mem_type_e mem_type;
+    platf::mem_type_e mem_type {platf::mem_type_e::unknown};
     wl::display_t wl_display;
-    std::array<struct dmabuf_format_info_t, MAX_DMABUF_FORMATS> dmabuf_infos;
-    int n_dmabuf_infos;
+    std::array<struct dmabuf_format_info_t, MAX_DMABUF_FORMATS> dmabuf_infos {};
+    int n_dmabuf_infos = 0;
     bool display_is_nvidia = false;  // Track if display GPU is NVIDIA
-    std::chrono::nanoseconds delay;
+    bool allow_dmabuf = true;  ///< Whether this source permits DMA-BUF frame negotiation.
+    std::chrono::nanoseconds delay {};
     std::optional<std::uint64_t> last_pts {};
     std::optional<std::uint64_t> last_seq {};
     std::uint64_t sequence {};
-    uint32_t framerate;
+    uint32_t framerate = 0;
 
   protected:
     // Allow subclasses to access for pipewire requirements setup and stream dead checks

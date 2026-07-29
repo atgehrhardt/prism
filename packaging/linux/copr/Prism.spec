@@ -41,6 +41,7 @@ BuildRequires: libXi-devel
 BuildRequires: libXinerama-devel
 BuildRequires: libXrandr-devel
 BuildRequires: libXtst-devel
+BuildRequires: libxkbcommon-devel
 BuildRequires: openssl-devel
 BuildRequires: pipewire-devel
 BuildRequires: rpm-build
@@ -155,6 +156,9 @@ BuildRequires: libqt6-qtsvg-devel
 Requires: libnotify >= 0.8.0
 Requires: miniupnpc >= 2.2.4
 Requires: which >= 2.21
+Requires: bubblewrap
+Requires: labwc
+Requires: wlr-randr
 
 %if 0%{?fedora}
 # Fedora runtime requirements
@@ -165,7 +169,9 @@ Requires: libevdev >= 1.5.6
 Requires: libopusenc >= 0.2.1
 Requires: libva >= 2.14.0
 Requires: libwayland-client >= 1.20.0
+Requires: libxkbcommon >= 1.0.0
 Requires: libX11 >= 1.7.3.1
+Requires: xorg-x11-server-Xwayland
 Requires: numactl-libs >= 2.0.14
 Requires: openssl >= 3.0.2
 Requires: pulseaudio-libs >= 10.0

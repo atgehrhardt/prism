@@ -103,18 +103,20 @@ if [ "${1:-}" = "-o" ]; then
   fi
   exit 0
 fi
-case "${1:-}" in
-  output.*.enable)
-    output="${1#output.}"
-    output="${output%.enable}"
-    if [ "${PRISM_TEST_FAIL_OUTPUT:-}" = "$output" ]; then
-      exit 1
-    fi
-    awk -v wanted="$output" '{$2 = ($1 == wanted ? "enabled" : $2); print}' \
-      "$PRISM_TEST_OUTPUTS" > "$PRISM_TEST_OUTPUTS.tmp"
-    mv "$PRISM_TEST_OUTPUTS.tmp" "$PRISM_TEST_OUTPUTS"
-    ;;
-esac
+for argument in "$@"; do
+  case "$argument" in
+    output.*.enable)
+      output="${argument#output.}"
+      output="${output%.enable}"
+      if [ "${PRISM_TEST_FAIL_OUTPUT:-}" = "$output" ]; then
+        continue
+      fi
+      awk -v wanted="$output" '{$2 = ($1 == wanted ? "enabled" : $2); print}' \
+        "$PRISM_TEST_OUTPUTS" > "$PRISM_TEST_OUTPUTS.tmp"
+      mv "$PRISM_TEST_OUTPUTS.tmp" "$PRISM_TEST_OUTPUTS"
+      ;;
+  esac
+done
 EOF
 
 cat > "$TEST_ROOT/bin/pgrep" <<'EOF'
@@ -168,14 +170,20 @@ touch "$PRISM_TEST_VIRTUAL_AUDIO_GUARD" "$PRISM_TEST_MIRROR_WATCHDOG"
 
 # Recover committed headless state, duplicate routes, and both session sinks.
 cat > "$XDG_RUNTIME_DIR/prism-headless.state" <<EOF
-version=2
+version=4
 session_id=42
 backend=systemd
 unit=prism-headless-session.service
+input_unit=prism-input-bridge.service
+steam_unit=prism-headless-steam.service
 app_unit=prism-headless-app-42.scope
 steam=0
-wayland_display=gamescope-7
+wayland_display=wayland-7
+output_name=HEADLESS-1
 x_display=:9
+width=1920
+height=1080
+framerate=60
 physical_sink=physical-speakers
 capture_sink_module=
 session_sink_module=30
@@ -185,6 +193,9 @@ cat > "$XDG_RUNTIME_DIR/prism-headless-audio.state" <<EOF
 loop_module=31
 physical_sink=physical-speakers
 EOF
+printf '%s\n' 42 > "$XDG_RUNTIME_DIR/prism-headless-session.ready"
+printf '%s\n' 42 > "$XDG_RUNTIME_DIR/prism-headless-input.ready"
+printf '%s\n' PRISM_SESSION_ID=42 > "$XDG_RUNTIME_DIR/prism-headless-input.env"
 cat > "$PRISM_TEST_MODULES" <<EOF
 30	module-null-sink	sink_name=prism-headless
 31	module-loopback	source=prism-headless.monitor sink=prism-stream
@@ -201,6 +212,9 @@ printf '%s\n' \
 "$CLEANUP"
 [ ! -e "$XDG_RUNTIME_DIR/prism-headless.state" ]
 [ ! -e "$XDG_RUNTIME_DIR/prism-headless-audio.state" ]
+[ ! -e "$XDG_RUNTIME_DIR/prism-headless-session.ready" ]
+[ ! -e "$XDG_RUNTIME_DIR/prism-headless-input.ready" ]
+[ ! -e "$XDG_RUNTIME_DIR/prism-headless-input.env" ]
 awk '$1 == 35 || $1 == 36 {preserved++} END {exit preserved == 2 ? 0 : 1}' \
   "$PRISM_TEST_MODULES"
 

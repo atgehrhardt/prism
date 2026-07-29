@@ -30,7 +30,7 @@ prism_steam_game_main() {
   local state="$runtime/prism-headless.state"
   local log="$HOME/.local/state/prism-headless.log"
   local expected_session="${PRISM_SESSION_ID:-}"
-  local state_session state_unit unit
+  local state_session state_unit state_steam_unit compositor_unit steam_unit
   local game_pattern game_pid
   local launched=0
   local steam_missing_seconds=0
@@ -47,39 +47,45 @@ prism_steam_game_main() {
 
   state_session="$(prism_state_get "$state" session_id 2>/dev/null || true)"
   state_unit="$(prism_state_get "$state" unit 2>/dev/null || true)"
+  state_steam_unit="$(prism_state_get "$state" steam_unit 2>/dev/null || true)"
   if [ -z "$expected_session" ] || [ "$state_session" != "$expected_session" ]; then
     echo "ERROR: headless session state does not match game launch"
     return 1
   fi
-  unit="${PRISM_HEADLESS_UNIT:-$state_unit}"
-  if [ -z "$unit" ] || ! prism_unit_live "$unit"; then
+  compositor_unit="${PRISM_HEADLESS_UNIT:-$state_unit}"
+  steam_unit="${PRISM_HEADLESS_STEAM_UNIT:-$state_steam_unit}"
+  if [ -z "$compositor_unit" ] || ! prism_unit_live "$compositor_unit"; then
     echo "ERROR: owned headless session is not active"
     return 1
   fi
+  if [ -z "$steam_unit" ] || ! prism_unit_live "$steam_unit"; then
+    echo "ERROR: owned headless Steam unit is not active"
+    return 1
+  fi
 
-  echo "=== steam-game $(date -Is) appid=$id session=$expected_session unit=$unit ==="
+  echo "=== steam-game $(date -Is) appid=$id session=$expected_session unit=$steam_unit ==="
   echo "game $id launch requested by the owned Steam session; waiting for the game process"
   # Install-script evaluators include `Install=1` before `--`; requiring the
   # exact delimiter below prevents them from being mistaken for the game.
   game_pattern="SteamLaunch AppId=$id -- "
 
   for _ in $(seq 1 60); do
-    prism_unit_live "$unit" || break
-    prism_unit_has_comm "$unit" steam && break
+    prism_unit_live "$compositor_unit" || break
+    prism_unit_has_comm "$steam_unit" steam && break
     sleep 1
   done
-  if ! prism_unit_has_comm "$unit" steam; then
+  if ! prism_unit_has_comm "$steam_unit" steam; then
     echo "ERROR: session Steam did not start"
     return 1
   fi
 
-  while prism_unit_live "$unit"; do
-    game_pid="$(prism_session_game_pids "$unit" "$game_pattern" | head -1)"
+  while prism_unit_live "$compositor_unit"; do
+    game_pid="$(prism_session_game_pids "$steam_unit" "$game_pattern" | head -1)"
     if [ -n "$game_pid" ]; then
       launched=1
       break
     fi
-    if prism_unit_has_comm "$unit" steam; then
+    if prism_unit_has_comm "$steam_unit" steam; then
       if [ "$steam_missing_seconds" -gt 0 ]; then
         echo "session Steam returned after a ${steam_missing_seconds}s restart window"
       fi
@@ -101,8 +107,8 @@ prism_steam_game_main() {
   fi
 
   echo "game $id launched (pid $game_pid)"
-  while [ -n "$(prism_session_game_pids "$unit" "$game_pattern" | head -1)" ]; do
-    if ! prism_unit_live "$unit"; then
+  while [ -n "$(prism_session_game_pids "$steam_unit" "$game_pattern" | head -1)" ]; do
+    if ! prism_unit_live "$compositor_unit"; then
       echo "ERROR: owned headless session died while game $id was running"
       return 1
     fi

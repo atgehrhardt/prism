@@ -1,7 +1,5 @@
 [Unit]
-Description=Prism owned headless streaming session
-After=prism-labwc.service
-Requires=prism-labwc.service
+Description=Prism private headless labwc compositor
 
 [Service]
 Type=simple

@@ -146,6 +146,44 @@ namespace video {
     return AV_PROFILE_H264_HIGH;
   }
 
+  int scale_bgr0_frame(
+    SwsContext *context,
+    AVFrame *destination,
+    const std::uint8_t *data,
+    int width,
+    int height,
+    int row_pitch
+  ) {
+    if (context == nullptr || destination == nullptr || data == nullptr ||
+        width <= 0 || height <= 0 || row_pitch < width * 4) {
+      return AVERROR(EINVAL);
+    }
+
+    if (destination->data[0] == nullptr) {
+      const auto status = av_frame_get_buffer(destination, 0);
+      if (status < 0) {
+        return status;
+      }
+    }
+
+    const auto writable_status = av_frame_make_writable(destination);
+    if (writable_status < 0) {
+      return writable_status;
+    }
+
+    const std::uint8_t *source_data[4] = {data, nullptr, nullptr, nullptr};
+    const int source_linesize[4] = {row_pitch, 0, 0, 0};
+    return sws_scale(
+      context,
+      source_data,
+      source_linesize,
+      0,
+      height,
+      destination->data,
+      destination->linesize
+    );
+  }
+
   /**
    * @brief Create an FFmpeg hardware device buffer for VA-API input.
    *
@@ -182,12 +220,16 @@ namespace video {
       // If we need to add aspect ratio padding, we need to scale into an intermediate output buffer
       bool requires_padding = (sw_frame->width != sws_output_frame->width || sw_frame->height != sws_output_frame->height);
 
-      // Setup the input frame using the caller's img_t
-      sws_input_frame->data[0] = img.data;
-      sws_input_frame->linesize[0] = img.row_pitch;
-
       // Perform color conversion and scaling to the final size
-      auto status = sws_scale_frame(sws.get(), requires_padding ? sws_output_frame.get() : sw_frame.get(), sws_input_frame.get());
+      auto *destination = requires_padding ? sws_output_frame.get() : sw_frame.get();
+      auto status = scale_bgr0_frame(
+        sws.get(),
+        destination,
+        img.data,
+        img.width,
+        img.height,
+        img.row_pitch
+      );
       if (status < 0) {
         char string[AV_ERROR_MAX_STRING_SIZE];
         BOOST_LOG(error) << "Couldn't scale frame: "sv << av_make_error_string(string, AV_ERROR_MAX_STRING_SIZE, status);

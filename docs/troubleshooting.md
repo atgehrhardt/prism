@@ -228,34 +228,107 @@ sudo udevadm control --reload-rules && sudo udevadm trigger -s input
 
 ### Headless session does not start
 
-Headless capture is desktop-environment independent, but currently requires an accessible
-systemd user manager in addition to labwc, gamescope, PipeWire, `pactl`, and `wlr-randr`.
-Steam headless mode additionally requires bubblewrap (`bwrap`) for controller-device isolation.
+Headless capture is desktop-environment independent, but requires an accessible systemd
+user manager, labwc with its wlroots headless backend, `wlr-randr`, Xwayland, PipeWire,
+and `pactl`. Steam headless mode additionally requires bubblewrap (`bwrap`) for
+controller-device isolation.
 Mirror capture and any otherwise-supported virtual-display mode remain available
 when that ownership backend is missing.
 
-Inspect the owned session and its private compositor with:
+Inspect the private labwc session with:
 
 ```bash
-systemctl --user status prism-headless-session.service prism-labwc.service
-systemctl --user show prism-headless-session.service -p ActiveState -p ControlGroup
+systemctl --user status prism-headless-session.service \
+  prism-input-bridge.service prism-headless-steam.service
+systemctl --user show prism-headless-session.service \
+  prism-input-bridge.service prism-headless-steam.service \
+  -p ActiveState -p ControlGroup
 cat "$XDG_RUNTIME_DIR/prism-headless.state"
 tail -n 200 ~/.local/state/prism-headless.log
 ```
 
-Prism publishes `prism-headless.state` and the capture override only after gamescope's
-Wayland and Xwayland sockets have been verified as members of the owned service. If startup
-fails before that point, the transaction rolls back instead of silently capturing the host
-desktop.
+Labwc is the session's only compositor and runs directly on `WLR_BACKENDS=headless`;
+Prism does not inherit the desktop's `WAYLAND_DISPLAY` or `DISPLAY`. One ten-second
+wall-clock deadline starts with the labwc service and covers its owned Wayland and
+Xwayland sockets, the `HEADLESS-1` output, the exact client mode, the wlroots
+screencopy/DMA-BUF/output and virtual-input protocols, and the input bridge's matching
+ready marker. Socket creation alone is not readiness. Steam sessions get a separate
+ten-second process check after compositor readiness.
 
-Teardown records that the private labwc compositor must be reset. The next headless
-startup performs that reset, waits for the input bridge to reconnect, and confirms the
-headless output remains stable before attaching gamescope. This makes it safe to launch
-a replacement stream immediately without waiting for desktop Steam.
+The video path uses wlroots screencopy on only the verified private socket and output.
+Prism requests compositor-provided DMA-BUF frames for its existing VAAPI/CUDA encoding
+paths, with the existing system-memory path available when required by the selected
+encoder. Keyboard and mouse events enter labwc through wlroots virtual pointer and
+keyboard protocols; controllers remain direct Prism uinput devices. Xwayland remains
+necessary because Steam, Proton, and many games are X11 clients even though native
+Wayland applications use the private socket directly. Audio continues through the
+isolated `prism-headless` sink.
+
+Prism atomically publishes version 4 state and a `wlroots:<session>` capture override
+only after every compositor, mode, input, and audio phase succeeds. The state binds that
+session to one `wayland-<n>` socket, `HEADLESS-1`, Xwayland display, and client mode. A
+malformed, stale, or unavailable override is a hard capture failure and never selects the
+desktop, portal, mirror, virtual display, or another compositor.
+
+The phase-specific errors distinguish the failure:
+
+- `labwc exited before headless readiness` means the owned compositor terminated.
+- `labwc did not publish an owned Wayland socket within 10s` or
+  `labwc did not publish an owned Xwayland socket within 10s` means the corresponding
+  socket did not appear in the compositor's cgroup.
+- `labwc did not expose HEADLESS-1 within 10s` means the headless backend did not create
+  the expected output.
+- `labwc did not apply <width>x<height>@<fps> within 10s` means the exact custom mode
+  could not be applied.
+- `labwc is missing required output, DMA-BUF, screencopy, or virtual-input protocols`
+  means the installed compositor cannot support Prism's direct capture/input contract.
+- `Prism input bridge did not become ready within 10s` means the bridge could not create
+  its virtual pointer and keyboard on the owned socket.
+- `Steam did not start within 10s after labwc readiness` means compositor, capture, and
+  input phases passed but the session-owned Steam process did not appear.
+
+Any of these errors rolls back the attempt. Prism does not retry labwc automatically
+and does not silently switch to mirror or virtual-display capture.
+
+Rollback and normal teardown remove the capture override first so the input bridge
+releases its evdev grabs, then stop the app scope, Steam unit, input bridge, and labwc in
+that order. They unload only recorded audio modules and restore only the recorded
+physical default sink. An upgrade removes Prism's obsolete persistent labwc unit and
+persistent input-bridge enablement without removing user-created labwc configuration.
+Version-two and version-three state is accepted only by one-time migration cleanup; an
+active session reader accepts only version four.
 
 After a Steam headless stream, `prism-steam-restore.service` waits five seconds before
 returning Steam to the desktop. Starting another headless Steam stream during that grace
 period cancels the restore and avoids a shutdown/relaunch cycle.
+
+Synchronized games start Steam with `-silent` and the exact `steam://rungameid/<appid>`
+URL on its initial command line. This keeps Steam's window and Gamepad UI hidden while
+the game starts. The separate Steam Headless entry still launches the full Steam UI.
+
+Private labwc headless sessions are SDR. Native multi-touch/pen injection is not part of
+this path; client touch emulated as an absolute mouse remains supported.
+
+### Virtual display does not start
+
+Virtual-display capture asks `krfb-virtualmonitor` for `Virtual-Prism-Virtual` and
+explicitly associates the process with KDE's trusted `org.kde.krfb.virtualmonitor`
+desktop entry. Prism gives the output one ten-second wall-clock deadline; each
+`kscreen-doctor` probe is independently limited to one second.
+
+Inspect the virtual lifecycle log with:
+
+```bash
+tail -n 200 ~/.local/state/prism-virtual.log
+kscreen-doctor -o
+```
+
+The startup error identifies whether Krfb exited, remained active without publishing the
+output, or KScreen repeatedly failed to return a valid configuration. A failed or
+interrupted launch removes its capture override, audio routes, and exact Krfb process, and
+restores only the physical outputs recorded as enabled before the attempt. Virtual mode
+does not fall back to mirror or headless capture, so a failure cannot silently stream a
+different display.
 
 ### Audio is loud, clipped, or distorted in virtual/headless mode
 
@@ -356,9 +429,6 @@ To check whether low-latency mode is being used, one can watch the VCLK and DCLK
 frequencies in amdgpu_top. Without this encoder tuning both clock frequencies
 will fluctuate strongly, whereas with active low-latency encoding they will stay
 high as long as the encoder is used.
-
-### Gamescope compatibility
-Some users have reported stuttering issues when streaming games running within Gamescope.
 
 <div class="section_buttons">
 

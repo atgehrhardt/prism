@@ -57,6 +57,65 @@ prism_audio_module_exists() {
     awk -v wanted="$module" '$1 == wanted {found=1} END {exit !found}'
 }
 
+## @brief Test whether an exact PulseAudio or PipeWire sink is available.
+##
+## @param sink Exact sink name.
+## @return Zero when pactl reports the sink.
+prism_audio_sink_available() {
+  local sink="${1:-}"
+
+  [ -n "$sink" ] || return 1
+  pactl list short sinks 2>/dev/null |
+    awk -v wanted="$sink" '$2 == wanted {found=1} END {exit !found}'
+}
+
+## @brief Select an available desktop sink without choosing a Prism sink.
+##
+## @param preferred User-configured preferred sink.
+## @param fallback Sink recorded before the capture session.
+## @return Zero and the selected sink on stdout, or nonzero when none exists.
+prism_audio_choose_restore_sink() {
+  local preferred="${1:-}"
+  local fallback="${2:-}"
+  local current
+
+  if prism_audio_sink_available "$preferred"; then
+    printf '%s\n' "$preferred"
+    return 0
+  fi
+  if prism_audio_sink_available "$fallback"; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+
+  current="$(pactl get-default-sink 2>/dev/null || true)"
+  case "$current" in
+    '' | prism-stream | prism-headless | prism-virtual) return 1 ;;
+  esac
+  prism_audio_sink_available "$current" || return 1
+  printf '%s\n' "$current"
+}
+
+## @brief Restore an available desktop sink with a bounded retry.
+##
+## @param sink Exact available sink name.
+## @return Zero after verification, otherwise nonzero after one second.
+prism_restore_default_sink() {
+  local sink="${1:-}"
+
+  [ -n "$sink" ] || return 0
+  echo "restoring default sink: $sink"
+  for _ in $(seq 1 10); do
+    if prism_audio_sink_available "$sink"; then
+      pactl set-default-sink "$sink" >/dev/null 2>&1 || true
+      [ "$(pactl get-default-sink 2>/dev/null || true)" = "$sink" ] && return 0
+    fi
+    sleep 0.1
+  done
+  echo "WARN: could not restore default sink $sink" >&2
+  return 1
+}
+
 prism_unload_module() {
   local module="${1:-}"
   local exists_status
