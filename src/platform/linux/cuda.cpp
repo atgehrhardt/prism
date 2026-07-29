@@ -87,6 +87,12 @@ namespace cuda {
 
   static cdf_t cdf;
 
+  bool supports_ram_frame_format(AVPixelFormat format) {
+    return format == AV_PIX_FMT_NV12 ||
+           format == AV_PIX_FMT_P010LE ||
+           format == AV_PIX_FMT_YUV444P;
+  }
+
   inline static int check(CUresult result, const std::string_view &sv) {
     if (result != CUDA_SUCCESS) {
       const char *name;
@@ -190,9 +196,8 @@ namespace cuda {
 
       auto hwframe_ctx = (AVHWFramesContext *) hw_frames_ctx->data;
 
-      if (hwframe_ctx->sw_format != AV_PIX_FMT_NV12 &&
-          hwframe_ctx->sw_format != AV_PIX_FMT_YUV444P) {
-        BOOST_LOG(error) << "cuda::cuda_t doesn't support any format other than AV_PIX_FMT_NV12 and AV_PIX_FMT_YUV444P"sv;
+      if (!supports_ram_frame_format(hwframe_ctx->sw_format)) {
+        BOOST_LOG(error) << "cuda::cuda_t doesn't support any format other than AV_PIX_FMT_NV12, AV_PIX_FMT_P010LE and AV_PIX_FMT_YUV444P"sv;
         return -1;
       }
 
@@ -204,6 +209,7 @@ namespace cuda {
       }
 
       is_yuv444 = (hwframe_ctx->sw_format == AV_PIX_FMT_YUV444P);
+      is_p010 = (hwframe_ctx->sw_format == AV_PIX_FMT_P010LE);
 
       auto cuda_ctx = (AVCUDADeviceContext *) hwframe_ctx->device_ctx->hwctx;
 
@@ -256,6 +262,8 @@ namespace cuda {
 
       if (is_yuv444) {
         sws.convert_yuv444(frame->data[0], frame->data[1], frame->data[2], frame->linesize[0], tex->texture.linear, stream.get(), {frame->width, frame->height, 0, 0});
+      } else if (is_p010) {
+        sws.convert_p010(frame->data[0], frame->data[1], frame->linesize[0], frame->linesize[1], tex->texture.linear, stream.get(), {frame->width, frame->height, 0, 0});
       } else {
         sws.convert_nv12(frame->data[0], frame->data[1], frame->linesize[0], frame->linesize[1], tex->texture.linear, stream.get(), {frame->width, frame->height, 0, 0});
       }
@@ -278,9 +286,10 @@ namespace cuda {
     int width;  ///< Frame or display width in pixels.
 
     // When height and width don't change, it's not necessary to use linear interpolation
-    bool linear_interpolation;  ///< Whether the CUDA converter uses linear interpolation.
+    bool linear_interpolation {};  ///< Whether the CUDA converter uses linear interpolation.
 
-    bool is_yuv444;  ///< Whether the CUDA converter outputs YUV 4:4:4.
+    bool is_yuv444 {};  ///< Whether the CUDA converter outputs YUV 4:4:4.
+    bool is_p010 {};  ///< Whether the CUDA converter outputs 10-bit P010.
 
     sws_t sws;  ///< Software scaler used for CUDA frame conversion fallback paths.
   };
@@ -299,6 +308,9 @@ namespace cuda {
     int convert(platf::img_t &img) override {
       if (is_yuv444) {
         return sws.load_ram(img, tex.array) || sws.convert_yuv444(frame->data[0], frame->data[1], frame->data[2], frame->linesize[0], tex_obj(tex), stream.get());
+      }
+      if (is_p010) {
+        return sws.load_ram(img, tex.array) || sws.convert_p010(frame->data[0], frame->data[1], frame->linesize[0], frame->linesize[1], tex_obj(tex), stream.get());
       }
       return sws.load_ram(img, tex.array) || sws.convert_nv12(frame->data[0], frame->data[1], frame->linesize[0], frame->linesize[1], tex_obj(tex), stream.get());
     }
@@ -342,6 +354,9 @@ namespace cuda {
     int convert(platf::img_t &img) override {
       if (is_yuv444) {
         return sws.convert_yuv444(frame->data[0], frame->data[1], frame->data[2], frame->linesize[0], tex_obj(((img_t *) &img)->tex), stream.get());
+      }
+      if (is_p010) {
+        return sws.convert_p010(frame->data[0], frame->data[1], frame->linesize[0], frame->linesize[1], tex_obj(((img_t *) &img)->tex), stream.get());
       }
       return sws.convert_nv12(frame->data[0], frame->data[1], frame->linesize[0], frame->linesize[1], tex_obj(((img_t *) &img)->tex), stream.get());
     }

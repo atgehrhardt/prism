@@ -9,6 +9,7 @@ NATIVE_SERVICE="$SOURCE_DIR/contrib/virtual-session/prism.service"
 SERVICE_TEMPLATE="$SOURCE_DIR/packaging/linux/app-dev.lizardbyte.app.Prism.service.in"
 APP_RUN="$SOURCE_DIR/packaging/linux/AppImage/AppRun"
 LINUX_CMAKE="$SOURCE_DIR/cmake/packaging/linux.cmake"
+LINUX_BUILD="$SOURCE_DIR/scripts/linux_build.sh"
 MAIN_CPP="$SOURCE_DIR/src/main.cpp"
 
 DNF_TRANSACTION="$(
@@ -26,11 +27,53 @@ grep -Fq '@PRISM_SERVICE_CLEANUP_COMMAND@' "$SERVICE_TEMPLATE"
 grep -Fq 'xsession-cleanup' "$APP_RUN"
 grep -Fq 'exit 64' "$APP_RUN"
 
-for payload in prism-audio-common.sh prism-session-cleanup.sh; do
+for payload in \
+  prism-audio-common.sh \
+  prism-headless-session.sh \
+  prism-headless-steam-session.sh \
+  prism-session-cleanup.sh \
+  prism-virtual-common.sh; do
   grep -Fq "$payload" "$INSTALLER"
   grep -Fq "$payload" "$LINUX_CMAKE"
 done
-grep -Fq 'prism-labwc-link-socket.sh' "$INSTALLER"
+for labwc_component in \
+  prism-input-bridge \
+  prism-input-bridge.service \
+  prism-headless-steam.service \
+  labwc \
+  wlr-randr \
+  xorg-x11-server-Xwayland; do
+  grep -Fq "$labwc_component" "$INSTALLER"
+done
+grep -Fq 'add_executable(prism-input-bridge' \
+  "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
+grep -Fq 'wlr-virtual-pointer-unstable-v1' \
+  "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
+grep -Fq 'virtual-keyboard-unstable-v1' \
+  "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
+grep -Fq 'PkgConfig::XKBCOMMON' \
+  "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
+ARCH_BUILD_DEPS="$(sed -n '/^function add_arch_deps()/,/^}/p' "$LINUX_BUILD")"
+DEBIAN_BUILD_DEPS="$(sed -n '/^function add_debian_based_deps()/,/^}/p' "$LINUX_BUILD")"
+FEDORA_BUILD_DEPS="$(sed -n '/^function add_fedora_deps()/,/^}/p' "$LINUX_BUILD")"
+grep -Fq "'libxkbcommon'" <<< "$ARCH_BUILD_DEPS"
+grep -Fq '"libxkbcommon-dev"' <<< "$DEBIAN_BUILD_DEPS"
+grep -Fq '"libxkbcommon-devel"' <<< "$FEDORA_BUILD_DEPS"
+grep -Fq 'systemctl --user restart prism.service' "$INSTALLER"
+grep -Fq 'disable --now prism-input-bridge.service prism-labwc.service' "$INSTALLER"
+if grep -Eq 'prism-labwc-link-socket.sh.*install -D|enable .*prism-(labwc|input-bridge)' "$INSTALLER"; then
+  echo "Installer still installs or enables a persistent headless helper" >&2
+  exit 1
+fi
+if grep -Fq 'prism-labwc-link-socket.sh' "$LINUX_CMAKE"; then
+  echo "CMake packaging still includes the obsolete labwc helper" >&2
+  exit 1
+fi
+if grep -Eiq 'gamescope-pipewire|prism-gamescope-query|libei-1[.]0' \
+  "$SOURCE_DIR/cmake/compile_definitions/linux.cmake" "$LINUX_CMAKE"; then
+  echo "Build or packaging still contains a direct-gamescope component" >&2
+  exit 1
+fi
 if grep -Fq 'reset --hard' "$INSTALLER"; then
   echo "Installer still destructively resets an existing checkout" >&2
   exit 1

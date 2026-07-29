@@ -5,115 +5,114 @@
 set -u
 
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-OVERRIDE_FILE="$RUNTIME/prism-capture-override"
-STATE="$RUNTIME/prism-virtual-desktop.state"
-VNAME="Prism-Virtual"
-VOUT="Virtual-$VNAME"
 VPORT=5999
 LOG="$HOME/.local/state/prism-virtual.log"
-ASTATE="$RUNTIME/prism-virtual-audio.state"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=contrib/virtual-session/prism-audio-common.sh
-. "$SCRIPT_DIR/prism-audio-common.sh"
+# shellcheck source=contrib/virtual-session/prism-virtual-common.sh
+. "$SCRIPT_DIR/prism-virtual-common.sh"
+OVERRIDE_FILE="$PRISM_VIRTUAL_OVERRIDE_FILE"
+STATE="$PRISM_VIRTUAL_STATE"
+ASTATE="$PRISM_VIRTUAL_AUDIO_STATE"
+VNAME="$PRISM_VIRTUAL_NAME"
+VOUT="$PRISM_VIRTUAL_OUTPUT"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 echo "=== virtual-desktop start $(date -Is) client=${PRISM_CLIENT_WIDTH:-?}x${PRISM_CLIENT_HEIGHT:-?}@${PRISM_CLIENT_FPS:-?} ==="
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
-# kscreen-doctor can hang indefinitely when KWin is in a degenerate state
-# (e.g. all outputs disabled by a previous session that was never torn down);
-# never let a single call block the launch forever.
-prism_kscreen() {
-  timeout 10 kscreen-doctor "$@"
-}
-
-prism_output_snapshot() {
-  set -o pipefail
-  prism_kscreen -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g'
-}
-
-prism_output_is_enabled() {
-  local output="$1"
-  prism_output_snapshot | awk -v target="$output" '
-    /^Output:/ {name=$3}
-    /^\tenabled$/ && name == target {found=1}
-    END {exit found ? 0 : 1}
-  '
-}
+VIRTUAL_READY_TIMEOUT="${PRISM_TEST_VIRTUAL_READY_TIMEOUT_SECONDS:-10}"
+case "$VIRTUAL_READY_TIMEOUT" in
+  '' | *[!0-9]* | 0)
+    echo "ERROR: invalid virtual-output readiness timeout '$VIRTUAL_READY_TIMEOUT'"
+    exit 1
+    ;;
+esac
 
 # Shared cross-mode capture lock (see prism-headless-start.sh).
 exec 9>"$RUNTIME/prism-capture.lock"
-flock -x -w 90 9 || exit 1
+flock -x -w 10 9 || {
+  echo "ERROR: timed out waiting for capture lifecycle lock"
+  exit 1
+}
 
-# Recover audio resources from an interrupted or overlapping virtual session.
-pkill -f 'prism-virtual-audio.sh' 2>/dev/null || true
-OLD_LOOP_MODULE="$(prism_audio_state_get "$ASTATE" loop_module 2>/dev/null || true)"
-OLD_SINK_MODULE="$(prism_audio_state_get "$ASTATE" sink_module 2>/dev/null || true)"
-prism_unload_module "$OLD_LOOP_MODULE" || exit 1
-prism_unload_loopback_modules prism-virtual.monitor prism-stream || exit 1
-prism_unload_module "$OLD_SINK_MODULE" || exit 1
-prism_unload_named_sink_modules prism-virtual || exit 1
-rm -f "$ASTATE"
+READY=0
 
-# Recover from a previous session that was never torn down (e.g. prism was
-# killed mid-stream): re-enable any physical outputs it disabled, otherwise
-# KWin sits in a zero-output state where kscreen-doctor hangs.
-if [ -f "$STATE" ]; then
-  echo "found stale state file; re-enabling outputs from previous session"
-  RESTORE_STATE="${STATE}.restore.$$"
-  : > "$RESTORE_STATE"
-  if ! OUTPUTS="$(prism_output_snapshot)"; then
-    echo "ERROR: KWin output state is unavailable; retaining recovery state"
-    rm -f "$RESTORE_STATE"
-    exit 1
+## @brief Roll back a partially completed virtual-display transaction.
+##
+## @return The startup status that triggered the rollback.
+rollback() {
+  local rc=$?
+
+  trap - EXIT INT TERM
+  [ "$READY" = "1" ] && return "$rc"
+  echo "virtual desktop startup failed; rolling back"
+  if ! prism_virtual_cleanup; then
+    echo "ERROR: virtual desktop rollback is incomplete"
   fi
-  while read -r OUT; do
-    [ -z "$OUT" ] && continue
-    if ! printf '%s\n' "$OUTPUTS" | awk -v target="$OUT" '
-      /^Output:/ && $3 == target {found=1}
-      END {exit found ? 0 : 1}
-    '; then
-      echo "recorded output $OUT is disconnected; no restoration is needed"
-      continue
-    fi
-    if ! prism_kscreen "output.$OUT.enable" >/dev/null 2>&1 || ! prism_output_is_enabled "$OUT"; then
-      echo "ERROR: could not verify restored output $OUT"
-      printf '%s\n' "$OUT" >> "$RESTORE_STATE"
-    fi
-  done < "$STATE"
-  if [ -s "$RESTORE_STATE" ]; then
-    mv -f "$RESTORE_STATE" "$STATE"
-    exit 1
-  fi
-  rm -f "$RESTORE_STATE" "$STATE"
+  return "$rc"
+}
+
+trap rollback EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Recover from an interrupted or overlapping virtual session before creating
+# new resources. The shared cleanup retains only unresolved ownership state.
+if [ -e "$STATE" ] || [ -e "$ASTATE" ] ||
+  prism_virtual_monitor_present ||
+  prism_virtual_audio_guard_present; then
+  echo "found stale virtual desktop resources; reconciling them"
+  prism_virtual_cleanup || exit 1
 fi
 
 W="${PRISM_CLIENT_WIDTH:-1920}"
 H="${PRISM_CLIENT_HEIGHT:-1080}"
 FPS="${PRISM_CLIENT_FPS:-60}"
 
-# Clean up any previous virtual output.
-pkill -f "krfb-virtualmonitor --name $VNAME" 2>/dev/null || true
-sleep 1
-
 # Create the virtual output sized to the client. krfb's VNC server is unused
 # but requires a password/port; use a random password.
 PW="$(head -c 9 /dev/urandom | base64)"
-setsid krfb-virtualmonitor --name "$VNAME" --resolution "${W}x${H}" \
+setsid krfb-virtualmonitor --name "$VNAME" \
+  --desktopfile org.kde.krfb.virtualmonitor --resolution "${W}x${H}" \
   --password "$PW" --port "$VPORT" >>"$LOG" 2>&1 9>&- &
+VIRTUAL_PID=$!
 
-# Wait for the output to appear.
+# Wait for the output under a single wall-clock deadline. Each KScreen probe
+# gets at most one second, so a wedged KWin cannot multiply the total timeout.
 OUT_FOUND=""
-for _ in $(seq 1 40); do
-  if prism_output_snapshot | grep -q "Output:.* $VOUT "; then
-    OUT_FOUND=1
-    break
+KSCREEN_FAILURES=0
+READY_DEADLINE=$((SECONDS + VIRTUAL_READY_TIMEOUT))
+while [ "$SECONDS" -lt "$READY_DEADLINE" ]; do
+  if OUTPUTS="$(prism_virtual_output_snapshot 1)"; then
+    if printf '%s\n' "$OUTPUTS" |
+      awk -v target="$VOUT" '$1 == "Output:" && $3 == target {found=1} END {exit found ? 0 : 1}'; then
+      OUT_FOUND=1
+      break
+    fi
+  else
+    KSCREEN_FAILURES=$((KSCREEN_FAILURES + 1))
+  fi
+  if ! kill -0 "$VIRTUAL_PID" >/dev/null 2>&1; then
+    echo "ERROR: krfb-virtualmonitor exited before publishing $VOUT"
+    exit 1
   fi
   sleep 0.25
 done
 if [ -z "$OUT_FOUND" ]; then
-  echo "ERROR: virtual output $VOUT did not appear"
+  if ! kill -0 "$VIRTUAL_PID" >/dev/null 2>&1; then
+    echo "ERROR: krfb-virtualmonitor exited before publishing $VOUT"
+  elif [ "$KSCREEN_FAILURES" -gt 0 ]; then
+    echo "ERROR: KScreen failed $KSCREEN_FAILURES time(s); $VOUT was not observable within ${VIRTUAL_READY_TIMEOUT}s"
+  else
+    echo "ERROR: krfb-virtualmonitor remained active but $VOUT did not appear within ${VIRTUAL_READY_TIMEOUT}s"
+  fi
+  exit 1
+fi
+
+# Confirm the monitor did not exit immediately after publishing its output.
+if ! kill -0 "$VIRTUAL_PID" >/dev/null 2>&1; then
+  echo "ERROR: krfb-virtualmonitor exited after publishing $VOUT"
   exit 1
 fi
 
@@ -122,14 +121,14 @@ fi
 # resulting mode may be slightly off (e.g. 119.85) but mode.WxH@FPS resolves it.
 if [ "$FPS" != "60" ]; then
   echo "setting $VOUT mode to ${W}x${H}@${FPS}"
-  prism_kscreen "output.$VOUT.addCustomMode.$W.$H.$((FPS * 1000)).full" 2>/dev/null || true
-  prism_kscreen "output.$VOUT.mode.${W}x${H}@${FPS}" 2>/dev/null \
+  prism_virtual_kscreen 10 "output.$VOUT.addCustomMode.$W.$H.$((FPS * 1000)).full" 2>/dev/null || true
+  prism_virtual_kscreen 10 "output.$VOUT.mode.${W}x${H}@${FPS}" 2>/dev/null \
     || echo "WARN: could not switch $VOUT to ${W}x${H}@${FPS}, staying at 60Hz"
 fi
 
 # Enable VRR on the virtual output so KWin paces frames by content instead of
 # a fixed vblank; the streamer captures frames as they are produced.
-prism_kscreen "output.$VOUT.vrrpolicy.always" 2>/dev/null \
+prism_virtual_kscreen 10 "output.$VOUT.vrrpolicy.always" 2>/dev/null \
   || echo "WARN: could not set vrrpolicy on $VOUT (needs Plasma 6)"
 
 # HDR: mark the virtual output as HDR/WCG capable when the client asked for an
@@ -137,7 +136,7 @@ prism_kscreen "output.$VOUT.vrrpolicy.always" 2>/dev/null \
 if [ "${PRISM_CLIENT_HDR:-false}" = "true" ]; then
   echo "enabling hdr/wcg on $VOUT"
   for _ in 1 2 3; do
-    prism_kscreen "output.$VOUT.hdr.enable" "output.$VOUT.wcg.enable" 2>/dev/null && break
+    prism_virtual_kscreen 10 "output.$VOUT.hdr.enable" "output.$VOUT.wcg.enable" 2>/dev/null && break
     sleep 1
   done || echo "WARN: could not enable hdr on $VOUT"
 fi
@@ -161,7 +160,7 @@ setsid "$SCRIPT_DIR/prism-virtual-audio.sh" "$PHYSICAL_SINK" >>"$LOG" 2>&1 9>&- 
 # priorities when the virtual output appears, so don't rely on "priority 1").
 # Remember which ones we disabled so undo can re-enable exactly those.
 STATE_TMP="${STATE}.tmp.$$"
-if ! OUTPUTS="$(prism_output_snapshot)"; then
+if ! OUTPUTS="$(prism_virtual_output_snapshot 10)"; then
   echo "ERROR: could not inspect enabled physical outputs"
   rm -f "$STATE_TMP"
   exit 1
@@ -178,9 +177,26 @@ mv -f "$STATE_TMP" "$STATE"
 while read -r OUT; do
   [ "$OUT" = "$VOUT" ] && continue
   echo "disabling physical output $OUT"
-  if ! prism_kscreen "output.$OUT.disable" >/dev/null 2>&1; then
+  if ! prism_virtual_kscreen 10 "output.$OUT.disable" >/dev/null 2>&1; then
     echo "ERROR: could not disable physical output $OUT; recovery state retained"
     exit 1
   fi
 done < "$STATE"
+if ! OUTPUTS="$(prism_virtual_output_snapshot 10)"; then
+  echo "ERROR: could not verify physical-output isolation; recovery state retained"
+  exit 1
+fi
+while read -r OUT; do
+  [ -z "$OUT" ] && continue
+  if printf '%s\n' "$OUTPUTS" | awk -v target="$OUT" '
+    /^Output:/ {name=$3}
+    /^\tenabled$/ && name == target {found=1}
+    END {exit found ? 0 : 1}
+  '; then
+    echo "ERROR: physical output $OUT remains enabled; recovery state retained"
+    exit 1
+  fi
+done < "$STATE"
+READY=1
+trap - EXIT INT TERM
 echo "virtual desktop ready: $VOUT ${W}x${H}"

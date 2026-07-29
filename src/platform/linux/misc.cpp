@@ -54,6 +54,7 @@
 #include "src/entry_handler.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
+#include "src/process.h"
 #include "vaapi.h"
 
 #ifdef __GNUC__
@@ -1105,9 +1106,20 @@ namespace platf {
    * @param hwdevice_type Hardware device type requested for capture or encode.
    * @param display_name Display name.
    * @param config Configuration values to apply.
+   * @param wayland_display Explicit compositor socket, or empty to use the
+   *        process environment.
+   * @param expected_width Required output width, or zero for no check.
+   * @param expected_height Required output height, or zero for no check.
    * @return Display backend, or nullptr when Wayland capture initialization fails.
    */
-  std::shared_ptr<display_t> wl_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+  std::shared_ptr<display_t> wl_display(
+    mem_type_e hwdevice_type,
+    const std::string &display_name,
+    const video::config_t &config,
+    const std::string &wayland_display = {},
+    int expected_width = 0,
+    int expected_height = 0
+  );
 
   /**
    * @brief Check whether Wayland capture is available for the current session.
@@ -1214,25 +1226,52 @@ namespace platf {
   }
 
   std::shared_ptr<display_t> display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
-#ifdef PRISM_BUILD_WAYLAND
-    // Prism: per-stream capture override. When $XDG_RUNTIME_DIR/prism-capture-override
-    // exists and names a Wayland socket, capture that (headless) compositor via the
-    // wlroots backend instead of the session desktop. An app's prep "do" command
-    // writes the file and its "undo" command removes it.
-    static std::string prism_saved_wayland_display;
-    static bool prism_override_was_active = false;
+    // Runtime-owned capture overrides are authoritative. Recognized overrides
+    // fail closed so a broken isolated session can never expose the desktop.
     std::string prism_override;
+    std::string prism_runtime_dir = lizardbyte::common::get_env("XDG_RUNTIME_DIR");
+    if (prism_runtime_dir.empty()) {
+      prism_runtime_dir = "/run/user/" + std::to_string(::getuid());
+    }
     {
-      std::string runtime_dir = lizardbyte::common::get_env("XDG_RUNTIME_DIR");
-      if (runtime_dir.empty()) {
-        runtime_dir = "/run/user/" + std::to_string(::getuid());
-      }
-      std::ifstream override_file(runtime_dir + "/prism-capture-override");
+      std::ifstream override_file(prism_runtime_dir + "/prism-capture-override");
       if (override_file) {
         std::getline(override_file, prism_override);
+        std::string unexpected_line;
+        if (std::getline(override_file, unexpected_line)) {
+          BOOST_LOG(error) << "[prism] Capture override contains multiple lines; refusing desktop fallback"sv;
+          return nullptr;
+        }
       }
     }
-  #ifdef PRISM_BUILD_PORTAL
+#ifdef PRISM_BUILD_WAYLAND
+    if (prism_override.rfind("wlroots:", 0) == 0) {
+      const auto session_id = proc::prism_parse_wlroots_capture_override(prism_override);
+      if (!session_id) {
+        BOOST_LOG(error) << "[prism] Malformed private-labwc capture override; refusing desktop fallback"sv;
+        return nullptr;
+      }
+      const auto state = proc::prism_read_headless_state(
+        prism_runtime_dir + "/prism-headless.state",
+        *session_id
+      );
+      if (!state) {
+        BOOST_LOG(error) << "[prism] Private-labwc capture override does not match owned session state"sv;
+        return nullptr;
+      }
+      BOOST_LOG(info) << "[prism] Capturing private labwc session "sv << state->session_id
+                      << " from "sv << state->wayland_display << '/' << state->output_name;
+      return wl_display(
+        hwdevice_type,
+        state->output_name,
+        config,
+        state->wayland_display,
+        state->width,
+        state->height
+      );
+    }
+#endif
+#ifdef PRISM_BUILD_PORTAL
     // Portal form: "portal:<output-name>" captures the named output (e.g. a
     // KWin virtual output) through the normal XDG portal backend.
     if (prism_override.rfind("portal:", 0) == 0) {
@@ -1241,34 +1280,16 @@ namespace platf {
       if (auto override_display = portal_display(hwdevice_type, portal_output, config)) {
         return override_display;
       }
-      BOOST_LOG(error) << "[prism] Portal capture override failed for output '"sv << portal_output << "'; falling back to normal capture"sv;
-    } else
-  #endif
-      if (!prism_override.empty()) {
-      const std::string &prism_socket = prism_override;
-      if (!prism_override_was_active) {
-        prism_saved_wayland_display = lizardbyte::common::get_env("WAYLAND_DISPLAY");
-        prism_override_was_active = true;
-      }
-      lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_socket);
-      BOOST_LOG(info) << "[prism] Capture override active; screencasting Wayland socket '"sv << prism_socket << "'"sv;
-      // Note: sources[source::WAYLAND] may be false here (e.g. KDE, where the
-      // desktop compositor lacks wlr-screencopy) — the override targets a
-      // different compositor that does support it, so attempt it directly.
-      if (auto override_display = wl_display(hwdevice_type, std::string {}, config)) {
-        return override_display;
-      }
-      BOOST_LOG(error) << "[prism] Capture override failed on socket '"sv << prism_socket << "'; falling back to normal capture"sv;
-    }
-    if (prism_override_was_active) {
-      if (prism_saved_wayland_display.empty()) {
-        lizardbyte::common::unset_env("WAYLAND_DISPLAY");
-      } else {
-        lizardbyte::common::set_env("WAYLAND_DISPLAY", prism_saved_wayland_display);
-      }
-      prism_override_was_active = false;
+      BOOST_LOG(error) << "[prism] Portal capture override failed for output '"sv << portal_output
+                       << "'; refusing desktop fallback"sv;
+      return nullptr;
     }
 #endif
+    if (!prism_override.empty()) {
+      BOOST_LOG(error) << "[prism] Unknown capture override '"sv << prism_override
+                       << "'; refusing desktop fallback"sv;
+      return nullptr;
+    }
     // Keep KMS as first element to check before dropping CAP_SYS_ADMIN
 #ifdef PRISM_BUILD_DRM
     if (sources[source::KMS]) {

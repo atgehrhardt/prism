@@ -443,7 +443,7 @@ Additional information:
 
 - HDR streaming is supported for Intel and AMD GPUs that support encoding HEVC Main 10 or AV1 10-bit profiles using VAAPI.
 - The KMS capture backend is required for HDR capture. Other capture methods, like NvFBC or X11, do not support HDR.
-- You will need a desktop environment with a compositor that supports HDR rendering, such as Gamescope or KDE Plasma 6.
+- You will need a desktop environment with a compositor that supports HDR rendering, such as KDE Plasma 6.
 
 @seealso{[Arch wiki on HDR Support for Linux](https://wiki.archlinux.org/title/HDR_monitor_support) and
 [Reddit Guide for HDR Support for AMD GPUs](https://www.reddit.com/r/linux_gaming/comments/10m2gyx/guide_alpha_test_hdr_on_linux)}

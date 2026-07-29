@@ -50,6 +50,27 @@ namespace video {
   int select_h264_profile(const config_t &config);
 
   /**
+   * @brief Convert an externally owned BGR0 image with a configured scaler.
+   *
+   * @param context Initialized FFmpeg scaling context.
+   * @param destination Configured destination frame. Pixel storage is
+   * allocated on demand.
+   * @param data First byte of the externally owned BGR0 image.
+   * @param width Source width in pixels.
+   * @param height Source height in pixels.
+   * @param row_pitch Bytes between consecutive source rows.
+   * @return Number of output rows on success, or a negative FFmpeg error.
+   */
+  int scale_bgr0_frame(
+    SwsContext *context,
+    AVFrame *destination,
+    const std::uint8_t *data,
+    int width,
+    int height,
+    int row_pitch
+  );
+
+  /**
    * @brief Map an FFmpeg hardware device type to Prism's memory type.
    *
    * @param type FFmpeg hardware device type reported by the encoder backend.

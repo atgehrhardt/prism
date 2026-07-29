@@ -43,9 +43,22 @@ namespace wl {
      * @param hwdevice_type Hardware device type requested for capture or encode.
      * @param display_name Display name.
      * @param config Configuration values to apply.
+     * @param wayland_display Explicit compositor socket, or empty for the
+     *        process environment.
+     * @param expected_width Required output width, or zero to accept the
+     *        compositor mode.
+     * @param expected_height Required output height, or zero to accept the
+     *        compositor mode.
      * @return 0 on success; nonzero or negative platform status on failure.
      */
-    int init(platf::mem_type_e hwdevice_type, const std::string &display_name, const ::video::config_t &config) {
+    int init(
+      platf::mem_type_e hwdevice_type,
+      const std::string &display_name,
+      const ::video::config_t &config,
+      const std::string &wayland_display = {},
+      int expected_width = 0,
+      int expected_height = 0
+    ) {
       // calculate frame interval we should capture at
       delay = ::video::capture_frame_interval(config);
       const AVRational fps = ::video::framerate_to_rational(config);
@@ -57,7 +70,7 @@ namespace wl {
 
       mem_type = hwdevice_type;
 
-      if (display.init()) {
+      if (display.init(wayland_display.empty() ? nullptr : wayland_display.c_str())) {
         return -1;
       }
 
@@ -82,6 +95,10 @@ namespace wl {
       }
       display.roundtrip();
 
+      if (interface.monitors.empty()) {
+        BOOST_LOG(error) << "[wlgrab] Compositor did not advertise an output"sv;
+        return -1;
+      }
       auto monitor = interface.monitors[0].get();
 
       if (!display_name.empty()) {
@@ -100,7 +117,13 @@ namespace wl {
           auto streamedMonitor = util::from_view(display_name);
           if (streamedMonitor >= 0 && streamedMonitor < interface.monitors.size()) {
             monitor = interface.monitors[streamedMonitor].get();
+            matched = true;
           }
+        }
+        if (!matched) {
+          BOOST_LOG(error) << "[wlgrab] Requested output ["sv << display_name
+                           << "] is unavailable"sv;
+          return -1;
         }
       }
 
@@ -111,8 +134,16 @@ namespace wl {
       width = monitor->viewport.width;
       height = monitor->viewport.height;
 
-      this->env_width = ::wl::env_width;
-      this->env_height = ::wl::env_height;
+      if ((expected_width > 0 && width != expected_width) ||
+          (expected_height > 0 && height != expected_height)) {
+        BOOST_LOG(error) << "[wlgrab] Private output mode "sv << width << 'x' << height
+                         << " does not match required mode "sv
+                         << expected_width << 'x' << expected_height;
+        return -1;
+      }
+
+      this->env_width = expected_width > 0 ? width : ::wl::env_width;
+      this->env_height = expected_height > 0 ? height : ::wl::env_height;
 
       this->logical_width = monitor->viewport.logical_width;
       this->logical_height = monitor->viewport.logical_height;
@@ -293,10 +324,28 @@ namespace wl {
      * @param hwdevice_type Hardware device type requested for capture or encode.
      * @param display_name Display name.
      * @param config Configuration values to apply.
+     * @param wayland_display Explicit compositor socket, or empty for the
+     *        process environment.
+     * @param expected_width Required output width, or zero for no check.
+     * @param expected_height Required output height, or zero for no check.
      * @return 0 on success; nonzero or negative platform status on failure.
      */
-    int init(platf::mem_type_e hwdevice_type, const std::string &display_name, const ::video::config_t &config) {
-      if (wlr_t::init(hwdevice_type, display_name, config)) {
+    int init(
+      platf::mem_type_e hwdevice_type,
+      const std::string &display_name,
+      const ::video::config_t &config,
+      const std::string &wayland_display = {},
+      int expected_width = 0,
+      int expected_height = 0
+    ) {
+      if (wlr_t::init(
+            hwdevice_type,
+            display_name,
+            config,
+            wayland_display,
+            expected_width,
+            expected_height
+          )) {
         return -1;
       }
 
@@ -502,9 +551,25 @@ namespace wl {
 
 namespace platf {
   /**
-   * @brief Create a Wayland capture backend for the requested memory type.
+   * @brief Create a Wayland capture backend for the requested compositor.
+   *
+   * @param hwdevice_type Hardware memory type requested by the encoder.
+   * @param display_name Output name or index to capture.
+   * @param config Video configuration for the stream.
+   * @param wayland_display Explicit compositor socket, or empty for the
+   *        process environment.
+   * @param expected_width Required output width, or zero for no check.
+   * @param expected_height Required output height, or zero for no check.
+   * @return Initialized display backend, or null on failure.
    */
-  std::shared_ptr<display_t> wl_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+  std::shared_ptr<display_t> wl_display(
+    mem_type_e hwdevice_type,
+    const std::string &display_name,
+    const video::config_t &config,
+    const std::string &wayland_display,
+    int expected_width,
+    int expected_height
+  ) {
     if (hwdevice_type != platf::mem_type_e::system && hwdevice_type != platf::mem_type_e::vaapi && hwdevice_type != platf::mem_type_e::cuda) {
       BOOST_LOG(error) << "[wlgrab] Could not initialize display with the given hw device type."sv;
       return nullptr;
@@ -512,7 +577,14 @@ namespace platf {
 
     if (hwdevice_type == platf::mem_type_e::vaapi || hwdevice_type == platf::mem_type_e::cuda) {
       auto wlr = std::make_shared<wl::wlr_vram_t>();
-      if (wlr->init(hwdevice_type, display_name, config)) {
+      if (wlr->init(
+            hwdevice_type,
+            display_name,
+            config,
+            wayland_display,
+            expected_width,
+            expected_height
+          )) {
         return nullptr;
       }
 
@@ -520,7 +592,14 @@ namespace platf {
     }
 
     auto wlr = std::make_shared<wl::wlr_ram_t>();
-    if (wlr->init(hwdevice_type, display_name, config)) {
+    if (wlr->init(
+          hwdevice_type,
+          display_name,
+          config,
+          wayland_display,
+          expected_width,
+          expected_height
+        )) {
       return nullptr;
     }
 

@@ -208,11 +208,29 @@ if(WAYLAND_FOUND)
     GEN_WAYLAND("${WAYLAND_PROTOCOLS_DIR}" "unstable/xdg-output" xdg-output-unstable-v1)
     GEN_WAYLAND("${WAYLAND_PROTOCOLS_DIR}" "unstable/linux-dmabuf" linux-dmabuf-unstable-v1)
     GEN_WAYLAND("${CMAKE_SOURCE_DIR}/third-party/wlr-protocols" "unstable" wlr-screencopy-unstable-v1)
+    GEN_WAYLAND("${CMAKE_SOURCE_DIR}/third-party/wlr-protocols" "unstable" wlr-virtual-pointer-unstable-v1)
+    GEN_WAYLAND("${CMAKE_SOURCE_DIR}/contrib/virtual-session/protocols" "" virtual-keyboard-unstable-v1)
 
     include_directories(
             SYSTEM
             ${WAYLAND_INCLUDE_DIRS}
     )
+
+    pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
+    add_executable(prism-input-bridge
+            "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-input-bridge.c"
+            "${CMAKE_BINARY_DIR}/generated-src/wlr-virtual-pointer-unstable-v1.c"
+            "${CMAKE_BINARY_DIR}/generated-src/virtual-keyboard-unstable-v1.c")
+    target_include_directories(prism-input-bridge PRIVATE
+            "${CMAKE_BINARY_DIR}/generated-src"
+            ${WAYLAND_INCLUDE_DIRS})
+    target_link_libraries(prism-input-bridge PRIVATE
+            ${WAYLAND_LIBRARIES}
+            PkgConfig::XKBCOMMON
+            m)
+    install(TARGETS prism-input-bridge
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    list(APPEND PRISM_TARGET_DEPENDENCIES prism-input-bridge)
 
     list(APPEND PLATFORM_LIBRARIES ${WAYLAND_LIBRARIES} gbm)
     list(APPEND PLATFORM_TARGET_FILES

@@ -12,6 +12,10 @@
   #include <string>
   #include <vector>
 
+extern "C" {
+  #include <libavutil/pixfmt.h>
+}
+
   // local includes
   #include "src/video_colorspace.h"
 
@@ -25,6 +29,14 @@ namespace cuda {
   namespace nvfbc {
     std::vector<std::string> display_names();
   }
+
+  /**
+   * @brief Check whether the CUDA RAM converter supports an encoder format.
+   *
+   * @param format FFmpeg software pixel format requested by the encoder.
+   * @return True when mapped RGB frames can be converted directly on CUDA.
+   */
+  bool supports_ram_frame_format(AVPixelFormat format);
 
   std::unique_ptr<platf::avcodec_encode_device_t> make_avcodec_encode_device(int width, int height, bool vram);
 
@@ -112,6 +124,33 @@ namespace cuda {
     // Converts loaded image into a CUDevicePtr
     int convert_nv12(std::uint8_t *Y, std::uint8_t *UV, std::uint32_t pitchY, std::uint32_t pitchUV, cudaTextureObject_t texture, stream_t::pointer stream);
     int convert_nv12(std::uint8_t *Y, std::uint8_t *UV, std::uint32_t pitchY, std::uint32_t pitchUV, cudaTextureObject_t texture, stream_t::pointer stream, const viewport_t &viewport);
+
+    /**
+     * @brief Convert the configured viewport from an RGBA CUDA texture to P010.
+     *
+     * @param Y Destination luma plane.
+     * @param UV Destination interleaved chroma plane.
+     * @param pitchY Luma-plane row stride in bytes.
+     * @param pitchUV Chroma-plane row stride in bytes.
+     * @param texture Source RGBA CUDA texture.
+     * @param stream CUDA stream on which to launch the conversion.
+     * @return Zero on success, otherwise a CUDA error status.
+     */
+    int convert_p010(std::uint8_t *Y, std::uint8_t *UV, std::uint32_t pitchY, std::uint32_t pitchUV, cudaTextureObject_t texture, stream_t::pointer stream);
+
+    /**
+     * @brief Convert an explicit RGBA texture viewport to P010.
+     *
+     * @param Y Destination luma plane.
+     * @param UV Destination interleaved chroma plane.
+     * @param pitchY Luma-plane row stride in bytes.
+     * @param pitchUV Chroma-plane row stride in bytes.
+     * @param texture Source RGBA CUDA texture.
+     * @param stream CUDA stream on which to launch the conversion.
+     * @param viewport Source and destination region to convert.
+     * @return Zero on success, otherwise a CUDA error status.
+     */
+    int convert_p010(std::uint8_t *Y, std::uint8_t *UV, std::uint32_t pitchY, std::uint32_t pitchUV, cudaTextureObject_t texture, stream_t::pointer stream, const viewport_t &viewport);
     int convert_yuv444(std::uint8_t *Y, std::uint8_t *U, std::uint8_t *V, std::uint32_t pitch, cudaTextureObject_t texture, stream_t::pointer stream);
     int convert_yuv444(std::uint8_t *Y, std::uint8_t *U, std::uint8_t *V, std::uint32_t pitch, cudaTextureObject_t texture, stream_t::pointer stream, const viewport_t &viewport);
 

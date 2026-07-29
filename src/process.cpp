@@ -6,6 +6,7 @@
 
 // standard includes
 #include <cctype>
+#include <charconv>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -212,6 +213,29 @@ namespace proc {
     return {"default"s, false};
   }
 
+  std::optional<std::string> prism_parse_wlroots_capture_override(
+    const std::string_view capture_override
+  ) {
+    constexpr auto prefix = "wlroots:"sv;
+    if (!capture_override.starts_with(prefix)) {
+      return std::nullopt;
+    }
+
+    const auto session_id = capture_override.substr(prefix.size());
+    if (session_id.empty() || session_id.size() > 128 ||
+        !std::all_of(
+          session_id.begin(),
+          session_id.end(),
+          [](const unsigned char character) {
+            return std::isalnum(character) != 0 ||
+                   character == '_' || character == '.' || character == '-';
+          }
+        )) {
+      return std::nullopt;
+    }
+    return std::string(session_id);
+  }
+
   std::optional<prism_headless_state_t> prism_read_headless_state(
     const std::filesystem::path &path,
     const std::string &expected_session_id
@@ -233,6 +257,10 @@ namespace proc {
         return std::nullopt;
       }
     }
+    constexpr std::size_t headless_state_field_count = 18;  ///< Exact version-four state field count.
+    if (values.size() != headless_state_field_count) {
+      return std::nullopt;
+    }
 
     const auto required = [&values](const std::string &key) -> const std::string * {
       const auto iter = values.find(key);
@@ -242,18 +270,27 @@ namespace proc {
     const auto *session_id = required("session_id"s);
     const auto *backend = required("backend"s);
     const auto *unit = required("unit"s);
+    const auto *input_unit = required("input_unit"s);
+    const auto *steam_unit = required("steam_unit"s);
     const auto *app_unit = required("app_unit"s);
     const auto *steam = required("steam"s);
     const auto *wayland_display = required("wayland_display"s);
+    const auto *output_name = required("output_name"s);
     const auto *x_display = required("x_display"s);
+    const auto *width = required("width"s);
+    const auto *height = required("height"s);
+    const auto *framerate = required("framerate"s);
     const auto *physical_sink = required("physical_sink"s);
     const auto *capture_sink_module = required("capture_sink_module"s);
     const auto *session_sink_module = required("session_sink_module"s);
     const auto *loop_module = required("loop_module"s);
-    if (version == nullptr || session_id == nullptr || backend == nullptr || unit == nullptr || app_unit == nullptr ||
-        steam == nullptr || wayland_display == nullptr || x_display == nullptr ||
-        physical_sink == nullptr || capture_sink_module == nullptr ||
-        session_sink_module == nullptr || loop_module == nullptr) {
+    if (version == nullptr || session_id == nullptr || backend == nullptr ||
+        unit == nullptr || input_unit == nullptr || steam_unit == nullptr ||
+        app_unit == nullptr || steam == nullptr || wayland_display == nullptr ||
+        output_name == nullptr || x_display == nullptr || width == nullptr ||
+        height == nullptr || framerate == nullptr || physical_sink == nullptr ||
+        capture_sink_module == nullptr || session_sink_module == nullptr ||
+        loop_module == nullptr) {
       return std::nullopt;
     }
 
@@ -262,31 +299,90 @@ namespace proc {
                return std::isdigit(character) != 0;
              });
     };
-    const bool valid_wayland_display = wayland_display->rfind("gamescope-", 0) == 0 &&
-                                       all_digits(wayland_display->begin() + 10, wayland_display->end());
+    const bool valid_session_id = !session_id->empty() && session_id->size() <= 128 &&
+                                  std::all_of(session_id->begin(), session_id->end(), [](const unsigned char character) {
+                                    return std::isalnum(character) != 0 ||
+                                           character == '_' || character == '.' || character == '-';
+                                  });
     const bool valid_x_display = x_display->size() > 1 && x_display->front() == ':' &&
                                  all_digits(x_display->begin() + 1, x_display->end());
-    const bool valid_modules = all_digits(session_sink_module->begin(), session_sink_module->end()) &&
-                               all_digits(loop_module->begin(), loop_module->end()) &&
-                               (capture_sink_module->empty() ||
-                                all_digits(capture_sink_module->begin(), capture_sink_module->end()));
-    if (*version != "2"sv || *session_id != expected_session_id || expected_session_id.empty() ||
-        *backend != "systemd"sv || *unit != "prism-headless-session.service"sv ||
+    const bool valid_physical_sink = !physical_sink->empty() && physical_sink->size() <= 255 &&
+                                     std::all_of(
+                                       physical_sink->begin(),
+                                       physical_sink->end(),
+                                       [](const unsigned char character) {
+                                         return std::isalnum(character) != 0 ||
+                                                character == '_' || character == '.' || character == '-';
+                                       }
+                                     );
+    const auto parse_bounded = [&all_digits](const std::string &value, std::uint64_t maximum) -> std::optional<std::uint64_t> {
+      if (!all_digits(value.begin(), value.end())) {
+        return std::nullopt;
+      }
+      std::uint64_t parsed = 0;
+      const auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
+      if (result.ec != std::errc {} || result.ptr != value.data() + value.size() || parsed == 0 || parsed > maximum) {
+        return std::nullopt;
+      }
+      return parsed;
+    };
+    const auto parse_module = [&all_digits](const std::string &value) -> std::optional<std::uint32_t> {
+      if (!all_digits(value.begin(), value.end())) {
+        return std::nullopt;
+      }
+      std::uint32_t parsed = 0;
+      const auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
+      if (result.ec != std::errc {} || result.ptr != value.data() + value.size()) {
+        return std::nullopt;
+      }
+      return parsed;
+    };
+    const bool valid_wayland_prefix = wayland_display->rfind("wayland-", 0) == 0;
+    const auto parsed_wayland_display = valid_wayland_prefix ?
+                                          parse_module(wayland_display->substr(8)) :
+                                          std::nullopt;
+    const auto parsed_width = parse_bounded(*width, 16384);
+    const auto parsed_height = parse_bounded(*height, 16384);
+    const auto parsed_framerate = parse_bounded(*framerate, 1000);
+    const auto parsed_x_display = valid_x_display ?
+                                    parse_module(x_display->substr(1)) :
+                                    std::nullopt;
+    const auto parsed_capture_module = capture_sink_module->empty() ?
+                                         std::optional<std::uint32_t> {0} :
+                                         parse_module(*capture_sink_module);
+    const auto parsed_session_module = parse_module(*session_sink_module);
+    const auto parsed_loop_module = parse_module(*loop_module);
+    if (*version != "4"sv || *session_id != expected_session_id ||
+        !valid_session_id || *backend != "systemd"sv ||
+        *unit != "prism-headless-session.service"sv ||
+        *input_unit != "prism-input-bridge.service"sv ||
+        *steam_unit != "prism-headless-steam.service"sv ||
         *app_unit != "prism-headless-app-"s + expected_session_id + ".scope"s ||
         (*steam != "0"sv && *steam != "1"sv) ||
-        !valid_wayland_display || !valid_x_display || !valid_modules) {
+        !parsed_wayland_display || *parsed_wayland_display > 127 ||
+        *output_name != "HEADLESS-1"sv ||
+        !valid_x_display || !valid_physical_sink || !parsed_width ||
+        !parsed_height || !parsed_framerate || !parsed_x_display ||
+        *parsed_x_display > 127 ||
+        !parsed_capture_module || !parsed_session_module || !parsed_loop_module) {
       return std::nullopt;
     }
 
     return prism_headless_state_t {
-      .version = 2,
+      .version = 4,
       .session_id = *session_id,
       .backend = *backend,
       .unit = *unit,
+      .input_unit = *input_unit,
+      .steam_unit = *steam_unit,
       .app_unit = *app_unit,
       .steam = *steam == "1"sv,
       .wayland_display = *wayland_display,
+      .output_name = *output_name,
       .x_display = *x_display,
+      .width = static_cast<int>(*parsed_width),
+      .height = static_cast<int>(*parsed_height),
+      .framerate = static_cast<int>(*parsed_framerate),
       .physical_sink = *physical_sink,
       .capture_sink_module = *capture_sink_module,
       .session_sink_module = *session_sink_module,
@@ -301,8 +397,7 @@ namespace proc {
    * @return Executable helper path, or an empty path when it is unavailable.
    */
   static std::filesystem::path prism_session_script_path(const std::string &script) {
-    if (script.empty() || script == "."sv || script == ".."sv ||
-        script.find('/') != std::string::npos || script.find('\\') != std::string::npos) {
+    if (script.empty() || script == "."sv || script == ".."sv || script.find('/') != std::string::npos || script.find('\\') != std::string::npos) {
       return {};
     }
 
@@ -322,8 +417,7 @@ namespace proc {
                candidate;
     };
 
-    if (const char *override_dir = std::getenv("PRISM_SESSION_DIR");
-        override_dir != nullptr && *override_dir != '\0') {
+    if (const char *override_dir = std::getenv("PRISM_SESSION_DIR"); override_dir != nullptr && *override_dir != '\0') {
       return executable_script(override_dir);
     }
 
@@ -410,8 +504,8 @@ namespace proc {
     if (mode == "headless"sv) {
       // A generated Steam game app carries its launch target as
       // "steam steam://rungameid/<appid>". Hand the appid to the start script
-      // (PRISM_STEAM_APP_ID), which brings up a lightweight (non-Deck-UI)
-      // session Steam with the game URL on its initial command line. Replace
+      // (PRISM_STEAM_APP_ID), which brings up a silent background Steam client
+      // with the game URL on its initial command line. Replace
       // the app command with the lifecycle monitor, which exits with the game
       // so closing the game ends the app and therefore the stream.
       const bool had_steam_app = _env.count("PRISM_STEAM_APP_ID") != 0;
@@ -455,6 +549,8 @@ namespace proc {
       }
       _env["PRISM_HEADLESS_BACKEND"] = state->backend;
       _env["PRISM_HEADLESS_UNIT"] = state->unit;
+      _env["PRISM_HEADLESS_INPUT_UNIT"] = state->input_unit;
+      _env["PRISM_HEADLESS_STEAM_UNIT"] = state->steam_unit;
       _env["PRISM_HEADLESS_APP_UNIT"] = state->app_unit;
       _prism_had_pulse_prop = _env.count("PULSE_PROP") != 0;
       _prism_old_pulse_prop = _prism_had_pulse_prop ? _env["PULSE_PROP"].to_string() : std::string();
@@ -462,8 +558,8 @@ namespace proc {
                            "prism.session.id="s + state->session_id;
       _prism_env_overridden = true;
       if (!_app.cmd.empty()) {
-        // Run the app's own command inside the gamescope session that the
-        // start script launched in the headless compositor. Only verified,
+        // Run the app's own command directly inside the private labwc session.
+        // Only verified,
         // session-owned socket names are accepted from its atomic state.
         _env["WAYLAND_DISPLAY"] = state->wayland_display;
         _env["DISPLAY"] = state->x_display;
@@ -475,7 +571,7 @@ namespace proc {
           _app.working_dir = find_working_directory(_app.cmd, _env).string();
         }
         _app.cmd = "prism-headless-exec.sh"s;
-        BOOST_LOG(info) << "[prism] App command will run inside the gamescope session (WAYLAND_DISPLAY="sv
+        BOOST_LOG(info) << "[prism] App command will run inside the private labwc session (WAYLAND_DISPLAY="sv
                         << state->wayland_display << ", DISPLAY="sv << state->x_display
                         << ", session="sv << state->session_id << ')';
       }
@@ -542,6 +638,8 @@ namespace proc {
       }
       _env.erase("PRISM_HEADLESS_BACKEND");
       _env.erase("PRISM_HEADLESS_UNIT");
+      _env.erase("PRISM_HEADLESS_INPUT_UNIT");
+      _env.erase("PRISM_HEADLESS_STEAM_UNIT");
       _env.erase("PRISM_HEADLESS_APP_UNIT");
       _env.erase("PRISM_HEADLESS_APP_COMMAND");
       if (_prism_had_pulse_prop) {
@@ -722,8 +820,7 @@ namespace proc {
     } else if (_process.running()) {
       // The app is still running only if the initial process launched is still running
       return _app_id;
-    } else if (_app.auto_detach && _process.native_exit_code() == 0 &&
-               std::chrono::steady_clock::now() - _app_launch_time < 5s) {
+    } else if (_app.auto_detach && _process.native_exit_code() == 0 && std::chrono::steady_clock::now() - _app_launch_time < 5s) {
       BOOST_LOG(info) << "App exited gracefully within 5 seconds of launch. Treating the app as a detached command."sv;
       BOOST_LOG(info) << "Adjust this behavior in the Applications tab or apps.json if this is not what you want."sv;
       placebo = true;

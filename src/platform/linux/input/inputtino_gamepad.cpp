@@ -58,6 +58,13 @@ namespace platf::gamepad {
   }
 
   /**
+   * @brief Return the udev-compatible name for a virtual DualSense device.
+   */
+  std::string_view dualsense_device_name(bool edge) {
+    return edge ? "Prism PS5 (virtual) pad (DualSense Edge)"sv : "Prism PS5 (virtual) pad"sv;
+  }
+
+  /**
    * @brief Create an inputtino DualSense or DualSense Edge controller.
    *
    * @param globalIndex Global index.
@@ -73,7 +80,7 @@ namespace platf::gamepad {
     }
 
     return inputtino::PS5Joypad::create({
-      .name = inputtino_name_for_seat(edge ? "Prism DualSense Edge (virtual) pad"sv : "Prism PS5 (virtual) pad"sv),
+      .name = inputtino_name_for_seat(dualsense_device_name(edge)),
       .vendor_id = 0x054C,
       .product_id = static_cast<std::uint16_t>(edge ? 0x0DF2 : 0x0CE6),
       .version = 0x8111,

@@ -1,0 +1,14 @@
+[Unit]
+Description=Prism Steam session inside private labwc
+After=prism-headless-session.service prism-input-bridge.service
+BindsTo=prism-headless-session.service
+PartOf=prism-headless-session.service
+
+[Service]
+Type=simple
+EnvironmentFile=%t/prism-headless-session.env
+ExecStart=%h/.local/bin/prism-headless-steam-session.sh
+KillMode=control-group
+TimeoutStopSec=20
+SendSIGKILL=yes
+Restart=no

@@ -7,6 +7,7 @@
 
 // standard includes
 #include <algorithm>
+#include <array>
 #include <tuple>
 #include <utility>
 
@@ -47,6 +48,87 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(EncoderTest, ValidateEncoder) {
   // todo:: test something besides fixture setup
+}
+
+TEST(VideoFrameScale, ConvertsExternallyOwnedBgr0Pixels) {
+  constexpr int width = 2;
+  constexpr int height = 2;
+  constexpr int row_pitch = width * 4;
+  const std::array<std::uint8_t, row_pitch * height> pixels = {
+    0,
+    0,
+    255,
+    0,
+    0,
+    255,
+    0,
+    0,
+    255,
+    0,
+    0,
+    0,
+    255,
+    255,
+    255,
+    0,
+  };
+
+  video::sws_t scaler {
+    sws_getContext(
+      width,
+      height,
+      AV_PIX_FMT_BGR0,
+      width,
+      height,
+      AV_PIX_FMT_NV12,
+      SWS_POINT,
+      nullptr,
+      nullptr,
+      nullptr
+    )
+  };
+  ASSERT_NE(scaler, nullptr);
+
+  video::avcodec_frame_t destination {av_frame_alloc()};
+  ASSERT_NE(destination, nullptr);
+  destination->width = width;
+  destination->height = height;
+  destination->format = AV_PIX_FMT_NV12;
+
+  EXPECT_EQ(
+    video::scale_bgr0_frame(
+      scaler.get(),
+      destination.get(),
+      pixels.data(),
+      width,
+      height,
+      row_pitch
+    ),
+    height
+  );
+  EXPECT_NE(destination->data[0], nullptr);
+  EXPECT_EQ(
+    video::scale_bgr0_frame(
+      scaler.get(),
+      destination.get(),
+      pixels.data(),
+      width,
+      height,
+      row_pitch
+    ),
+    height
+  );
+  EXPECT_LT(
+    video::scale_bgr0_frame(
+      scaler.get(),
+      destination.get(),
+      pixels.data(),
+      width,
+      height,
+      row_pitch - 1
+    ),
+    0
+  );
 }
 
 /**

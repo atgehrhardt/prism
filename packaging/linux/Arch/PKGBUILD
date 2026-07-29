@@ -30,10 +30,12 @@ fi
 
 depends=(
   'avahi'
+  'bubblewrap'
   'curl'
   'gcc-libs'
   'gtk3'
   'hicolor-icon-theme'
+  'labwc'
   'libayatana-appindicator'
   'libcap'
   'libdrm'
@@ -46,6 +48,7 @@ depends=(
   'libx11'
   'libxcb'
   'libxfixes'
+  'libxkbcommon'
   'libxrandr'
   'libxtst'
   'miniupnpc'
@@ -57,6 +60,8 @@ depends=(
   'udev'
   'vulkan-icd-loader'
   'which'
+  'wlr-randr'
+  'xorg-xwayland'
 )
 
 makedepends=(

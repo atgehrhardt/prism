@@ -16,6 +16,8 @@ PRISM_SYS_ROOT="${PRISM_SYS_ROOT:-/sys}"
 RECOVERY_LOG="${PRISM_RECOVERY_LOG:-$HOME/.local/state/prism-recovery.log}"
 HEADLESS_STATE="$RUNTIME/prism-headless.state"
 HEADLESS_AUDIO_STATE="$RUNTIME/prism-headless-audio.state"
+HEADLESS_READY_FILE="$RUNTIME/prism-headless-session.ready"
+HEADLESS_INPUT_READY_FILE="$RUNTIME/prism-headless-input.ready"
 VIRTUAL_STATE="$RUNTIME/prism-virtual-desktop.state"
 VIRTUAL_AUDIO_STATE="$RUNTIME/prism-virtual-audio.state"
 MIRROR_AUDIO_STATE="$RUNTIME/prism-mirror-audio.state"
@@ -66,6 +68,8 @@ prism_virtual_output_present() {
 
 prism_headless_units_present() {
   prism_unit_live "$PRISM_HEADLESS_UNIT" || prism_unit_has_pids "$PRISM_HEADLESS_UNIT" ||
+    prism_unit_live "$PRISM_INPUT_UNIT" || prism_unit_has_pids "$PRISM_INPUT_UNIT" ||
+    prism_unit_live "$PRISM_STEAM_UNIT" || prism_unit_has_pids "$PRISM_STEAM_UNIT" ||
     systemctl --user list-units --all --plain --no-legend \
       'prism-headless-app-*.scope' 2>/dev/null | awk 'NF {found=1} END {exit found ? 0 : 1}'
 }
@@ -73,6 +77,9 @@ prism_headless_units_present() {
 prism_headless_markers_present() {
   [ -e "$HEADLESS_STATE" ] || [ -e "$HEADLESS_AUDIO_STATE" ] ||
     [ -e "$RUNTIME/prism-headless-session.env" ] ||
+    [ -e "$RUNTIME/prism-headless-input.env" ] ||
+    [ -e "$HEADLESS_READY_FILE" ] ||
+    [ -e "$HEADLESS_INPUT_READY_FILE" ] ||
     prism_headless_units_present || prism_legacy_headless_present
 }
 
@@ -81,7 +88,7 @@ prism_select_restore_sink() {
 
   configured="$(sed -n 's/^prism_default_sink *= *//p' \
     "$HOME/.config/prism/prism.conf" 2>/dev/null | tail -1)"
-  if [ -n "$configured" ]; then
+  if prism_audio_sink_available "$configured"; then
     printf '%s\n' "$configured"
     return 0
   fi
@@ -93,7 +100,7 @@ prism_select_restore_sink() {
       continue
     fi
     candidate_sink="$(prism_audio_state_get "$candidate" physical_sink 2>/dev/null || true)"
-    [ -n "$candidate_sink" ] || continue
+    prism_audio_sink_available "$candidate_sink" || continue
     if [ -z "$newest" ] || [ "$candidate" -nt "$newest" ]; then
       newest="$candidate"
       newest_sink="$candidate_sink"
@@ -103,7 +110,7 @@ prism_select_restore_sink() {
     printf '%s\n' "$newest_sink"
     return 0
   fi
-  pactl get-default-sink 2>/dev/null || true
+  prism_audio_choose_restore_sink "" "" 2>/dev/null || true
 }
 
 prism_cleanup_headless() {
@@ -206,7 +213,7 @@ prism_verify_cleanup() {
     result=1
   fi
   if prism_legacy_headless_present; then
-    echo "ERROR: a Prism-owned legacy gamescope process tree remains active"
+    echo "ERROR: an obsolete Prism-owned headless process tree remains active"
     result=1
   fi
   if prism_virtual_monitor_present; then
@@ -273,7 +280,12 @@ prism_session_cleanup_main() {
   [ "$audio_result" -eq 0 ] || result=1
 
   if ! prism_headless_units_present 2>/dev/null && ! prism_legacy_headless_present; then
-    rm -f "$RUNTIME/prism-headless-session.env" "$RUNTIME/prism-mangoapp.conf"
+    rm -f "$RUNTIME/prism-headless-session.env" "$RUNTIME/prism-headless-input.env" \
+      "$HEADLESS_READY_FILE" "$HEADLESS_INPUT_READY_FILE" \
+      "$RUNTIME/prism-labwc-reset-required"
+    if [ "$audio_result" -eq 0 ]; then
+      rm -f "$HEADLESS_STATE"
+    fi
   fi
   if [ "$audio_result" -eq 0 ]; then
     rm -f "$HEADLESS_AUDIO_STATE" "$VIRTUAL_AUDIO_STATE" "$MIRROR_AUDIO_STATE"

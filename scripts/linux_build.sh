@@ -289,6 +289,7 @@ function add_arch_deps() {
     'libx11'
     'libxcb'
     'libxfixes'
+    'libxkbcommon'
     'libxrandr'
     'libxtst'
     'miniupnpc'
@@ -357,6 +358,7 @@ function add_debian_based_deps() {
     "libxcb-xfixes0-dev"  # X11
     "libxcb1-dev"  # X11
     "libxfixes-dev"  # X11
+    "libxkbcommon-dev"
     "libxrandr-dev"  # X11
     "libxtst-dev"  # X11
     "libvulkan-dev"  # Vulkan
@@ -457,6 +459,7 @@ function add_fedora_deps() {
     "libXinerama-devel"  # X11
     "libXrandr-devel"  # X11
     "libXtst-devel"  # X11
+    "libxkbcommon-devel"
     "mesa-libGL-devel"
     "mesa-libgbm-devel"
     "miniupnpc-devel"

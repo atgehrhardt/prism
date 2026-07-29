@@ -217,6 +217,75 @@ namespace cuda {
     dstY1[1] = calcY(rgb_rb, color_matrix) * 245.0f;  // 245.0f is a magic number to ensure slight changes in luminosity are more visible
   }
 
+  /**
+   * @brief Convert a normalized component into P010's high ten bits.
+   *
+   * @param value Normalized component in the inclusive range zero to one.
+   * @return Ten-bit component stored in the most significant bits of a word.
+   */
+  inline __device__ std::uint16_t normalized_to_p010(float value) {
+    const auto clamped = fminf(fmaxf(value, 0.0f), 1.0f);
+    return static_cast<std::uint16_t>(__float2uint_rn(clamped * 1023.0f) << 6);
+  }
+
+  /**
+   * @brief Convert a BGRA texture into a two-plane P010 CUDA frame.
+   *
+   * @param srcImage Source BGRA texture.
+   * @param dstY Destination luma plane.
+   * @param dstUV Destination interleaved chroma plane.
+   * @param dstPitchY Luma pitch in bytes.
+   * @param dstPitchUV Chroma pitch in bytes.
+   * @param scale Source sampling scale.
+   * @param viewport Destination viewport.
+   * @param color_matrix RGB-to-YUV conversion coefficients.
+   */
+  __global__ void RGBA_to_P010(
+    cudaTextureObject_t srcImage,
+    std::uint8_t *dstY,
+    std::uint8_t *dstUV,
+    std::uint32_t dstPitchY,
+    std::uint32_t dstPitchUV,
+    float scale,
+    const viewport_t viewport,
+    const cuda_color_t *const color_matrix
+  ) {
+    int idX = (threadIdx.x + blockDim.x * blockIdx.x) * 2;
+    int idY = (threadIdx.y + blockDim.y * blockIdx.y) * 2;
+
+    if (idX >= viewport.width || idY >= viewport.height) {
+      return;
+    }
+
+    const float x = idX * scale;
+    const float y = idY * scale;
+
+    idX += viewport.offsetX;
+    idY += viewport.offsetY;
+
+    auto *dstY0 = reinterpret_cast<std::uint16_t *>(dstY + idY * dstPitchY) + idX;
+    auto *dstY1 = reinterpret_cast<std::uint16_t *>(dstY + (idY + 1) * dstPitchY) + idX;
+    auto *dstUV16 = reinterpret_cast<std::uint16_t *>(dstUV + (idY / 2) * dstPitchUV) + idX;
+
+    const float3 rgb_lt = bgra_to_rgb(tex2D<float4>(srcImage, x, y));
+    const float3 rgb_rt = bgra_to_rgb(tex2D<float4>(srcImage, x + scale, y));
+    const float3 rgb_lb = bgra_to_rgb(tex2D<float4>(srcImage, x, y + scale));
+    const float3 rgb_rb = bgra_to_rgb(tex2D<float4>(srcImage, x + scale, y + scale));
+
+    const float2 uv = (calcUV(rgb_lt, color_matrix) +
+                       calcUV(rgb_rt, color_matrix) +
+                       calcUV(rgb_lb, color_matrix) +
+                       calcUV(rgb_rb, color_matrix)) *
+                      0.25f;
+
+    dstUV16[0] = normalized_to_p010(uv.x);
+    dstUV16[1] = normalized_to_p010(uv.y);
+    dstY0[0] = normalized_to_p010(calcY(rgb_lt, color_matrix));
+    dstY0[1] = normalized_to_p010(calcY(rgb_rt, color_matrix));
+    dstY1[0] = normalized_to_p010(calcY(rgb_lb, color_matrix));
+    dstY1[1] = normalized_to_p010(calcY(rgb_rb, color_matrix));
+  }
+
   __global__ void RGBA_to_YUV444(
     cudaTextureObject_t srcImage,
     std::uint8_t *dstY,
@@ -376,6 +445,22 @@ namespace cuda {
     RGBA_to_NV12<<<grid, block, 0, stream>>>(texture, Y, UV, pitchY, pitchUV, scale, viewport, (cuda_color_t *) color_matrix.get());
 
     return CU_CHECK_IGNORE(cudaGetLastError(), "RGBA_to_NV12 failed");
+  }
+
+  int sws_t::convert_p010(std::uint8_t *Y, std::uint8_t *UV, std::uint32_t pitchY, std::uint32_t pitchUV, cudaTextureObject_t texture, stream_t::pointer stream) {
+    return convert_p010(Y, UV, pitchY, pitchUV, texture, stream, viewport);
+  }
+
+  int sws_t::convert_p010(std::uint8_t *Y, std::uint8_t *UV, std::uint32_t pitchY, std::uint32_t pitchUV, cudaTextureObject_t texture, stream_t::pointer stream, const viewport_t &viewport) {
+    const int threadsX = viewport.width / 2;
+    const int threadsY = viewport.height / 2;
+
+    const dim3 block(threadsPerBlock);
+    const dim3 grid(div_align(threadsX, threadsPerBlock), threadsY);
+
+    RGBA_to_P010<<<grid, block, 0, stream>>>(texture, Y, UV, pitchY, pitchUV, scale, viewport, (cuda_color_t *) color_matrix.get());
+
+    return CU_CHECK_IGNORE(cudaGetLastError(), "RGBA_to_P010 failed");
   }
 
   int sws_t::convert_yuv444(std::uint8_t *Y, std::uint8_t *U, std::uint8_t *V, std::uint32_t pitch, cudaTextureObject_t texture, stream_t::pointer stream) {

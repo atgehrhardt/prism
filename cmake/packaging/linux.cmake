@@ -12,8 +12,8 @@ install(PROGRAMS
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-session.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-start.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-steam.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-steam-session.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-stop.sh"
-        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-labwc-link-socket.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-mirror-audio.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-session-cleanup.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steam-game.sh"
@@ -21,6 +21,7 @@ install(PROGRAMS
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steamos-start.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steamos-stop.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-virtual-audio.sh"
+        "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-virtual-common.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-virtual-start.sh"
         "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-virtual-stop.sh"
         DESTINATION "${PRISM_SESSION_DIR}")
@@ -49,7 +50,55 @@ else()
                 DESTINATION "${UDEV_RULES_INSTALL_DIR}")
     endif()
     if(SYSTEMD_FOUND)
+        file(READ
+                "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-session.service"
+                PRISM_HEADLESS_SESSION_SERVICE)
+        string(REPLACE
+                "%h/.local/bin/prism-headless-session.sh"
+                "${PRISM_SESSION_DIR}/prism-headless-session.sh"
+                PRISM_HEADLESS_SESSION_SERVICE
+                "${PRISM_HEADLESS_SESSION_SERVICE}")
+        file(WRITE
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-headless-session.service"
+                "${PRISM_HEADLESS_SESSION_SERVICE}")
+        file(READ
+                "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-input-bridge.service"
+                PRISM_INPUT_BRIDGE_SERVICE)
+        string(REPLACE
+                "%h/.local/bin/prism-input-bridge"
+                "${CMAKE_INSTALL_FULL_BINDIR}/prism-input-bridge"
+                PRISM_INPUT_BRIDGE_SERVICE
+                "${PRISM_INPUT_BRIDGE_SERVICE}")
+        file(WRITE
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-input-bridge.service"
+                "${PRISM_INPUT_BRIDGE_SERVICE}")
+        file(READ
+                "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-headless-steam.service"
+                PRISM_HEADLESS_STEAM_SERVICE)
+        string(REPLACE
+                "%h/.local/bin/prism-headless-steam-session.sh"
+                "${PRISM_SESSION_DIR}/prism-headless-steam-session.sh"
+                PRISM_HEADLESS_STEAM_SERVICE
+                "${PRISM_HEADLESS_STEAM_SERVICE}")
+        file(WRITE
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-headless-steam.service"
+                "${PRISM_HEADLESS_STEAM_SERVICE}")
+        file(READ
+                "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-steam-restore.service"
+                PRISM_STEAM_RESTORE_SERVICE)
+        string(REPLACE
+                "%h/.local/bin/prism-steam-restore.sh"
+                "${PRISM_SESSION_DIR}/prism-steam-restore.sh"
+                PRISM_STEAM_RESTORE_SERVICE
+                "${PRISM_STEAM_RESTORE_SERVICE}")
+        file(WRITE
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-steam-restore.service"
+                "${PRISM_STEAM_RESTORE_SERVICE}")
         install(FILES "${CMAKE_CURRENT_BINARY_DIR}/app-${PROJECT_FQDN}.service"
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-headless-session.service"
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-input-bridge.service"
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-headless-steam.service"
+                "${CMAKE_CURRENT_BINARY_DIR}/prism-steam-restore.service"
                 DESTINATION "${SYSTEMD_USER_UNIT_INSTALL_DIR}")
         install(FILES "${PRISM_SOURCE_ASSETS_DIR}/linux/misc/60-prism.conf"
                 DESTINATION "${SYSTEMD_MODULES_LOAD_DIR}")
@@ -71,7 +120,9 @@ set(CPACK_RPM_USER_FILELIST "%caps(cap_sys_admin,cap_sys_nice+p) ${PRISM_EXECUTA
 set(CPACK_DEB_COMPONENT_INSTALL ON)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
             ${CPACK_DEB_PLATFORM_PACKAGE_DEPENDS} \
+            bubblewrap, \
             debianutils, \
+            labwc, \
             libcap2, \
             libcurl4, \
             libdrm2, \
@@ -83,11 +134,16 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
             libva2, \
             libva-drm2, \
             libwayland-client0, \
+            libxkbcommon0, \
             libx11-6, \
             miniupnpc, \
-            openssl | libssl3")
+            openssl | libssl3, \
+            wlr-randr, \
+            xwayland")
 set(CPACK_RPM_PACKAGE_REQUIRES "\
             ${CPACK_RPM_PLATFORM_PACKAGE_REQUIRES} \
+            bubblewrap, \
+            labwc, \
             libcap >= 2.22, \
             libcurl >= 7.0, \
             libdrm >= 2.4.97, \
@@ -95,13 +151,16 @@ set(CPACK_RPM_PACKAGE_REQUIRES "\
             libopusenc >= 0.2.1, \
             libva >= 2.14.0, \
             libwayland-client >= 1.20.0, \
+            libxkbcommon >= 1.0.0, \
             libX11 >= 1.7.3.1, \
             mesa-libgbm >= 25.0.7, \
             miniupnpc >= 2.2.4, \
             numactl-libs >= 2.0.14, \
             openssl >= 3.0.2, \
             pulseaudio-libs >= 10.0, \
-            which >= 2.21")
+            which >= 2.21, \
+            wlr-randr, \
+            xorg-x11-server-Xwayland")
 
 if(NOT BOOST_USE_STATIC)
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
