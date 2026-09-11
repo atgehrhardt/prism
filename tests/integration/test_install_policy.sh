@@ -4,6 +4,7 @@ set -euo pipefail
 
 SOURCE_DIR="${1:?source directory required}"
 INSTALLER="$SOURCE_DIR/install.sh"
+python3 "$SOURCE_DIR/tests/integration/test_install_bootstrap.py" "$INSTALLER"
 README="$SOURCE_DIR/README.md"
 NATIVE_SERVICE="$SOURCE_DIR/contrib/virtual-session/prism.service"
 SERVICE_TEMPLATE="$SOURCE_DIR/packaging/linux/app-dev.lizardbyte.app.Prism.service.in"

@@ -104,6 +104,12 @@ NVIDIA/AMD requirements, and installation on other distributions.
 curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
 ```
 
+Run this as your normal user from any directory on the target machine; no manual
+clone is needed. The installer clones sources into `~/Dev/prism`, builds and
+installs the server, and starts the user service. It prompts for sudo when
+installing system dependencies. Set `PRISM_SRC_DIR` on `bash` to choose another
+source directory.
+
 The Fedora source installer uses only Fedora's enabled repositories. It does not install
 Steam or enable third-party repositories; in particular, RPM Fusion is no longer required
 solely to satisfy Steam. Install Steam separately if you want Steam discovery, synchronized
