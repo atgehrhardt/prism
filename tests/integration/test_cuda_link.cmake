@@ -1,0 +1,26 @@
+## @file
+## @brief Verify that mixed CUDA/C++ links prefer the C++ compiler runtime.
+set(CMAKE_CXX_COMPILER_ID GNU)
+set(CMAKE_CXX_COMPILER_VERSION 16)
+set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "/compiler runtime/lib;/system/lib")
+set(CUDA_FOUND TRUE)
+set(PRISM_LINK_OPTIONS existing-option)
+include("${SOURCE_DIR}/cmake/targets/linux.cmake")
+set(EXPECTED "existing-option;$<$<LINK_LANGUAGE:CXX>:-L/compiler runtime/lib>;$<$<LINK_LANGUAGE:CXX>:-L/system/lib>")
+if(NOT PRISM_LINK_OPTIONS STREQUAL EXPECTED)
+    message(FATAL_ERROR "C++ runtime search paths were not preserved: ${PRISM_LINK_OPTIONS}")
+endif()
+
+set(CUDA_FOUND FALSE)
+set(PRISM_LINK_OPTIONS existing-option)
+include("${SOURCE_DIR}/cmake/targets/linux.cmake")
+if(NOT PRISM_LINK_OPTIONS STREQUAL "existing-option")
+    message(FATAL_ERROR "Non-CUDA build received runtime overrides")
+endif()
+
+set(CUDA_FOUND TRUE)
+set(CMAKE_CXX_COMPILER_ID Clang)
+include("${SOURCE_DIR}/cmake/targets/linux.cmake")
+if(NOT PRISM_LINK_OPTIONS STREQUAL "existing-option")
+    message(FATAL_ERROR "Non-GNU build received GCC runtime overrides")
+endif()

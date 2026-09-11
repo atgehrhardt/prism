@@ -46,8 +46,21 @@ For NVIDIA, install a CUDA toolkit with `nvcc >= 12` before building Prism. The
 installer accepts `PRISM_ENABLE_CUDA=AUTO|ON|OFF` (default `AUTO`) and `CUDACXX`
 for an explicit compiler path. It fails when NVIDIA is detected or CUDA is
 requested but the compiler is missing. AMD uses VAAPI and does not need CUDA.
-Use a host compiler supported by the installed CUDA toolkit; bypassing its check
-requires the explicit `PRISM_CUDA_ALLOW_UNSUPPORTED_COMPILER=1` option.
+The installer verifies CUDA compilation before configuring Prism. It tries the
+system GCC, then installed versioned GCC executables (newest first), and selects
+one that passes. Set `CUDAHOSTCXX` to choose a host compiler explicitly; an
+explicit selection is never replaced automatically. For example, when the CUDA
+toolkit rejects GCC 16 but GCC 15 is installed:
+
+```bash
+CUDAHOSTCXX=/usr/bin/gcc-15 bash install.sh
+```
+
+If none passes, install a host compiler supported by the toolkit and rerun.
+Bypassing the toolkit's version check requires the explicit
+`PRISM_CUDA_ALLOW_UNSUPPORTED_COMPILER=1` option and still must pass the compile
+probe. Unsupported compilers may fail to build or produce incorrect runtime
+behavior. `PRISM_ENABLE_CUDA=OFF` intentionally disables NVIDIA headless HDR.
 
 Enable HDR in Iris and launch an app whose streaming mode is **Headless**. The
 client must have an HDR10 display and an HEVC Main10 or AV1 10-bit decoder. The
