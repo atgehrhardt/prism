@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-## @file
-## @brief Exercise installer startup without packages, network, or host changes.
+"""@file
+@brief Test installer startup without packages, network, or host changes.
+"""
 
 import os
 from pathlib import Path
@@ -13,27 +14,36 @@ INSTALLER = Path(sys.argv.pop(1)).resolve()
 
 
 class InstallBootstrapTest(unittest.TestCase):
-    """Verify file and pipe entry points reach the build in the cloned source."""
+    """Verify file and pipe entry points build in the cloned source."""
 
     def test_bootstrap(self):
         """Cover fresh/existing sources, relative paths, and clone failures."""
         for piped in (False, True):
-            for existing, clone_fails in ((False, False), (True, False), (False, True)):
-                with self.subTest(piped=piped, existing=existing, clone_fails=clone_fails):
-                    with tempfile.TemporaryDirectory(prefix="prism-bootstrap-") as tmp:
+            for existing, clone_fails in (
+                (False, False), (True, False), (False, True)
+            ):
+                with self.subTest(
+                    piped=piped, existing=existing, clone_fails=clone_fails
+                ):
+                    with tempfile.TemporaryDirectory(
+                        prefix="prism-bootstrap-"
+                    ) as tmp:
                         root = Path(tmp)
                         caller = root / "unrelated directory"
                         caller.mkdir()
                         source = caller / "source checkout"
                         fixture = root / "fixture"
                         (fixture / "scripts").mkdir(parents=True)
-                        (fixture / "contrib/virtual-session").mkdir(parents=True)
+                        session_dir = fixture / "contrib/virtual-session"
+                        session_dir.mkdir(parents=True)
                         (fixture / "scripts/linux_cuda_config.sh").write_text(
-                            'prism_configure_cuda() { CUDA_FLAG=OFF; CUDA_FLAGS=(); }\n'
+                            'prism_configure_cuda() { '
+                            'CUDA_FLAG=OFF; CUDA_FLAGS=(); }\n'
                         )
-                        (fixture / "contrib/virtual-session/build-headless-compositor.sh").write_text(
-                            'exit 0\n'
+                        compositor = (
+                            session_dir / 'build-headless-compositor.sh'
                         )
+                        compositor.write_text('exit 0\n')
                         if existing:
                             import shutil
                             shutil.copytree(fixture, source)
@@ -51,7 +61,8 @@ class InstallBootstrapTest(unittest.TestCase):
 fi
 ''',
                             # Stop before building or installing anything.
-                            "cmake": '''[ "$PWD" = "$EXPECTED_SOURCE" ] || exit 24
+                            "cmake": '''\
+[ "$PWD" = "$EXPECTED_SOURCE" ] || exit 24
 [ "$1" = -S ] && [ "$2" = "$EXPECTED_SOURCE" ] || exit 25
 printf 'reached build\\n'
 exit 42
@@ -59,7 +70,9 @@ exit 42
                         }
                         for name, body in stubs.items():
                             path = mock_bin / name
-                            path.write_text("#!/usr/bin/env bash\nset -eu\n" + body)
+                            path.write_text(
+                                "#!/usr/bin/env bash\nset -eu\n" + body
+                            )
                             path.chmod(0o755)
                         env = dict(os.environ)
                         env.update(
@@ -73,14 +86,17 @@ exit 42
                         result = subprocess.run(
                             ["bash"] if piped else ["bash", str(INSTALLER)],
                             input=INSTALLER.read_text() if piped else "",
-                            cwd=caller, env=env, capture_output=True, text=True,
+                            cwd=caller, env=env,
+                            capture_output=True, text=True,
                             timeout=15,
                         )
                         self.assertEqual(
                             result.returncode, 23 if clone_fails else 42,
                             result.stdout + result.stderr,
                         )
-                        self.assertEqual("reached build" in result.stdout, not clone_fails)
+                        self.assertEqual(
+                            "reached build" in result.stdout, not clone_fails
+                        )
 
 
 if __name__ == "__main__":
