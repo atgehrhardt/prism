@@ -7,6 +7,8 @@ SESSION_ID="${PRISM_SESSION_ID:?missing PRISM_SESSION_ID}"
 WAYLAND_SOCKET="${WAYLAND_DISPLAY:?missing WAYLAND_DISPLAY}"
 X_DISPLAY="${DISPLAY:?missing DISPLAY}"
 APP_ID="${PRISM_STEAM_APP_ID:-}"
+# shellcheck source=contrib/virtual-session/prism-headless-common.sh
+. "$SCRIPT_DIR/prism-headless-common.sh"
 
 case "$APP_ID" in
   '' | *[!0-9]*)
@@ -17,10 +19,9 @@ case "$APP_ID" in
     ;;
 esac
 
-export XDG_SESSION_TYPE=wayland
+prism_headless_app_environment
 export PULSE_SINK=prism-headless
 export PULSE_PROP="prism.session.id=$SESSION_ID"
-unset GAMESCOPE_WAYLAND_DISPLAY
 
 echo "starting Steam directly in labwc socket=$WAYLAND_SOCKET display=$X_DISPLAY session=$SESSION_ID"
 if [ -n "$APP_ID" ]; then

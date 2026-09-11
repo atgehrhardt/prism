@@ -12,7 +12,7 @@ READY_FILE="$RUNTIME/prism-headless-session.ready"
 INPUT_READY_FILE="$RUNTIME/prism-headless-input.ready"
 LOG="$HOME/.local/state/prism-headless.log"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-export PATH="$SCRIPT_DIR:$PATH"
+export PATH="$SCRIPT_DIR:$HOME/.local/bin:$PATH"
 # shellcheck source=contrib/virtual-session/prism-headless-common.sh
 . "$SCRIPT_DIR/prism-headless-common.sh"
 
@@ -22,23 +22,20 @@ echo "=== headless-start $(date -Is) backend=labwc steam=${PRISM_STEAM:-0} id=${
 
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME/bus"
 
-for required in awk cmp date find flock labwc pactl prism-input-bridge \
+for required in awk cmp date find flock pactl prism-input-bridge \
   python3 readlink systemctl systemd-run timeout wayland-info wlr-randr; do
   if ! command -v "$required" >/dev/null 2>&1; then
     echo "ERROR: headless mode requires '$required'" >&2
     exit 1
   fi
 done
-if ! labwc --version 2>&1 | grep -q '+xwayland'; then
-  echo "ERROR: installed labwc was built without Xwayland support" >&2
-  exit 1
-fi
 prism_headless_require_backend || exit 1
 
 W="${PRISM_CLIENT_WIDTH:-1920}"
 H="${PRISM_CLIENT_HEIGHT:-1080}"
 FPS="${PRISM_CLIENT_FPS:-60}"
 HDR="${PRISM_CLIENT_HDR:-false}"
+RENDER_DEVICE="${PRISM_RENDER_DEVICE:-}"
 STEAM="${PRISM_STEAM:-0}"
 SESSION_ID="${PRISM_SESSION_ID:-manual-$$}"
 APP_UNIT="prism-headless-app-${SESSION_ID}.scope"
@@ -62,6 +59,25 @@ case "$HDR" in
     exit 1
     ;;
 esac
+case "$RENDER_DEVICE" in
+  '') ;;
+  /dev/dri/renderD*)
+    case "${RENDER_DEVICE#/dev/dri/renderD}" in
+      '' | *[!0-9]*) echo "ERROR: invalid render device '$RENDER_DEVICE'" >&2; exit 1 ;;
+    esac
+    ;;
+  *) echo "ERROR: invalid render device '$RENDER_DEVICE'" >&2; exit 1 ;;
+esac
+COMPOSITOR=labwc
+[ "$HDR" != true ] || COMPOSITOR=prism-labwc
+if ! command -v "$COMPOSITOR" >/dev/null 2>&1; then
+  echo "ERROR: headless mode requires $COMPOSITOR; for HDR run contrib/virtual-session/build-headless-compositor.sh" >&2
+  exit 1
+fi
+if ! "$COMPOSITOR" --version 2>&1 | grep -q '+xwayland'; then
+  echo "ERROR: installed $COMPOSITOR was built without Xwayland support" >&2
+  exit 1
+fi
 case "$STEAM" in
   0 | 1) ;;
   *)
@@ -232,7 +248,11 @@ write_session_environment() {
   local wayland_display="${1:-}"
   local x_display="${2:-}"
 
-  prism_atomic_write "$ENV_FILE" <<EOF
+  {
+    if [ -n "$RENDER_DEVICE" ]; then
+      printf 'WLR_RENDER_DRM_DEVICE=%s\n' "$RENDER_DEVICE"
+    fi
+    cat <<EOF
 PRISM_SESSION_ID=$SESSION_ID
 PRISM_HEADLESS_BACKEND=systemd
 PRISM_HEADLESS_UNIT=$PRISM_HEADLESS_UNIT
@@ -242,7 +262,7 @@ PRISM_HEADLESS_APP_UNIT=$APP_UNIT
 PRISM_CLIENT_WIDTH=$W
 PRISM_CLIENT_HEIGHT=$H
 PRISM_CLIENT_FPS=$FPS
-PRISM_CLIENT_HDR=false
+PRISM_CLIENT_HDR=$HDR
 PRISM_STEAM=$STEAM
 PRISM_STEAM_APP_ID=${PRISM_STEAM_APP_ID:-}
 PRISM_PHYSICAL_SINK=$PHYSICAL_SINK
@@ -251,6 +271,7 @@ DISPLAY=$x_display
 PULSE_SINK=prism-headless
 PULSE_PROP=prism.session.id=$SESSION_ID
 EOF
+  } | prism_atomic_write "$ENV_FILE"
 }
 
 if ! write_session_environment; then
@@ -319,6 +340,7 @@ while [ "$(date +%s%3N)" -lt "$DEADLINE_MS" ]; do
     if timeout 1 env \
       XDG_RUNTIME_DIR="$RUNTIME" WAYLAND_DISPLAY="$WAYLAND_SOCKET" \
       wlr-randr --output "$OUTPUT_NAME" \
+      --on --scale 1 --transform normal --pos 0,0 \
       --custom-mode "${W}x${H}@${FPS}" >/dev/null 2>&1; then
       MODE_CONFIGURED=1
     fi
@@ -328,7 +350,7 @@ while [ "$(date +%s%3N)" -lt "$DEADLINE_MS" ]; do
       XDG_RUNTIME_DIR="$RUNTIME" WAYLAND_DISPLAY="$WAYLAND_SOCKET" \
       wlr-randr 2>/dev/null || true)"
     if printf '%s\n' "$RANDR_OUTPUT" |
-      grep -Eq "^[[:space:]]+${W}x${H} px, ${FPS}([.]0+)? Hz \\(current\\)$"; then
+      prism_headless_mode_matches "$OUTPUT_NAME" "$W" "$H" "$FPS"; then
       SAW_MODE=1
     fi
   fi
@@ -340,7 +362,8 @@ while [ "$(date +%s%3N)" -lt "$DEADLINE_MS" ]; do
       printf '%s\n' "$PROTOCOLS" | grep -q "zwp_linux_dmabuf_v1" &&
       printf '%s\n' "$PROTOCOLS" | grep -q "zxdg_output_manager_v1" &&
       printf '%s\n' "$PROTOCOLS" | grep -q "zwlr_virtual_pointer_manager_v1" &&
-      printf '%s\n' "$PROTOCOLS" | grep -q "zwp_virtual_keyboard_manager_v1"; then
+      printf '%s\n' "$PROTOCOLS" | grep -q "zwp_virtual_keyboard_manager_v1" &&
+      { [ "$HDR" = false ] || printf '%s\n' "$PROTOCOLS" | grep -q "wp_color_manager_v1"; }; then
       SAW_PROTOCOLS=1
     fi
   fi

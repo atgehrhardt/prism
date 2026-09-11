@@ -9,4 +9,5 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=contrib/virtual-session/prism-headless-common.sh
 . "$SCRIPT_DIR/prism-headless-common.sh"
 
+prism_headless_app_environment
 prism_run_owned_app "$APP_UNIT" "$COMMAND"

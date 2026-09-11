@@ -44,7 +44,6 @@ endif()
 include(${CMAKE_MODULE_PATH}/compile_definitions/unix.cmake)
 include(${CMAKE_MODULE_PATH}/compile_definitions/linux.cmake)
 
-include_directories(BEFORE SYSTEM "${CMAKE_SOURCE_DIR}/third-party/nv-codec-headers/include")
 file(GLOB NVENC_SOURCES CONFIGURE_DEPENDS "src/nvenc/*.cpp" "src/nvenc/*.h")
 list(APPEND PLATFORM_TARGET_FILES ${NVENC_SOURCES})
 
@@ -139,6 +138,10 @@ include_directories(
         ${FFMPEG_INCLUDE_DIRS}
         ${Boost_INCLUDE_DIRS}  # has to be the last, or we get runtime error on macOS ffmpeg encoder
 )
+
+# FFmpeg bundles can carry a different Video Codec SDK. Prepend Prism's pinned
+# headers after the other BEFORE includes so its checked NVENC ABI wins.
+include_directories(BEFORE SYSTEM "${CMAKE_SOURCE_DIR}/third-party/nv-codec-headers/include")
 
 list(APPEND PRISM_EXTERNAL_LIBRARIES
         ${MINIUPNP_LIBRARIES}

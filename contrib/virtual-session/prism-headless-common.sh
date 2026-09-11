@@ -29,6 +29,30 @@ prism_headless_require_backend() {
   fi
 }
 
+## @brief Enable native Wayland HDR for compatible Proton games in this session.
+## @return Zero after exporting the session's application environment.
+prism_headless_app_environment() {
+  export XDG_SESSION_TYPE=wayland
+  unset GAMESCOPE_WAYLAND_DISPLAY
+  if [ "${PRISM_CLIENT_HDR:-false}" = true ]; then
+    export PROTON_ENABLE_WAYLAND=1 PROTON_ENABLE_HDR=1 DXVK_HDR=1
+  fi
+}
+
+## @brief Verify the selected output's current mode in wlr-randr output on stdin.
+## @param $1 Exact output name.
+## @param $2 Required width.
+## @param $3 Required height.
+## @param $4 Required refresh rate in Hz.
+## @return Zero only when that output has the requested current mode.
+prism_headless_mode_matches() {
+  awk -v output="$1" -v mode="${2}x${3}" -v fps="$4" '
+    /^[^[:space:]]/ { selected = ($1 == output) }
+    selected && $1 == mode && $2 == "px," && $3 == fps && $4 == "Hz" && /\(.*current.*\)/ { found = 1 }
+    END { exit !found }
+  '
+}
+
 prism_unit_active() {
   local unit="${1:?unit required}"
   systemctl --user is-active --quiet "$unit" 2>/dev/null

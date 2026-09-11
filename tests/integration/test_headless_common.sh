@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2016,SC2317
+# shellcheck disable=SC2016,SC2317,SC2329
 # Exact source patterns must remain literal; test stubs are called indirectly.
 # Exercise private-labwc headless lifecycle helpers and policy.
 set -euo pipefail
@@ -18,6 +18,109 @@ mkdir -p \
 
 # shellcheck source=/dev/null
 . "$SOURCE_DIR/contrib/virtual-session/prism-headless-common.sh"
+
+# A matching mode on another output must never satisfy private-output readiness.
+RANDR_FIXTURE='HEADLESS-1 "private"
+  Modes:
+    1920x1080 px, 60.000000 Hz (current)
+HEADLESS-2 "unrelated"
+  Modes:
+    2560x1440 px, 120.000000 Hz (current)'
+printf '%s\n' "$RANDR_FIXTURE" | prism_headless_mode_matches HEADLESS-1 1920 1080 60
+if printf '%s\n' "$RANDR_FIXTURE" | prism_headless_mode_matches HEADLESS-1 2560 1440 120; then
+  echo "another output satisfied private output readiness" >&2
+  exit 1
+fi
+if printf '%s\n' "$RANDR_FIXTURE" | prism_headless_mode_matches HEADLESS-1 1920 1080 59; then
+  echo "incorrect refresh rate was accepted" >&2
+  exit 1
+fi
+
+# Exercise the actual session launcher with fake compositor/audio executables.
+SESSION_TEST="$TEST_ROOT/session"
+mkdir -p "$SESSION_TEST/bin" "$SESSION_TEST/home/.local/bin" "$SESSION_TEST/runtime"
+cp "$SOURCE_DIR/contrib/virtual-session/prism-headless-session.sh" "$SESSION_TEST/"
+printf '#!/bin/sh\nexit 0\n' > "$SESSION_TEST/prism-headless-audio.sh"
+cat > "$SESSION_TEST/bin/labwc" <<'EOF'
+#!/usr/bin/env bash
+env > "$PRISM_TEST_SESSION_ENV"
+printf '%s\n' "$(basename "$0")" "$@" > "$PRISM_TEST_SESSION_ARGS"
+cp "$2/rc.xml" "$PRISM_TEST_SESSION_CONFIG"
+EOF
+cp "$SESSION_TEST/bin/labwc" "$SESSION_TEST/home/.local/bin/prism-labwc"
+chmod +x "$SESSION_TEST/bin/labwc" "$SESSION_TEST/home/.local/bin/prism-labwc" "$SESSION_TEST/prism-headless-audio.sh"
+for hdr in false true; do
+  env PATH="$SESSION_TEST/bin:$PATH" HOME="$SESSION_TEST/home" \
+    XDG_RUNTIME_DIR="$SESSION_TEST/runtime" PRISM_SESSION_ID=test \
+    PRISM_CLIENT_WIDTH=2560 PRISM_CLIENT_HEIGHT=1440 PRISM_CLIENT_FPS=120 \
+    PRISM_CLIENT_HDR="$hdr" PRISM_PHYSICAL_SINK=speakers \
+    DISPLAY=:99 WAYLAND_DISPLAY=wayland-99 WLR_HEADLESS_OUTPUTS=3 LABWC_UPDATE_ACTIVATION_ENV=yes \
+    PRISM_TEST_SESSION_ENV="$SESSION_TEST/environment" \
+    PRISM_TEST_SESSION_ARGS="$SESSION_TEST/args" \
+    PRISM_TEST_SESSION_CONFIG="$SESSION_TEST/rc.xml" \
+    bash "$SESSION_TEST/prism-headless-session.sh"
+  grep -Fxq 'WLR_BACKENDS=headless' "$SESSION_TEST/environment"
+  grep -Fxq 'WLR_HEADLESS_OUTPUTS=1' "$SESSION_TEST/environment"
+  grep -Fxq 'LABWC_UPDATE_ACTIVATION_ENV=no' "$SESSION_TEST/environment"
+  if grep -Eq '^(DISPLAY|WAYLAND_DISPLAY)=' "$SESSION_TEST/environment"; then
+    echo "headless compositor inherited a desktop display" >&2
+    exit 1
+  fi
+  grep -Fq '<xwaylandPersistence>yes</xwaylandPersistence>' "$SESSION_TEST/rc.xml"
+  grep -Fq "<hdr>$hdr</hdr>" "$SESSION_TEST/rc.xml"
+  if [ "$hdr" = true ]; then
+    [ "$(head -1 "$SESSION_TEST/args")" = prism-labwc ]
+    grep -Fxq 'WLR_RENDERER=vulkan' "$SESSION_TEST/environment"
+  else
+    [ "$(head -1 "$SESSION_TEST/args")" = labwc ]
+  fi
+done
+(
+  unset PROTON_ENABLE_WAYLAND PROTON_ENABLE_HDR DXVK_HDR
+  export PRISM_CLIENT_HDR=false
+  prism_headless_app_environment
+  [ -z "${PROTON_ENABLE_HDR:-}" ]
+  export PRISM_CLIENT_HDR=true
+  prism_headless_app_environment
+  [ "$PROTON_ENABLE_WAYLAND:$PROTON_ENABLE_HDR:$DXVK_HDR" = 1:1:1 ]
+)
+
+# Default audio must use the pre-created sink without waiting for streaming to
+# start. The fake inactive unit makes the helper clean up immediately afterward.
+cat > "$SESSION_TEST/bin/pactl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$PRISM_TEST_AUDIO_COMMANDS"
+case "$*" in
+  'list short sinks') printf '1\tprism-stream\n2\tcustom-sink\n' ;;
+  'load-module '*) echo 77 ;;
+esac
+EOF
+cat > "$SESSION_TEST/bin/systemctl" <<'EOF'
+#!/bin/sh
+echo inactive
+exit 1
+EOF
+cat > "$SESSION_TEST/bin/sleep" <<'EOF'
+#!/bin/sh
+echo unexpected-wait >> "$PRISM_TEST_AUDIO_COMMANDS"
+EOF
+chmod +x "$SESSION_TEST/bin/pactl" "$SESSION_TEST/bin/systemctl" "$SESSION_TEST/bin/sleep"
+for sink in prism-stream custom-sink; do
+  if [ "$sink" = custom-sink ]; then
+    mkdir -p "$SESSION_TEST/home/.config/prism"
+    printf 'audio_sink = custom-sink\n' > "$SESSION_TEST/home/.config/prism/prism.conf"
+  fi
+  : > "$SESSION_TEST/audio-commands"
+  env PATH="$SESSION_TEST/bin:$PATH" HOME="$SESSION_TEST/home" \
+    XDG_RUNTIME_DIR="$SESSION_TEST/runtime" \
+    PRISM_TEST_AUDIO_COMMANDS="$SESSION_TEST/audio-commands" \
+    bash "$SOURCE_DIR/contrib/virtual-session/prism-headless-audio.sh" speakers
+  grep -Fq "load-module module-loopback source=prism-headless.monitor sink=$sink" "$SESSION_TEST/audio-commands"
+  if grep -Fq unexpected-wait "$SESSION_TEST/audio-commands"; then
+    echo "audio waited for stream initialization despite a ready capture sink" >&2
+    exit 1
+  fi
+done
 
 CONTROL_GROUP="/user.slice/user-1000.slice/user@1000.service/app.slice/prism-headless-session.service"
 printf '%s\n' "0::$CONTROL_GROUP" >"$PRISM_PROC_ROOT/101/cgroup"
@@ -238,7 +341,7 @@ for diagnostic in \
   grep -Fq "$diagnostic" "$HEADLESS_START"
 done
 grep -Fq 'WLR_BACKENDS=headless' "$HEADLESS_SESSION"
-grep -Fq 'exec labwc --config-dir' "$HEADLESS_SESSION"
+grep -Fq 'exec "$COMPOSITOR" --config-dir' "$HEADLESS_SESSION"
 grep -Fq 'unset DISPLAY WAYLAND_DISPLAY' "$HEADLESS_SESSION"
 grep -Fq 'wlr-randr --output "$OUTPUT_NAME"' "$HEADLESS_START"
 grep -Fq 'wayland-info' "$HEADLESS_START"

@@ -76,15 +76,17 @@ namespace wl {
 
       interface.listen(display.registry());
 
-      display.roundtrip();
+      if (!display.roundtrip()) {
+        return -1;
+      }
 
       if (!interface[wl::interface_t::XDG_OUTPUT]) {
         BOOST_LOG(error) << "[wlgrab] Missing Wayland wire for xdg_output"sv;
         return -1;
       }
 
-      if (!interface[wl::interface_t::WLR_EXPORT_DMABUF]) {
-        BOOST_LOG(error) << "[wlgrab] Missing Wayland wire for wlr-export-dmabuf"sv;
+      if (!interface[wl::interface_t::WLR_EXPORT_DMABUF] || !interface[wl::interface_t::LINUX_DMABUF]) {
+        BOOST_LOG(error) << "[wlgrab] Capture requires screencopy v3 and linux-dmabuf"sv;
         return -1;
       }
 
@@ -93,7 +95,9 @@ namespace wl {
       for (auto &m : interface.monitors) {
         m->listen(interface.output_manager);
       }
-      display.roundtrip();
+      if (!display.roundtrip()) {
+        return -1;
+      }
 
       if (interface.monitors.empty()) {
         BOOST_LOG(error) << "[wlgrab] Compositor did not advertise an output"sv;
@@ -113,7 +117,10 @@ namespace wl {
             break;
           }
         }
-        if (!matched) {
+        if (!matched && expected_width == 0 &&
+            std::all_of(display_name.begin(), display_name.end(), [](unsigned char c) {
+              return std::isdigit(c);
+            })) {
           auto streamedMonitor = util::from_view(display_name);
           if (streamedMonitor >= 0 && streamedMonitor < interface.monitors.size()) {
             monitor = interface.monitors[streamedMonitor].get();
@@ -128,6 +135,19 @@ namespace wl {
       }
 
       output = monitor->output;
+      if (expected_width > 0) {
+        // Prism's private compositor exports the output's encoded pixels.
+        // Other compositors may tone-map their screencopy buffers to SDR.
+        hdr_metadata = read_output_hdr_metadata(display, interface.color_manager, output);
+      }
+      if (expected_width > 0 && config.dynamicRange && !hdr_metadata) {
+        BOOST_LOG(error) << "[wlgrab] Headless HDR requested but the output is not BT.2020/PQ; check prism-labwc and Vulkan support"sv;
+        return -1;
+      }
+      if (hdr_metadata && hwdevice_type == platf::mem_type_e::system) {
+        BOOST_LOG(error) << "[wlgrab] HDR requires a GPU encode path that preserves 10-bit DMA-BUF pixels"sv;
+        return -1;
+      }
 
       offset_x = monitor->viewport.offset_x;
       offset_y = monitor->viewport.offset_y;
@@ -166,7 +186,33 @@ namespace wl {
       BOOST_LOG(debug) << "[wlgrab] Desktop Resolution: "sv << env_width << 'x' << env_height;
       BOOST_LOG(debug) << "[wlgrab] Logical Desktop Resolution: "sv << env_logical_width << 'x' << env_logical_height;
 
+      // Validate actual capture before advertising HDR to the encoder/client.
+      if (hdr_metadata) {
+        std::shared_ptr<platf::img_t> unused;
+        if (snapshot({}, unused, 1000ms, true) != platf::capture_e::ok) {
+          return -1;
+        }
+      }
+
       return 0;
+    }
+
+    /** @brief Report HDR only after verifying the output's color description. */
+    bool is_hdr() override {
+      return hdr_metadata.has_value();
+    }
+
+    /**
+     * @brief Return mastering metadata reported by the selected compositor output.
+     * @param metadata Destination for the verified HDR10 metadata.
+     * @return True for a verified BT.2020/PQ output.
+     */
+    bool get_hdr_metadata(SS_HDR_METADATA &metadata) override {
+      if (!hdr_metadata) {
+        return false;
+      }
+      metadata = *hdr_metadata;
+      return true;
     }
 
     /**
@@ -196,7 +242,7 @@ namespace wl {
       do {
         auto remaining_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(to - std::chrono::steady_clock::now());
         if (remaining_time_ms.count() < 0 || !display.dispatch(remaining_time_ms)) {
-          return platf::capture_e::timeout;
+          return display.has_error() ? platf::capture_e::reinit : platf::capture_e::timeout;
         }
       } while (dmabuf.status == dmabuf_t::WAITING);
 
@@ -208,6 +254,11 @@ namespace wl {
         current_frame->sd.height != height
       ) {
         return platf::capture_e::reinit;
+      }
+
+      if (hdr_metadata && !is_hdr_capture_format(current_frame->sd.fourcc)) {
+        BOOST_LOG(error) << "[wlgrab] Refusing HDR capture from a buffer without 10-bit RGB pixels"sv;
+        return platf::capture_e::error;
       }
 
       return platf::capture_e::ok;
@@ -222,6 +273,7 @@ namespace wl {
     dmabuf_t dmabuf;  ///< DMA-BUF feedback and format state advertised by the compositor.
 
     wl_output *output;  ///< Wayland output selected for capture.
+    std::optional<SS_HDR_METADATA> hdr_metadata;  ///< Verified output colorimetry and mastering metadata.
   };
 
   /**
@@ -313,6 +365,13 @@ namespace wl {
       gl::ctx.GetTextureSubImage((*rgb_opt)->tex[0], 0, 0, 0, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
       gl::ctx.BindTexture(GL_TEXTURE_2D, 0);
 
+      if (current_frame->y_invert) {
+        for (int row = 0; row < img_out->height / 2; ++row) {
+          auto top = img_out->data + row * img_out->row_pitch;
+          auto bottom = img_out->data + (img_out->height - 1 - row) * img_out->row_pitch;
+          std::swap_ranges(top, top + img_out->row_pitch, bottom);
+        }
+      }
       img_out->frame_timestamp = current_frame->frame_timestamp;
 
       return platf::capture_e::ok;
@@ -483,6 +542,7 @@ namespace wl {
       img->sequence = sequence;
 
       img->sd = current_frame->sd;
+      img->y_invert = current_frame->y_invert;
       img->frame_timestamp = current_frame->frame_timestamp;
 
       // Prevent dmabuf from closing the file descriptors.

@@ -136,6 +136,9 @@ esac
 [ -r "$pid_file" ] || exit 1
 read -r pid _ < "$pid_file"
 kill -0 "$pid" 2>/dev/null || exit 1
+# Real pgrep -f cannot match a zombie's empty command line. Container PID 1
+# may not reap the terminated fixture immediately, even after SIGKILL.
+grep -q . "/proc/$pid/cmdline" 2>/dev/null || exit 1
 printf '%s\n' "$pid"
 EOF
 

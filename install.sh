@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Prism — one-command install for Fedora.
+# Prism source installer. Automatic dependency installation targets Fedora;
+# other distributions can supply dependencies with PRISM_SKIP_DEPENDENCIES=1.
 #   curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
 set -euo pipefail
 
@@ -11,7 +12,13 @@ BUILD_JOBS="$(nproc)"
 log() { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 
 # --- 1. Dependencies -------------------------------------------------------
-log "Installing build and runtime dependencies (sudo may ask for your password)"
+if [ "${PRISM_SKIP_DEPENDENCIES:-0}" != 1 ]; then
+  log "Installing build and runtime dependencies (sudo may ask for your password)"
+  if ! command -v dnf >/dev/null 2>&1; then
+    echo 'Install the build/runtime dependencies for your distro, then rerun with PRISM_SKIP_DEPENDENCIES=1. See docs/headless-hdr.md.' >&2
+    exit 1
+  fi
+# Keep the package transaction explicit for distro packagers.
 sudo dnf install -y \
   git cmake gcc-c++ ninja-build nodejs-npm wget which desktop-file-utils \
   libcap-devel libcurl-devel libdrm-devel libevdev-devel libnotify-devel \
@@ -21,7 +28,11 @@ sudo dnf install -y \
   libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
   numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
   wayland-devel libxkbcommon-devel python3-jinja2 bubblewrap \
-  kscreen krfb labwc wlr-randr xorg-x11-server-Xwayland
+  kscreen krfb labwc wlr-randr wayland-utils xorg-x11-server-Xwayland \
+  meson patch wayland-protocols-devel libinput-devel libdisplay-info-devel \
+  lcms2-devel pixman-devel libxml2-devel cairo-devel pango-devel libpng-devel \
+  xcb-util-wm-devel xorg-x11-server-Xwayland-devel glslang
+fi
 
 # --- 2. Source --------------------------------------------------------------
 if [ -d "$SRC_DIR/.git" ]; then
@@ -41,28 +52,17 @@ fi
 
 # --- 3. Build ----------------------------------------------------------------
 log "Building Prism (this takes a while)"
-# Enable CUDA (NVIDIA DMA-BUF/nvenc path) only when a CUDA toolkit is present;
-# on AMD/Intel systems Prism simply builds without it.
-CUDA_FLAG="OFF"
-CUDA_COMPILER_FLAG=""
-if command -v nvcc >/dev/null; then
-  CUDA_FLAG="ON"
-elif [ -x /usr/local/cuda/bin/nvcc ]; then
-  CUDA_FLAG="ON"
-  CUDA_COMPILER_FLAG="-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc"
-fi
-# Newer distros ship a GCC newer than nvcc supports; permit it (Prism's CUDA
-# code is small and builds fine in practice).
-if [ "$CUDA_FLAG" = "ON" ]; then
-  CUDA_COMPILER_FLAG="$CUDA_COMPILER_FLAG -DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler"
-fi
-read -r -a CUDA_FLAGS <<< "$CUDA_COMPILER_FLAG"
+# shellcheck source=scripts/linux_cuda_config.sh
+. "$SRC_DIR/scripts/linux_cuda_config.sh"
+prism_configure_cuda /sys/class/drm
+# Check before spending time building Prism or changing the installed session.
+bash "$SRC_DIR/contrib/virtual-session/build-headless-compositor.sh" --check
 cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
   -DPRISM_ENABLE_CUDA="$CUDA_FLAG" \
   "${CUDA_FLAGS[@]}" \
-  -DCUDA_FAIL_ON_MISSING=OFF \
+  -DCUDA_FAIL_ON_MISSING=ON \
   -DBUILD_DOCS=OFF -DBUILD_TESTS=OFF
 cmake --build "$SRC_DIR/cmake-build-prism" --parallel "$BUILD_JOBS"
 
@@ -79,6 +79,8 @@ DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>
 }
 
 # --- 5. Session stack ---------------------------------------------------------
+log "Building the isolated HDR headless compositor"
+bash "$SRC_DIR/contrib/virtual-session/build-headless-compositor.sh"
 log "Installing Prism scripts and systemd user units"
 # Stop and remove obsolete persistent/nested units before installing the
 # transient single-compositor labwc stack.

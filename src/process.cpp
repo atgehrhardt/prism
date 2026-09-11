@@ -523,6 +523,8 @@ namespace proc {
       const bool had_prism_steam = _env.count("PRISM_STEAM") != 0;
       const std::string old_prism_steam = had_prism_steam ? _env["PRISM_STEAM"].to_string() : std::string();
       _env["PRISM_STEAM"] = resolved.steam ? "1" : "0";
+      // Allocate compositor buffers on the same GPU that capture imports from.
+      _env["PRISM_RENDER_DEVICE"] = platf::resolve_render_device();
       const int rc = prism_run_session_script("prism-headless-start.sh"s, _env, _pipe.get());
       if (had_prism_steam) {
         _env["PRISM_STEAM"] = old_prism_steam;

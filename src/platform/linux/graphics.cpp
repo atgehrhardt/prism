@@ -109,7 +109,17 @@ namespace gl {
     return frame_buf;
   }
 
-  void frame_buf_t::copy(int id, int texture, int offset_x, int offset_y, int width, int height) {
+  void frame_buf_t::copy(int id, int texture, int offset_x, int offset_y, int width, int height, bool y_invert) {
+    if (y_invert) {
+      auto target = frame_buf_t::make(1);
+      target.bind(&texture, &texture + 1);
+      gl::ctx.BindFramebuffer(GL_READ_FRAMEBUFFER, (*this)[id]);
+      gl::ctx.ReadBuffer(GL_COLOR_ATTACHMENT0 + id);
+      gl::ctx.BindFramebuffer(GL_DRAW_FRAMEBUFFER, target[0]);
+      gl::ctx.DrawBuffer(GL_COLOR_ATTACHMENT0);
+      gl::ctx.BlitFramebuffer(offset_x, offset_y + height, offset_x + width, offset_y, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      return;
+    }
     gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, (*this)[id]);
     gl::ctx.ReadBuffer(GL_COLOR_ATTACHMENT0 + id);
     gl::ctx.BindTexture(GL_TEXTURE_2D, texture);
@@ -1261,13 +1271,14 @@ namespace egl {
 
   void sws_t::load_vram(img_descriptor_t &img, int offset_x, int offset_y, int texture, bool is_yuv444) {
     // When only a sub-part of the image must be encoded...
-    const bool copy = offset_x || offset_y || img.sd.width != in_width || img.sd.height != in_height;
+    const bool copy = img.y_invert || offset_x || offset_y || img.sd.width != in_width || img.sd.height != in_height;
     if (copy) {
       auto framebuf = gl::frame_buf_t::make(1);
       framebuf.bind(&texture, &texture + 1);
 
       loaded_texture = tex[0];
-      framebuf.copy(0, loaded_texture, offset_x, offset_y, in_width, in_height);
+      const int source_y = img.y_invert ? img.sd.height - offset_y - in_height : offset_y;
+      framebuf.copy(0, loaded_texture, offset_x, source_y, in_width, in_height, img.y_invert);
     } else {
       loaded_texture = texture;
     }
