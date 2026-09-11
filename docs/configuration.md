@@ -163,7 +163,8 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>virtual</td>
-        <td>Client-sized virtual display</td>
+        <td>Client-sized KWin virtual display, captured directly without a portal permission dialog.
+            Capture fails if the named virtual output is unavailable.</td>
     </tr>
     <tr>
         <td>headless</td>

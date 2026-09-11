@@ -34,6 +34,7 @@
 // local includes
 #include "cuda.h"
 #include "graphics.h"
+#include "kwin_output.h"
 #include "pipewire.cpp"
 #include "src/platform/common.h"
 #include "src/video.h"
@@ -388,7 +389,7 @@ namespace kwin {
 
     /**
      * @brief Request a screencast stream.
-     * @param output_name Which wl_output to capture.
+     * @param output_name Exact wl_output name to capture, or empty for the default output.
      * @return 0 on success, -1 on failure. On success, node_id and
      *         output width/height/x/y are populated.
      */
@@ -398,21 +399,13 @@ namespace kwin {
         BOOST_LOG(error) << "[kwingrab] no wl_output found"sv;
         return -1;
       }
-      struct wl_output *output = nullptr;
-      if (!output_name.empty()) {
-        for (auto const &[output_, params_] : outputs) {
-          if (params_->name == output_name) {
-            output = output_;
-            out_params = params_;
-          }
-        }
+      const auto selected = find_output(outputs, output_name);
+      if (selected == outputs.end()) {
+        BOOST_LOG(error) << "[kwingrab] Requested output '"sv << output_name << "' is unavailable; refusing desktop fallback"sv;
+        return -1;
       }
-      // Fall back to first element from the map in case of error
-      if (!output || !out_params) {
-        const auto output_ = outputs.begin();
-        output = output_->first;
-        out_params = output_->second;
-      }
+      auto *output = selected->first;
+      out_params = selected->second;
 
       // Request a stream for the chosen output with embedded cursor
       if (kde_screencast_v1_) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prism: prep "do" for the "Desktop (Virtual)" app. Creates a KWin virtual
-# output sized to the client, points this stream's portal capture at it, and
+# output sized to the client, points this stream's KWin capture at it, and
 # disables the physical primary output for the duration of the stream.
 set -u
 
@@ -141,8 +141,8 @@ if [ "${PRISM_CLIENT_HDR:-false}" = "true" ]; then
   done || echo "WARN: could not enable hdr on $VOUT"
 fi
 
-# Point this stream's portal capture at the virtual output.
-echo "portal:$VOUT" > "$OVERRIDE_FILE"
+## @brief Capture the named virtual output directly through KWin without a portal permission dialog.
+echo "kwin:$VOUT" > "$OVERRIDE_FILE"
 
 # Audio: Prism is pointed at a dedicated "prism-stream" capture sink
 # (audio_sink in prism.conf). Create it up front so it exists before
