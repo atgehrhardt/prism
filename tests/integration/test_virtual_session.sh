@@ -272,7 +272,8 @@ grep -Fq -- '--name Prism-Virtual --desktopfile org.kde.krfb.virtualmonitor' \
 grep -qx 'DP-1' "$XDG_RUNTIME_DIR/prism-virtual-desktop.state"
 grep -qx 'DP-1 disabled' "$PRISM_TEST_OUTPUTS"
 grep -qx 'HDMI-A-1 disabled' "$PRISM_TEST_OUTPUTS"
-[ "$(cat "$XDG_RUNTIME_DIR/prism-capture-override")" = "portal:Virtual-Prism-Virtual" ]
+# Virtual startup must select direct KWin capture, avoiding an interactive portal request.
+[ "$(cat "$XDG_RUNTIME_DIR/prism-capture-override")" = "kwin:Virtual-Prism-Virtual" ]
 "$STOP"
 grep -qx 'DP-1 enabled' "$PRISM_TEST_OUTPUTS"
 grep -qx 'HDMI-A-1 disabled' "$PRISM_TEST_OUTPUTS"

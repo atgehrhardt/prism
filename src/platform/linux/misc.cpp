@@ -1275,9 +1275,21 @@ namespace platf {
       );
     }
 #endif
+#ifdef PRISM_BUILD_KWIN
+    // Virtual sessions use direct KWin capture: a portal permission dialog
+    // cannot be answered after the physical outputs have been disabled.
+    if (prism_override.rfind("kwin:", 0) == 0) {
+      const std::string kwin_output = prism_override.substr(5);
+      if (kwin_output.empty()) {
+        BOOST_LOG(error) << "[prism] Empty KWin capture output; refusing desktop fallback"sv;
+        return nullptr;
+      }
+      BOOST_LOG(info) << "[prism] Capture override active; screencasting KWin output '"sv << kwin_output << "'"sv;
+      return kwin_display(hwdevice_type, kwin_output, config);
+    }
+#endif
 #ifdef PRISM_BUILD_PORTAL
-    // Portal form: "portal:<output-name>" captures the named output (e.g. a
-    // KWin virtual output) through the normal XDG portal backend.
+    // Explicit portal overrides retain the interactive XDG portal backend.
     if (prism_override.rfind("portal:", 0) == 0) {
       const std::string portal_output = prism_override.substr(7);
       BOOST_LOG(info) << "[prism] Capture override active; screencasting portal output '"sv << portal_output << "'"sv;
