@@ -112,15 +112,16 @@ if(WAYLAND_FOUND)
     pkg_check_modules(WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
     foreach(protocol color-management-v1 wlr-screencopy-unstable-v1)
         if(protocol STREQUAL "color-management-v1")
-            set(protocol_xml "${WAYLAND_PROTOCOLS_DIR}/staging/color-management/${protocol}.xml")
+            set(PROTOCOL_XML "${WAYLAND_PROTOCOLS_DIR}/staging/color-management/${protocol}.xml")
         else()
-            set(protocol_xml "${CMAKE_SOURCE_DIR}/third-party/wlr-protocols/unstable/${protocol}.xml")
+            set(PROTOCOL_XML "${CMAKE_SOURCE_DIR}/third-party/wlr-protocols/unstable/${protocol}.xml")
         endif()
         add_custom_command(
             OUTPUT "${CMAKE_BINARY_DIR}/generated-src/${protocol}-server.h"
-            COMMAND wayland-scanner server-header "${protocol_xml}"
+            COMMAND wayland-scanner server-header "${PROTOCOL_XML}"
                     "${CMAKE_BINARY_DIR}/generated-src/${protocol}-server.h"
-            DEPENDS "${protocol_xml}"
+            DEPENDS "${PROTOCOL_XML}"
+            COMMENT "Generating ${protocol} server header for tests"
             VERBATIM)
         target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/generated-src/${protocol}-server.h")
     endforeach()

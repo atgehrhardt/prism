@@ -54,7 +54,7 @@ fi
 log "Building Prism (this takes a while)"
 # shellcheck source=scripts/linux_cuda_config.sh
 . "$SRC_DIR/scripts/linux_cuda_config.sh"
-prism_configure_cuda
+prism_configure_cuda /sys/class/drm
 # Check before spending time building Prism or changing the installed session.
 bash "$SRC_DIR/contrib/virtual-session/build-headless-compositor.sh" --check
 cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
