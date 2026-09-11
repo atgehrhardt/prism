@@ -11,6 +11,8 @@
 #include <vector>
 
 #ifdef PRISM_BUILD_WAYLAND
+
+  #include <color-management-v1.h>
   #include <linux-dmabuf-unstable-v1.h>
   #include <wlr-screencopy-unstable-v1.h>
   #include <xdg-output-unstable-v1.h>
@@ -27,6 +29,21 @@
 
 namespace wl {
   /**
+   * @brief Describe a legacy GBM allocation compatible with advertised modifiers.
+   */
+  struct implicit_dmabuf_allocation_t {
+    uint32_t usage;  ///< GBM allocation usage flags.
+    uint64_t modifier;  ///< Modifier to advertise when importing the buffer.
+  };
+
+  /**
+   * @brief Select a permitted fallback when explicit modifier allocation fails.
+   * @param modifiers Compositor's modifiers, or empty for legacy implicit support.
+   * @return Allocation parameters, or no value when explicit modifiers are required.
+   */
+  std::optional<implicit_dmabuf_allocation_t> implicit_dmabuf_allocation(const std::vector<uint64_t> &modifiers);
+
+  /**
    * @brief Owning pointer for a Wayland display connection.
    */
   using display_internal_t = util::safe_ptr<wl_display, wl_display_disconnect>;
@@ -42,8 +59,9 @@ namespace wl {
      */
     void destroy();
 
-    egl::surface_descriptor_t sd;  ///< DMA-BUF surface descriptor received from the compositor.
+    egl::surface_descriptor_t sd {};  ///< DMA-BUF surface descriptor received from the compositor.
     std::optional<std::chrono::steady_clock::time_point> frame_timestamp;  ///< Capture timestamp associated with the frame.
+    bool y_invert {false};  ///< Compositor stores rows in reverse display order.
   };
 
   /**
@@ -166,6 +184,8 @@ namespace wl {
     zwlr_screencopy_frame_v1_listener listener;  ///< Callback table registered on screencopy frames.
 
   private:
+    /** @brief Release the active screencopy request and pending buffer parameters. */
+    void finish_frame();
     bool init_gbm();
     void cleanup_gbm();
     void create_and_copy_dmabuf(zwlr_screencopy_frame_v1 *frame);
@@ -191,6 +211,8 @@ namespace wl {
     struct gbm_device *gbm_device {nullptr};
     struct gbm_bo *current_bo {nullptr};
     struct wl_buffer *current_wl_buffer {nullptr};
+    zwlr_screencopy_frame_v1 *active_frame {nullptr};  ///< Single in-flight capture request, retained across timeouts.
+    zwp_linux_buffer_params_v1 *active_params {nullptr};  ///< Pending asynchronous DMA-BUF import.
     bool y_invert {false};
   };
 
@@ -363,6 +385,7 @@ namespace wl {
     std::map<std::uint32_t, std::vector<std::uint64_t>> supported_modifiers;  ///< DRM format modifiers grouped by format.
     zwlr_screencopy_manager_v1 *screencopy_manager {nullptr};  ///< WLR screencopy global used to request frames.
     zwp_linux_dmabuf_v1 *dmabuf_interface {nullptr};  ///< Linux DMA-BUF global used to allocate frame buffers.
+    wp_color_manager_v1 *color_manager {nullptr};  ///< Optional output color-description protocol.
     zxdg_output_manager_v1 *output_manager {nullptr};  ///< xdg-output global used to query monitor names and sizes.
 
   private:
@@ -389,12 +412,18 @@ namespace wl {
 
     // Roundtrip with Wayland connection
     /**
-     * @brief Flush pending Wayland requests and wait for replies.
+     * @brief Flush pending Wayland requests and wait at most one second for replies.
+     * @return True after the sync callback, false on timeout or connection error.
      */
-    void roundtrip();
+    bool roundtrip();
 
     // Wait up to the timeout to read and dispatch new events
     bool dispatch(std::chrono::milliseconds timeout);
+
+    /** @brief Report a fatal Wayland protocol or connection error. */
+    bool has_error() {
+      return wl_display_get_error(display_internal.get()) != 0;
+    }
 
     /**
      * @brief Return the Wayland registry for global discovery.
@@ -415,6 +444,22 @@ namespace wl {
   private:
     display_internal_t display_internal;
   };
+
+  /**
+   * @brief Read HDR10 colorimetry from the compositor's actual output description.
+   * @param display Connection used to dispatch bounded protocol requests.
+   * @param manager Optional color-management global.
+   * @param output Selected output, never a fallback monitor.
+   * @return HDR10 metadata, or no value for SDR, unsupported, or failed queries.
+   */
+  std::optional<SS_HDR_METADATA> read_output_hdr_metadata(display_t &display, wp_color_manager_v1 *manager, wl_output *output);
+
+  /**
+   * @brief Test whether a captured DMA-BUF preserves the RGB precision required for HDR10.
+   * @param fourcc DRM format advertised by screencopy.
+   * @return True for supported packed ten-bit RGB formats.
+   */
+  bool is_hdr_capture_format(uint32_t fourcc);
 
   /**
    * @brief Refresh the monitor list reported by the display server.

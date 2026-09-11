@@ -185,7 +185,7 @@ namespace gl {
     }
 
     /**
-     * Copies a part of the framebuffer to texture
+     * @brief Copy a framebuffer region into a texture, optionally reversing rows.
      *
      * @param id Framebuffer index to copy from.
      * @param texture Destination texture receiving the copied pixels.
@@ -193,8 +193,9 @@ namespace gl {
      * @param offset_y Source Y offset in pixels.
      * @param width Frame or display width in pixels.
      * @param height Frame or display height in pixels.
+     * @param y_invert Reverse source rows while preserving component precision.
      */
-    void copy(int id, int texture, int offset_x, int offset_y, int width, int height);
+    void copy(int id, int texture, int offset_x, int offset_y, int width, int height, bool y_invert = false);
   };
 
   /**
@@ -726,11 +727,11 @@ namespace egl {
      */
     void load_ram(platf::img_t &img);
     /**
-     * @brief Load vram data from the backing API or store.
+     * @brief Load a GPU frame for conversion, applying its crop and row orientation.
      *
-     * @param img Image or frame object to read from or populate.
-     * @param offset_x Offset x.
-     * @param offset_y Offset y.
+     * @param img Captured image, including the source orientation.
+     * @param offset_x Crop origin in display coordinates.
+     * @param offset_y Crop origin in display coordinates.
      * @param texture Texture resource to bind, update, or attach.
      * @param is_yuv444 Is YUV444.
      */

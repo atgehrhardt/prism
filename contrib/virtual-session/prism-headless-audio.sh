@@ -35,23 +35,24 @@ trap 'exit 143' TERM
 
 echo "=== headless-audio $(date -Is) physical=${PHYSICAL:-?} unit=$PRISM_HEADLESS_UNIT ==="
 
-CAPTURE_SINK=""
+CAPTURE_SINK="prism-stream"
 CONFIG="$HOME/.config/prism/prism.conf"
 if [ -f "$CONFIG" ]; then
-  CAPTURE_SINK="$(sed -n 's/^audio_sink *= *//p' "$CONFIG" | tail -1)"
+  CONFIGURED_SINK="$(sed -n 's/^audio_sink *= *//p' "$CONFIG" | tail -1)"
+  [ -z "$CONFIGURED_SINK" ] || CAPTURE_SINK="$CONFIGURED_SINK"
 fi
-for _ in $(seq 1 240); do
-  if [ -n "$CAPTURE_SINK" ] && pactl list short sinks 2>/dev/null |
+CAPTURE_SINK_READY=0
+# Startup already created prism-stream. Waiting for Prism's later stream-audio
+# initialization here deadlocks launch when audio_sink is left at its default.
+for _ in $(seq 1 20); do
+  if pactl list short sinks 2>/dev/null |
     awk -v wanted="$CAPTURE_SINK" '$2 == wanted {found=1} END {exit !found}'; then
+    CAPTURE_SINK_READY=1
     break
   fi
-  if [ -z "$CAPTURE_SINK" ]; then
-    current="$(pactl get-default-sink 2>/dev/null || true)"
-    case "$current" in sink-prism-*) CAPTURE_SINK="$current"; break ;; esac
-  fi
-  sleep 0.5
+  sleep 0.1
 done
-if [ -z "$CAPTURE_SINK" ]; then
+if [ "$CAPTURE_SINK_READY" != 1 ]; then
   echo "ERROR: timed out waiting for Prism's capture sink"
   exit 1
 fi

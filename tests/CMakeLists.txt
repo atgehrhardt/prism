@@ -108,6 +108,25 @@ add_executable(${PROJECT_NAME}
         ${TEST_SOURCES}
         ${PRISM_SOURCES})
 
+if(WAYLAND_FOUND)
+    pkg_check_modules(WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
+    foreach(protocol color-management-v1 wlr-screencopy-unstable-v1)
+        if(protocol STREQUAL "color-management-v1")
+            set(protocol_xml "${WAYLAND_PROTOCOLS_DIR}/staging/color-management/${protocol}.xml")
+        else()
+            set(protocol_xml "${CMAKE_SOURCE_DIR}/third-party/wlr-protocols/unstable/${protocol}.xml")
+        endif()
+        add_custom_command(
+            OUTPUT "${CMAKE_BINARY_DIR}/generated-src/${protocol}-server.h"
+            COMMAND wayland-scanner server-header "${protocol_xml}"
+                    "${CMAKE_BINARY_DIR}/generated-src/${protocol}-server.h"
+            DEPENDS "${protocol_xml}"
+            VERBATIM)
+        target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/generated-src/${protocol}-server.h")
+    endforeach()
+    target_link_libraries(${PROJECT_NAME} PkgConfig::WAYLAND_SERVER)
+endif()
+
 # Copy files needed for config consistency tests to build directory
 # This ensures both CLI and CLion can access the same files relative to the test executable
 # Using configure_file ensures files are copied when they change between builds

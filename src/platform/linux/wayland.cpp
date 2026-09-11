@@ -76,8 +76,24 @@ namespace wl {
     return 0;
   }
 
-  void display_t::roundtrip() {
-    wl_display_roundtrip(display_internal.get());
+  bool display_t::roundtrip() {
+    bool done = false;
+    static const wl_callback_listener listener = {
+      .done = [](void *data, wl_callback *, uint32_t) {
+        *static_cast<bool *>(data) = true;
+      },
+    };
+    auto callback = wl_display_sync(display_internal.get());
+    wl_callback_add_listener(callback, &listener, &done);
+    const auto deadline = std::chrono::steady_clock::now() + 1s;
+    while (!done) {
+      const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+      if (remaining <= 0ms || !dispatch(remaining)) {
+        break;
+      }
+    }
+    wl_callback_destroy(callback);
+    return done;
   }
 
   /**
@@ -89,15 +105,20 @@ namespace wl {
     // Check if any events are queued already. If not, flush
     // outgoing events, and prepare to wait for readability.
     if (wl_display_prepare_read(display_internal.get()) == 0) {
-      wl_display_flush(display_internal.get());
+      if (wl_display_flush(display_internal.get()) < 0 && errno != EAGAIN) {
+        wl_display_cancel_read(display_internal.get());
+        return false;
+      }
 
       // Wait for an event to come in
       struct pollfd pfd = {};
       pfd.fd = wl_display_get_fd(display_internal.get());
       pfd.events = POLLIN;
-      if (poll(&pfd, 1, timeout.count()) == 1 && (pfd.revents & POLLIN)) {
+      if (poll(&pfd, 1, timeout.count()) == 1 && (pfd.revents & (POLLIN | POLLHUP | POLLERR))) {
         // Read the new event(s)
-        wl_display_read_events(display_internal.get());
+        if (wl_display_read_events(display_internal.get()) < 0) {
+          return false;
+        }
       } else {
         // We timed out, so unlock the queue now
         wl_display_cancel_read(display_internal.get());
@@ -106,8 +127,7 @@ namespace wl {
     }
 
     // Dispatch any existing or new pending events
-    wl_display_dispatch_pending(display_internal.get());
-    return true;
+    return wl_display_dispatch_pending(display_internal.get()) >= 0;
   }
 
   wl_registry *display_t::registry() {
@@ -163,6 +183,9 @@ namespace wl {
     std::int32_t height,
     std::int32_t refresh
   ) {
+    if (!(flags & WL_OUTPUT_MODE_CURRENT)) {
+      return;
+    }
     viewport.width = width;
     viewport.height = height;
 
@@ -219,12 +242,15 @@ namespace wl {
       );
     } else if (!std::strcmp(interface, zxdg_output_manager_v1_interface.name)) {
       BOOST_LOG(info) << "[wayland] Found interface: "sv << interface << '(' << id << ") version "sv << version;
-      output_manager = (zxdg_output_manager_v1 *) wl_registry_bind(registry, id, &zxdg_output_manager_v1_interface, version);
+      output_manager = (zxdg_output_manager_v1 *) wl_registry_bind(registry, id, &zxdg_output_manager_v1_interface, std::min(version, 3u));
 
       this->interface[XDG_OUTPUT] = true;
     } else if (!std::strcmp(interface, zwlr_screencopy_manager_v1_interface.name)) {
       BOOST_LOG(info) << "[wayland] Found interface: "sv << interface << '(' << id << ") version "sv << version;
-      screencopy_manager = (zwlr_screencopy_manager_v1 *) wl_registry_bind(registry, id, &zwlr_screencopy_manager_v1_interface, version);
+      if (version < 3) {
+        return;  // DMA-BUF capture and buffer_done require screencopy version 3.
+      }
+      screencopy_manager = (zwlr_screencopy_manager_v1 *) wl_registry_bind(registry, id, &zwlr_screencopy_manager_v1_interface, 3);
 
       this->interface[WLR_EXPORT_DMABUF] = true;
     } else if (!std::strcmp(interface, zwp_linux_dmabuf_v1_interface.name)) {
@@ -233,6 +259,21 @@ namespace wl {
       zwp_linux_dmabuf_v1_add_listener(dmabuf_interface, &dmabuf_listener, this);
 
       this->interface[LINUX_DMABUF] = true;
+    } else if (!std::strcmp(interface, wp_color_manager_v1_interface.name)) {
+      static const wp_color_manager_v1_listener color_listener = {
+        .supported_intent = [](void *, wp_color_manager_v1 *, uint32_t) {
+        },
+        .supported_feature = [](void *, wp_color_manager_v1 *, uint32_t) {
+        },
+        .supported_tf_named = [](void *, wp_color_manager_v1 *, uint32_t) {
+        },
+        .supported_primaries_named = [](void *, wp_color_manager_v1 *, uint32_t) {
+        },
+        .done = [](void *, wp_color_manager_v1 *) {
+        },
+      };
+      color_manager = (wp_color_manager_v1 *) wl_registry_bind(registry, id, &wp_color_manager_v1_interface, 1);
+      wp_color_manager_v1_add_listener(color_manager, &color_listener, nullptr);
     }
   }
 
@@ -247,7 +288,7 @@ namespace wl {
     }
 
     auto render_path = platf::resolve_render_device();
-    int drm_fd = open(render_path.c_str(), O_RDWR);
+    int drm_fd = open(render_path.c_str(), O_RDWR | O_CLOEXEC);
     if (drm_fd < 0) {
       BOOST_LOG(error) << "[wayland] Failed to open DRM render node: "sv << render_path;
       return false;
@@ -299,14 +340,20 @@ namespace wl {
     wl_output *output,
     bool blend_cursor
   ) {
+    // A timeout does not cancel the server's request. Reuse it until a
+    // terminal callback arrives instead of letting two captures share buffers.
+    if (status == WAITING) {
+      return;
+    }
     this->dmabuf_interface = dmabuf_interface;
     this->supported_modifiers = supported_modifiers;
+    y_invert = false;
     // Reset state
     shm_info.supported = false;
     dmabuf_info.supported = false;
 
     // Create new frame
-    auto frame = zwlr_screencopy_manager_v1_capture_output(
+    auto frame = active_frame = zwlr_screencopy_manager_v1_capture_output(
       screencopy_manager,
       blend_cursor ? 1 : 0,
       output
@@ -321,7 +368,19 @@ namespace wl {
     status = WAITING;
   }
 
+  void dmabuf_t::finish_frame() {
+    if (active_params) {
+      zwp_linux_buffer_params_v1_destroy(active_params);
+      active_params = nullptr;
+    }
+    if (active_frame) {
+      zwlr_screencopy_frame_v1_destroy(active_frame);
+      active_frame = nullptr;
+    }
+  }
+
   dmabuf_t::~dmabuf_t() {
+    finish_frame();
     cleanup_gbm();
 
     for (auto &frame : frames) {
@@ -329,9 +388,11 @@ namespace wl {
     }
 
     if (gbm_device) {
-      // We should close the DRM FD, but it's owned by GBM
+      // GBM borrows the descriptor; the caller retains ownership.
+      const int drm_fd = gbm_device_get_fd(gbm_device);
       gbm_device_destroy(gbm_device);
       gbm_device = nullptr;
+      close(drm_fd);
     }
   }
 
@@ -369,58 +430,78 @@ namespace wl {
     BOOST_LOG(verbose) << "Frame flags: "sv << flags << (y_invert ? " (y_invert)" : "");
   }
 
+  std::optional<implicit_dmabuf_allocation_t> implicit_dmabuf_allocation(const std::vector<uint64_t> &modifiers) {
+    if (modifiers.size() == 1 && modifiers.front() == DRM_FORMAT_MOD_LINEAR) {
+      return implicit_dmabuf_allocation_t {GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR, DRM_FORMAT_MOD_LINEAR};
+    }
+    if (modifiers.empty() || std::find(modifiers.begin(), modifiers.end(), DRM_FORMAT_MOD_INVALID) != modifiers.end()) {
+      return implicit_dmabuf_allocation_t {GBM_BO_USE_RENDERING, DRM_FORMAT_MOD_INVALID};
+    }
+    return std::nullopt;
+  }
+
   // DMA-BUF creation helper
   void dmabuf_t::create_and_copy_dmabuf(zwlr_screencopy_frame_v1 *frame) {
     if (!init_gbm()) {
       BOOST_LOG(error) << "Failed to initialize GBM"sv;
-      zwlr_screencopy_frame_v1_destroy(frame);
+      finish_frame();
       status = REINIT;
       return;
     }
 
-    // Create GBM buffer
+    // Match the compositor's import capabilities. Legacy GBM allocation must
+    // not choose an unadvertised layout after an explicit allocation fails.
+    std::vector<uint64_t> modifiers;
     if (supported_modifiers) {
       auto it = supported_modifiers->find(dmabuf_info.format);
       if (it != supported_modifiers->end() && !it->second.empty()) {
-        current_bo = gbm_bo_create_with_modifiers(gbm_device, dmabuf_info.width, dmabuf_info.height, dmabuf_info.format, it->second.data(), it->second.size());
+        modifiers = it->second;
+        current_bo = gbm_bo_create_with_modifiers(gbm_device, dmabuf_info.width, dmabuf_info.height, dmabuf_info.format, modifiers.data(), modifiers.size());
+      }
+    }
+
+    uint64_t modifier = DRM_FORMAT_MOD_INVALID;
+    if (current_bo) {
+      modifier = gbm_bo_get_modifier(current_bo);
+    }
+    if (!current_bo) {
+      if (const auto fallback = implicit_dmabuf_allocation(modifiers)) {
+        current_bo = gbm_bo_create(gbm_device, dmabuf_info.width, dmabuf_info.height, dmabuf_info.format, fallback->usage);
+        modifier = fallback->modifier;
       }
     }
 
     if (!current_bo) {
-      current_bo = gbm_bo_create(gbm_device, dmabuf_info.width, dmabuf_info.height, dmabuf_info.format, GBM_BO_USE_RENDERING);
-    }
-
-    if (!current_bo) {
       BOOST_LOG(error) << "Failed to create GBM buffer"sv;
-      zwlr_screencopy_frame_v1_destroy(frame);
+      finish_frame();
       status = REINIT;
       return;
     }
 
-    // Get buffer info
-    int fd = gbm_bo_get_fd(current_bo);
-    if (fd < 0) {
-      BOOST_LOG(error) << "Failed to get buffer FD"sv;
-      gbm_bo_destroy(current_bo);
-      current_bo = nullptr;
-      zwlr_screencopy_frame_v1_destroy(frame);
-      status = REINIT;
+    // Export every plane: tiled/compressed RGB modifiers can carry auxiliary
+    // planes even though the image has only RGB channels.
+    const int plane_count = gbm_bo_get_plane_count(current_bo);
+    if (plane_count < 1 || plane_count > 4) {
+      failed(frame);
       return;
     }
-
-    uint32_t stride = gbm_bo_get_stride(current_bo);
-    uint64_t modifier = gbm_bo_get_modifier(current_bo);
-
-    // Store in surface descriptor for later use
     auto next_frame = get_next_frame();
-    next_frame->sd.fds[0] = fd;
-    next_frame->sd.pitches[0] = stride;
-    next_frame->sd.offsets[0] = 0;
+    next_frame->destroy();
     next_frame->sd.modifier = modifier;
-
-    // Create linux-dmabuf buffer
-    auto params = zwp_linux_dmabuf_v1_create_params(dmabuf_interface);
-    zwp_linux_buffer_params_v1_add(params, fd, 0, 0, stride, modifier >> 32, modifier & 0xffffffff);
+    auto params = active_params = zwp_linux_dmabuf_v1_create_params(dmabuf_interface);
+    for (int plane = 0; plane < plane_count; ++plane) {
+      const int fd = gbm_bo_get_fd_for_plane(current_bo, plane);
+      if (fd < 0) {
+        failed(frame);
+        return;
+      }
+      const auto stride = gbm_bo_get_stride_for_plane(current_bo, plane);
+      const auto offset = gbm_bo_get_offset(current_bo, plane);
+      next_frame->sd.fds[plane] = fd;
+      next_frame->sd.pitches[plane] = stride;
+      next_frame->sd.offsets[plane] = offset;
+      zwp_linux_buffer_params_v1_add(params, fd, plane, offset, stride, modifier >> 32, modifier & 0xffffffff);
+    }
 
     // Add listener for buffer creation
     zwp_linux_buffer_params_v1_add_listener(params, &params_listener, frame);
@@ -445,11 +526,11 @@ namespace wl {
     } else if (shm_info.supported) {
       // SHM fallback would go here
       BOOST_LOG(warning) << "[wayland] SHM capture not implemented"sv;
-      zwlr_screencopy_frame_v1_destroy(frame);
+      finish_frame();
       status = REINIT;
     } else {
       BOOST_LOG(error) << "[wayland] No supported buffer types"sv;
-      zwlr_screencopy_frame_v1_destroy(frame);
+      finish_frame();
       status = REINIT;
     }
   }
@@ -468,6 +549,7 @@ namespace wl {
 
     // Start the actual copy
     zwp_linux_buffer_params_v1_destroy(params);
+    self->active_params = nullptr;
     zwlr_screencopy_frame_v1_copy(frame, buffer);
   }
 
@@ -483,7 +565,9 @@ namespace wl {
     self->cleanup_gbm();
 
     zwp_linux_buffer_params_v1_destroy(params);
-    zwlr_screencopy_frame_v1_destroy(frame);
+    self->active_params = nullptr;
+    self->finish_frame();
+    self->get_next_frame()->destroy();
     self->status = REINIT;
   }
 
@@ -497,6 +581,7 @@ namespace wl {
     // Frame is ready for use, GBM buffer now contains screen content
     current_frame->destroy();
     current_frame = get_next_frame();
+    current_frame->y_invert = y_invert;
 
     std::uint64_t sec = (std::uint64_t(tv_sec_hi) << 32) | tv_sec_lo;
     auto ready_ts = std::chrono::seconds(sec) + std::chrono::nanoseconds(tv_nsec);
@@ -512,7 +597,7 @@ namespace wl {
 
     cleanup_gbm();
 
-    zwlr_screencopy_frame_v1_destroy(frame);
+    finish_frame();
     status = READY;
   }
 
@@ -525,7 +610,7 @@ namespace wl {
     auto next_frame = get_next_frame();
     next_frame->destroy();
 
-    zwlr_screencopy_frame_v1_destroy(frame);
+    finish_frame();
     status = REINIT;
   }
 

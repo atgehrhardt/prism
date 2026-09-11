@@ -1237,6 +1237,10 @@ namespace platf {
       std::ifstream override_file(prism_runtime_dir + "/prism-capture-override");
       if (override_file) {
         std::getline(override_file, prism_override);
+        if (prism_override.empty()) {
+          BOOST_LOG(error) << "[prism] Empty capture override; refusing desktop fallback"sv;
+          return nullptr;
+        }
         std::string unexpected_line;
         if (std::getline(override_file, unexpected_line)) {
           BOOST_LOG(error) << "[prism] Capture override contains multiple lines; refusing desktop fallback"sv;

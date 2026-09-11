@@ -144,6 +144,12 @@ const auto HEADLESS_HELPER_TEST = std::format(
   PRISM_SOURCE_DIR,
   PRISM_SOURCE_DIR
 );
+/** @brief CUDA selection and compositor dependency checks without host mutations. */
+const auto HEADLESS_BUILD_TEST = std::format(
+  "bash {}/tests/integration/test_headless_build.sh {}",
+  PRISM_SOURCE_DIR,
+  PRISM_SOURCE_DIR
+);
 const auto AUDIO_HELPER_TEST = std::format(
   "bash {}/tests/integration/test_audio_common.sh {}",
   PRISM_SOURCE_DIR,
@@ -204,6 +210,12 @@ INSTANTIATE_TEST_SUITE_P(
       "linux",
       true,
       "Headless lifecycle helper tests"
+    },
+    ExternalCommandTestData {
+      HEADLESS_BUILD_TEST,
+      "linux",
+      true,
+      "Headless CUDA and dependency preflight tests"
     },
     ExternalCommandTestData {
       AUDIO_HELPER_TEST,

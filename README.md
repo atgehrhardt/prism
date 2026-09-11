@@ -74,9 +74,10 @@ Steam Input. Set `gamepad = ds5-edge` to force that device type.
 
 ## Status
 
-⚠️ **Currently validated on Fedora 44 (KDE Plasma 6, Wayland, NVIDIA) only.** The design is
-GPU-agnostic (capture routing only; encoding stays on Sunshine's normal nvenc/vaapi/software
-paths) — **testers wanted!** If you try Prism on another distro, GPU, or desktop environment,
+**Primary hardware test target: Fedora with KDE Plasma, Wayland, and NVIDIA.**
+Headless HDR uses GPU DMA-BUF capture with NVIDIA CUDA/NVENC or AMD VAAPI encoding;
+its new compositor and capture changes have local Linux build/protocol tests, but
+still need end-to-end hardware validation. If you try Prism on another distro, GPU, or desktop environment,
 please report back in [Issues](https://github.com/atgehrhardt/prism/issues).
 
 ## Compatibility
@@ -92,9 +93,10 @@ Nothing is Fedora- or NVIDIA-locked, but features vary by desktop environment:
 | **Virtual display mode** | KDE Plasma 6 (Wayland) | Relies on KWin virtual outputs (`krfb-virtualmonitor`). No equivalent on other DEs yet. |
 | **Physical-display mode/HDR switching** (`prism-desktop-session.sh`, `prism-kwin-mode`) | KDE Plasma 6 | Built on `kscreen-doctor` / kde-output-management-v2; silently no-ops elsewhere. |
 
-In short: on non-KDE desktops you keep mirror capture, headless sessions, Steam sync, and
-audio separation; you lose virtual-display mode and physical-display switching. On any
-PipeWire distro with KDE Plasma 6, everything should work.
+Headless sessions do not depend on KDE or Fedora. They require the services and
+GPU capabilities above. The private HDR compositor also needs recent build dependencies;
+see the [HDR setup and validation notes](docs/headless-hdr.md) for version checks,
+NVIDIA/AMD requirements, and installation on other distributions.
 
 ## Install (Fedora 44)
 
@@ -140,6 +142,7 @@ systemctl --user disable prism.service
 rm -f ~/.local/bin/prism \
       ~/.local/bin/prism-*.sh \
       ~/.local/bin/prism-input-bridge \
+      ~/.local/bin/prism-labwc \
       ~/.local/bin/prism-kwin-mode \
       ~/.config/systemd/user/prism.service \
       ~/.config/systemd/user/prism-headless-session.service \
@@ -225,9 +228,13 @@ rm -rf ~/.config/prism ~/.cache/prism
 
 ## Caveats
 
-- **HDR**: private labwc headless sessions are SDR. Desktop HDR capture depends on your
-  portal/compositor. KWin virtual outputs are marked HDR/WCG-capable for HDR clients
-  (needs Plasma 6).
+- **HDR**: headless HDR uses the isolated `prism-labwc` compositor installed by
+  `install.sh`, with Vulkan rendering and 10-bit DMA-BUF capture. Prism verifies
+  BT.2020/PQ output colorimetry and passes its metadata to Iris/Moonlight. The host
+  needs Vulkan color-management support and a working HEVC Main10 or AV1 10-bit
+  GPU encoder. Proton games need a Wine Wayland/HDR-capable build. See
+  [headless HDR setup and assessment](docs/headless-hdr.md). Desktop HDR capture
+  depends on your portal/compositor; KWin virtual HDR outputs need Plasma 6.
 - **VRR**: private headless outputs have no physical VRR target. KWin virtual outputs
   still get `vrrpolicy.always`.
 - **Virtual outputs match the client's refresh rate** (a custom mode is added via
