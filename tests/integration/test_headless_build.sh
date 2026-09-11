@@ -9,11 +9,11 @@ trap 'rm -rf "$SANDBOX"' EXIT
 mkdir -p "$SANDBOX/bin" "$SANDBOX/drm/renderD128/device" "$SANDBOX/toolkit with spaces"
 
 # Isolate compiler discovery from the test machine's installed CUDA toolkit.
-for program in bash awk dirname; do
+for program in bash awk dirname mktemp sort cat rm; do
   ln -s "$(command -v "$program")" "$SANDBOX/bin/$program"
 done
 export CUDA_PATH="$SANDBOX/missing-toolkit"
-unset CUDACXX PRISM_CUDA_ALLOW_UNSUPPORTED_COMPILER
+unset CUDACXX CUDAHOSTCXX PRISM_CUDA_ALLOW_UNSUPPORTED_COMPILER
 # shellcheck source=scripts/linux_cuda_config.sh
 . "$SOURCE_DIR/scripts/linux_cuda_config.sh"
 
@@ -46,20 +46,57 @@ unset CUDACXX PRISM_CUDA_ALLOW_UNSUPPORTED_COMPILER
 grep -q 'CUDA toolkit' "$SANDBOX/nvidia-error"
 printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$SANDBOX/toolkit with spaces/nvcc"
 chmod +x "$SANDBOX/toolkit with spaces/nvcc"
+printf '%s\n' '#!/usr/bin/env bash' 'exit 0' > "$SANDBOX/bin/gcc"
+chmod +x "$SANDBOX/bin/gcc"
 (
   export PATH="$SANDBOX/bin"
   export CUDACXX="$SANDBOX/toolkit with spaces/nvcc"
   prism_configure_cuda "$SANDBOX/drm"
   [ "$CUDA_FLAG" = ON ]
-  [ "${#CUDA_FLAGS[@]}" -eq 1 ]
+  [ "${#CUDA_FLAGS[@]}" -eq 3 ]
   [ "${CUDA_FLAGS[0]}" = "-DCMAKE_CUDA_COMPILER=$CUDACXX" ]
   PRISM_CUDA_ALLOW_UNSUPPORTED_COMPILER=1 prism_configure_cuda "$SANDBOX/drm"
-  [ "${CUDA_FLAGS[1]}" = '-DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler' ]
+  [ "${CUDA_FLAGS[2]}" = '-DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler' ]
   unset CUDACXX
   export PATH="$SANDBOX/toolkit with spaces:$PATH"
   prism_configure_cuda "$SANDBOX/empty"
   [ "$CUDA_FLAG" = ON ]
 )
+
+# Reject the default host, then verify fallback and explicit override behavior.
+cat > "$SANDBOX/toolkit with spaces/nvcc" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = -allow-unsupported-compiler ]; then exit 0; fi
+[ "$1" = -ccbin ] || exit 98
+case "$2" in
+  */gcc-15 | */host\ with\ spaces) exit 0 ;;
+  *) echo 'unsupported GNU version' >&2; exit 1 ;;
+esac
+EOF
+(
+  export PATH="$SANDBOX/bin" CUDACXX="$SANDBOX/toolkit with spaces/nvcc"
+  if prism_configure_cuda "$SANDBOX/drm" 2>"$SANDBOX/host-error"; then exit 1; fi
+  [ "$CUDA_FLAG" = OFF ]
+  PRISM_CUDA_ALLOW_UNSUPPORTED_COMPILER=1 prism_configure_cuda "$SANDBOX/drm"
+  [ "${CUDA_FLAGS[2]}" = '-DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler' ]
+)
+grep -q 'CUDAHOSTCXX' "$SANDBOX/host-error"
+for program in gcc-16 gcc-15 'host with spaces'; do
+  cp "$SANDBOX/bin/gcc" "$SANDBOX/bin/$program"
+done
+(
+  export PATH="$SANDBOX/bin" CUDACXX="$SANDBOX/toolkit with spaces/nvcc"
+  prism_configure_cuda "$SANDBOX/drm"
+  [ "${CUDA_FLAGS[1]}" = "-DCMAKE_CUDA_HOST_COMPILER=$SANDBOX/bin/gcc-15" ]
+  [ "${CUDA_FLAGS[2]}" = '-DCMAKE_CUDA_FLAGS=' ]
+  CUDAHOSTCXX="$SANDBOX/bin/host with spaces" prism_configure_cuda "$SANDBOX/drm"
+  [ "${CUDA_FLAGS[1]}" = "-DCMAKE_CUDA_HOST_COMPILER=$SANDBOX/bin/host with spaces" ]
+  if CUDAHOSTCXX=gcc-16 prism_configure_cuda "$SANDBOX/drm"; then exit 1; fi
+  if CUDAHOSTCXX=missing-host prism_configure_cuda "$SANDBOX/drm"; then exit 1; fi
+)
+
+# Verify runtime search precedence for both CUDA and non-CUDA configurations.
+cmake -DSOURCE_DIR="$SOURCE_DIR" -P "$SOURCE_DIR/tests/integration/test_cuda_link.cmake"
 
 # Exercise --check without fetching/building or depending on the host distro.
 for program in git ninja patch cc wayland-scanner glslang; do
