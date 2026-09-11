@@ -2,8 +2,12 @@
 # Prism source installer. Automatic dependency installation targets Fedora;
 # other distributions can supply dependencies with PRISM_SKIP_DEPENDENCIES=1.
 #   curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
+## @file
+## @brief Install Prism from any directory, including through a shell pipeline.
 set -euo pipefail
 
+## @brief Clone, build, and install with stdin isolated from the downloaded script.
+main() {
 REPO="https://github.com/atgehrhardt/prism.git"
 BRANCH="master"
 SRC_DIR="${PRISM_SRC_DIR:-$HOME/Dev/prism}"
@@ -49,6 +53,11 @@ else
   log "Cloning Prism into $SRC_DIR"
   git clone --branch "$BRANCH" --recurse-submodules "$REPO" "$SRC_DIR"
 fi
+
+# Build helpers may run Git commands relative to their working directory.
+# Resolve relative PRISM_SRC_DIR overrides before changing directories.
+SRC_DIR="$(cd "$SRC_DIR" && pwd)"
+cd "$SRC_DIR"
 
 # --- 3. Build ----------------------------------------------------------------
 log "Building Prism (this takes a while)"
@@ -183,3 +192,8 @@ systemctl --user restart prism.service
 
 log "Done. Open https://$(hostname -I | awk '{print $1}'):47990 to pair Moonlight."
 log "Apps available: Desktop (Mirror), Desktop (Virtual), Desktop Headless, Steam Headless."
+}
+
+# Parse the complete installer before running subprocesses, and prevent them
+# from consuming script bytes from `curl | bash`. sudo still prompts on the TTY.
+main "$@" </dev/null
