@@ -7,6 +7,7 @@
 
 // local includes
 #include "cuda.h"
+#include "src/headless_hdr.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "src/video.h"
@@ -139,6 +140,15 @@ namespace wl {
         // Prism's private compositor exports the output's encoded pixels.
         // Other compositors may tone-map their screencopy buffers to SDR.
         hdr_metadata = read_output_hdr_metadata(display, interface.color_manager, output);
+        if (hdr_metadata) {
+          const char *runtime = std::getenv("XDG_RUNTIME_DIR");
+          const auto directory = runtime ? std::string(runtime) : "/run/user/" + std::to_string(getuid());
+          hdr_profile_path = directory + "/prism-headless-hdr";
+          const auto profile = prism::hdr::read(hdr_profile_path).value_or(prism::hdr::profile_t {});
+          hdr_metadata->maxDisplayLuminance = profile.peak;
+          BOOST_LOG(info) << "[wlgrab] Headless HDR calibration: SDR white " << profile.sdr_white
+                          << " nits, display peak " << profile.peak << " nits";
+        }
       }
       if (expected_width > 0 && config.dynamicRange && !hdr_metadata) {
         BOOST_LOG(error) << "[wlgrab] Headless HDR requested but the output is not BT.2020/PQ; check prism-labwc and Vulkan support"sv;
@@ -194,6 +204,7 @@ namespace wl {
         }
       }
 
+      hdr_live_ready = true;
       return 0;
     }
 
@@ -235,6 +246,16 @@ namespace wl {
      * @return Capture status reported to the streaming pipeline.
      */
     inline platf::capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
+      const auto now = std::chrono::steady_clock::now();
+      if (hdr_metadata && hdr_live_ready && now >= next_hdr_profile_check) {
+        next_hdr_profile_check = now + 250ms;
+        const auto profile = prism::hdr::read(hdr_profile_path);
+        if (profile && profile->peak != hdr_metadata->maxDisplayLuminance) {
+          // Recreate the encoder so both bitstream and client metadata follow
+          // live calibration. Pixels stay PQ; no second transfer is applied.
+          return platf::capture_e::reinit;
+        }
+      }
       auto to = std::chrono::steady_clock::now() + timeout;
 
       // Dispatch events until we get a new frame or the timeout expires
@@ -274,6 +295,9 @@ namespace wl {
 
     wl_output *output;  ///< Wayland output selected for capture.
     std::optional<SS_HDR_METADATA> hdr_metadata;  ///< Verified output colorimetry and mastering metadata.
+    std::filesystem::path hdr_profile_path;  ///< Session-local calibration file.
+    bool hdr_live_ready = false;  ///< Initial precision probe has finished; live reinitialization is safe.
+    std::chrono::steady_clock::time_point next_hdr_profile_check {};  ///< Bounded live metadata polling deadline.
   };
 
   /**

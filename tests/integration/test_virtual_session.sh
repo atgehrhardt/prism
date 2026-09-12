@@ -30,6 +30,7 @@ export PRISM_TEST_MONITOR="$TEST_ROOT/virtual-monitor"
 export PRISM_TEST_MONITOR_PID="$TEST_ROOT/virtual-monitor.pid"
 export PRISM_TEST_AUDIO_PID="$TEST_ROOT/virtual-audio.pid"
 export PRISM_TEST_KRFB_ARGS="$TEST_ROOT/krfb-args"
+export PRISM_TEST_VRR_REQUEST="$TEST_ROOT/vrr-request"
 mkdir -p "$TEST_ROOT/bin" "$HOME/.config/prism" "$XDG_RUNTIME_DIR"
 printf '%s\n' 'audio_sink = prism-stream' > "$HOME/.config/prism/prism.conf"
 
@@ -51,6 +52,10 @@ if [ "${1:-}" = "-o" ]; then
   exit 0
 fi
 case "${1:-}" in
+  output.*.vrrpolicy.always)
+    printf '%s\n' "$1" > "$PRISM_TEST_VRR_REQUEST"
+    [ "${PRISM_TEST_VRR_UNSUPPORTED:-0}" != 1 ] || exit 1
+    ;;
   output.*.disable)
     output="${1#output.}"
     output="${output%.disable}"
@@ -253,13 +258,13 @@ reset_fixture() {
     kill -KILL "$audio_pid" "$audio_child_pid" 2>/dev/null || true
   fi
   rm -f "$XDG_RUNTIME_DIR"/prism-* "$PRISM_TEST_MONITOR" \
-    "$PRISM_TEST_MONITOR_PID" "$PRISM_TEST_AUDIO_PID" "$PRISM_TEST_KRFB_ARGS"
+    "$PRISM_TEST_MONITOR_PID" "$PRISM_TEST_AUDIO_PID" "$PRISM_TEST_KRFB_ARGS" "$PRISM_TEST_VRR_REQUEST"
   printf '%s\n' 'DP-1 enabled' 'HDMI-A-1 disabled' > "$PRISM_TEST_OUTPUTS"
   : > "$PRISM_TEST_MODULES"
   printf '%s\n' $'1\tphysical-speakers' $'2\tprism-stream' > "$PRISM_TEST_SINKS"
   printf '%s\n' physical-speakers > "$PRISM_TEST_DEFAULT_SINK"
   unset PRISM_TEST_FAIL_DISABLE PRISM_TEST_FAIL_DISABLE_AFTER_CHANGE \
-    PRISM_TEST_FAIL_ENABLE PRISM_TEST_KSCREEN_FAIL
+    PRISM_TEST_FAIL_ENABLE PRISM_TEST_KSCREEN_FAIL PRISM_TEST_VRR_UNSUPPORTED
 }
 
 # A complete session uses the trusted desktop entry and restores only outputs
@@ -267,6 +272,7 @@ reset_fixture() {
 reset_fixture
 export PRISM_TEST_KRFB_SCENARIO=success
 PRISM_TEST_VIRTUAL_READY_TIMEOUT_SECONDS=2 "$START"
+grep -Fxq 'output.Virtual-Prism-Virtual.vrrpolicy.always' "$PRISM_TEST_VRR_REQUEST"
 grep -Fq -- '--name Prism-Virtual --desktopfile org.kde.krfb.virtualmonitor' \
   "$PRISM_TEST_KRFB_ARGS"
 grep -qx 'DP-1' "$XDG_RUNTIME_DIR/prism-virtual-desktop.state"
@@ -279,6 +285,15 @@ grep -qx 'DP-1 enabled' "$PRISM_TEST_OUTPUTS"
 grep -qx 'HDMI-A-1 disabled' "$PRISM_TEST_OUTPUTS"
 [ ! -e "$XDG_RUNTIME_DIR/prism-virtual-desktop.state" ]
 [ ! -e "$PRISM_TEST_MONITOR" ]
+
+## @brief Unsupported VRR must not prevent a virtual session from becoming ready.
+reset_fixture
+export PRISM_TEST_VRR_UNSUPPORTED=1
+PRISM_TEST_VIRTUAL_READY_TIMEOUT_SECONDS=2 "$START"
+grep -Fxq 'output.Virtual-Prism-Virtual.vrrpolicy.always' "$PRISM_TEST_VRR_REQUEST"
+[ "$(cat "$XDG_RUNTIME_DIR/prism-capture-override")" = "kwin:Virtual-Prism-Virtual" ]
+grep -Fq 'WARN: could not set vrrpolicy' "$HOME/.local/state/prism-virtual.log"
+"$STOP"
 
 # A monitor that remains alive without publishing an output fails under one
 # wall-clock deadline and creates no audio, override, or display state.

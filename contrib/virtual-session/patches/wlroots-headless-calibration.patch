@@ -1,0 +1,115 @@
+--- a/render/color.c
++++ b/render/color.c
+@@ -1,4 +1,6 @@
+ #include <assert.h>
++#include <stdio.h>
++#include <time.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <wlr/render/color.h>
+@@ -405,6 +407,40 @@
+ 	wlr_matrix_multiply(matrix, xyz_to_destination, source_to_xyz);
+ }
+
++/**
++ * @brief Read Prism's session-local SDR reference white, with bounded polling.
++ * @return Validated reference white in nits, or the upstream 203-nit default.
++ */
++static float prism_reference_white(void) {
++	static float white = 203;
++	static double next_check = 0;
++	struct timespec now;
++	clock_gettime(CLOCK_MONOTONIC, &now);
++	double seconds = now.tv_sec + now.tv_nsec / 1e9;
++	if (seconds < next_check) {
++		return white;
++	}
++	next_check = seconds + 0.1;
++	white = 203;
++	const char *path = getenv("PRISM_HDR_SETTINGS_FILE");
++	if (path == NULL || path[0] == '\0') {
++		return white;
++	}
++	FILE *file = fopen(path, "r");
++	if (file == NULL) {
++		return white;
++	}
++	int version, candidate, peak;
++	char extra;
++	if (fscanf(file, "%d %d %d %c", &version, &candidate, &peak, &extra) == 3 &&
++			version == 1 && candidate >= 80 && candidate <= 500 &&
++			peak >= candidate && peak <= 4000) {
++		white = candidate;
++	}
++	fclose(file);
++	return white;
++}
++
+ void wlr_color_transfer_function_get_default_luminance(enum wlr_color_transfer_function tf,
+ 		struct wlr_color_luminances *lum) {
+ 	switch (tf) {
+@@ -412,7 +448,7 @@
+ 		*lum = (struct wlr_color_luminances){
+ 			.min = 0.005,
+ 			.max = 10000,
+-			.reference = 203,
++			.reference = prism_reference_white(),
+ 		};
+ 		break;
+ 	case WLR_COLOR_TRANSFER_FUNCTION_BT1886:
+--- a/include/wlr/types/wlr_scene.h
++++ b/include/wlr/types/wlr_scene.h
+@@ -257,6 +257,7 @@
+ 		struct wlr_color_transform *prev_gamma_lut_color_transform;
+ 		struct wlr_color_transform *prev_supplied_color_transform;
+ 		struct wlr_color_transform *combined_color_transform;
++		float prism_hdr_reference; ///< Reference white used by the cached output transform.
+
+ 		struct wl_listener output_commit;
+ 		struct wl_listener output_damage;
+--- a/types/scene/wlr_scene.c
++++ b/types/scene/wlr_scene.c
+@@ -2325,6 +2325,24 @@
+ 	enum wlr_scene_debug_damage_option debug_damage =
+ 		scene_output->scene->debug_damage_option;
+
++	/* Rebuild the cached output transform when live SDR-white calibration
++	 * changes. Source HDR normalization and destination normalization must
++	 * change together so native HDR pixels retain absolute luminance. */
++	float prism_reference = 0;
++	bool prism_reference_changed = false;
++	const struct wlr_output_image_description *prism_description =
++		output_pending_image_description(output, state);
++	if (prism_description != NULL && getenv("PRISM_HDR_SETTINGS_FILE") != NULL) {
++		struct wlr_color_luminances luminances;
++		wlr_color_transfer_function_get_default_luminance(
++			prism_description->transfer_function, &luminances);
++		prism_reference = luminances.reference;
++		prism_reference_changed = scene_output->prism_hdr_reference != prism_reference;
++		if (prism_reference_changed) {
++			scene_output_damage_whole(scene_output);
++		}
++	}
++
+ 	bool render_gamma_lut = false;
+ 	if (wlr_output_get_gamma_size(output) == 0 && output->renderer->features.output_color_transform) {
+ 		if (scene_output->gamma_lut_color_transform != scene_output->prev_gamma_lut_color_transform) {
+@@ -2498,7 +2516,8 @@
+ 	if ((render_gamma_lut
+ 			&& scene_output->gamma_lut_color_transform != scene_output->prev_gamma_lut_color_transform)
+ 			|| scene_output->prev_supplied_color_transform != options->color_transform
+-			|| (state->committed & WLR_OUTPUT_STATE_IMAGE_DESCRIPTION)) {
++			|| (state->committed & WLR_OUTPUT_STATE_IMAGE_DESCRIPTION)
++			|| prism_reference_changed) {
+ 		const struct wlr_output_image_description *output_description =
+ 			output_pending_image_description(output, state);
+ 		if (!scene_output_combine_color_transforms(scene_output, options->color_transform,
+@@ -2507,6 +2526,8 @@
+ 			return false;
+ 		}
+ 	}
++
++	scene_output->prism_hdr_reference = prism_reference;
+
+ 	scene_output->in_point++;
+ 	struct wlr_render_pass *render_pass = wlr_renderer_begin_buffer_pass(output->renderer, buffer,

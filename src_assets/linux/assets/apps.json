@@ -4,6 +4,13 @@
   },
   "apps": [
     {
+      "name": "Headless HDR Configuration",
+      "cmd": "prism-hdr-calibration",
+      "prism-capture": "headless",
+      "auto-detach": false,
+      "wait-all": false
+    },
+    {
       "name": "Desktop (Mirror)",
       "image-path": "desktop.png",
       "prism-capture": "default"

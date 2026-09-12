@@ -39,6 +39,7 @@ for payload in \
 done
 for labwc_component in \
   prism-input-bridge \
+  prism-hdr-calibration \
   prism-input-bridge.service \
   prism-headless-steam.service \
   labwc \
@@ -48,6 +49,18 @@ for labwc_component in \
 done
 grep -Fq 'add_executable(prism-input-bridge' \
   "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
+grep -Fq 'add_executable(prism-hdr-calibration' \
+  "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
+python3 - "$SOURCE_DIR/src_assets/linux/assets/apps.json" <<'PY'
+import json
+import sys
+apps = json.load(open(sys.argv[1]))["apps"]
+wizard = next(app for app in apps if app["name"] == "Headless HDR Configuration")
+assert wizard["cmd"] == "prism-hdr-calibration"
+assert wizard["prism-capture"] == "headless"
+assert wizard["auto-detach"] is False
+assert wizard["wait-all"] is False
+PY
 grep -Fq 'wlr-virtual-pointer-unstable-v1' \
   "$SOURCE_DIR/cmake/compile_definitions/linux.cmake"
 grep -Fq 'virtual-keyboard-unstable-v1' \

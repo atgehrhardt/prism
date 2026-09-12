@@ -30,6 +30,7 @@
 #include "config.h"
 #include "crypto.h"
 #include "display_device.h"
+#include "headless_hdr.h"
 #include "logging.h"
 #include "platform/common.h"
 #include "process.h"
@@ -488,6 +489,38 @@ namespace proc {
    */
   static std::mutex prism_capture_mutex;
 
+  /**
+   * @brief Select a profile using authenticated identity rather than the shared legacy client ID.
+   * @param certificate Verified paired certificate, or empty for an unauthenticated launch.
+   * @return Host-controlled profile path, or an empty path when identity is unavailable.
+   */
+  static std::string hdr_profile_path(const std::string &certificate) {
+    if (certificate.empty()) {
+      return {};
+    }
+    return (platf::appdata() / "hdr-clients" /
+            (util::hex(crypto::hash(certificate)).to_string() + ".conf"))
+      .string();
+  }
+
+  int proc_t::prism_resume_hdr_profile(const std::string &certificate) {
+    std::lock_guard<std::mutex> lock(prism_capture_mutex);
+    if (_prism_active_mode != "headless") {
+      return 0;
+    }
+    const auto path = hdr_profile_path(certificate);
+    if (_app.name == prism::hdr::app_name && path != _env["PRISM_HDR_PROFILE"].to_string()) {
+      return -1;
+    }
+    try {
+      prism::hdr::write(prism_runtime_dir() + "/prism-headless-hdr", prism::hdr::read(path).value_or(prism::hdr::profile_t {}));
+      return 0;
+    } catch (const std::exception &exception) {
+      BOOST_LOG(error) << "Could not restore headless HDR calibration: " << exception.what();
+      return -1;
+    }
+  }
+
   int proc_t::prism_capture_begin() {
     // Serialize with prism_capture_end(): a delayed teardown from the previous
     // app must fully finish before this bring-up arms new session state.
@@ -502,6 +535,17 @@ namespace proc {
     _prism_active_mode = mode;
 
     if (mode == "headless"sv) {
+      // A certificate fingerprint selects the profile: legacy HTTP uniqueid
+      // is shared by some Moonlight clients and must not select device settings.
+      try {
+        const auto path = _env["PRISM_HDR_PROFILE"].to_string();
+        const auto profile = path.empty() ? prism::hdr::profile_t {} :
+                                            prism::hdr::read(path).value_or(prism::hdr::profile_t {});
+        prism::hdr::write(prism_runtime_dir() + "/prism-headless-hdr", profile);
+      } catch (const std::exception &exception) {
+        BOOST_LOG(error) << "[prism] Could not initialize HDR calibration: " << exception.what();
+        return -1;
+      }
       // A generated Steam game app carries its launch target as
       // "steam steam://rungameid/<appid>". Hand the appid to the start script
       // (PRISM_STEAM_APP_ID), which brings up a silent background Steam client
@@ -686,6 +730,11 @@ namespace proc {
       BOOST_LOG(error) << "Couldn't find app with ID ["sv << app_id << ']';
       return 404;
     }
+    if (iter->name == prism::hdr::app_name &&
+        (!launch_session->enable_hdr || launch_session->client_cert.empty())) {
+      BOOST_LOG(error) << "HDR calibration requires an HDR stream from a paired client";
+      return 400;
+    }
 
     _app_id = app_id;
     _app = *iter;
@@ -700,6 +749,7 @@ namespace proc {
     _env["PRISM_CLIENT_HEIGHT"] = std::to_string(launch_session->height);
     _env["PRISM_CLIENT_FPS"] = std::to_string(launch_session->fps);
     _env["PRISM_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
+    _env["PRISM_HDR_PROFILE"] = hdr_profile_path(launch_session->client_cert);
     _env["PRISM_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
     _env["PRISM_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
     _env["PRISM_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";

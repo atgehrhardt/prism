@@ -62,12 +62,15 @@ for hdr in false true; do
   grep -Fxq 'WLR_BACKENDS=headless' "$SESSION_TEST/environment"
   grep -Fxq 'WLR_HEADLESS_OUTPUTS=1' "$SESSION_TEST/environment"
   grep -Fxq 'LABWC_UPDATE_ACTIVATION_ENV=no' "$SESSION_TEST/environment"
+  grep -Fxq "PRISM_HDR_SETTINGS_FILE=$SESSION_TEST/runtime/prism-headless-hdr" "$SESSION_TEST/environment"
   if grep -Eq '^(DISPLAY|WAYLAND_DISPLAY)=' "$SESSION_TEST/environment"; then
     echo "headless compositor inherited a desktop display" >&2
     exit 1
   fi
   grep -Fq '<xwaylandPersistence>yes</xwaylandPersistence>' "$SESSION_TEST/rc.xml"
   grep -Fq "<hdr>$hdr</hdr>" "$SESSION_TEST/rc.xml"
+  # Both SDR and HDR sessions request VRR for all content, including windowed apps.
+  grep -Fq '<adaptiveSync>yes</adaptiveSync>' "$SESSION_TEST/rc.xml"
   if [ "$hdr" = true ]; then
     [ "$(head -1 "$SESSION_TEST/args")" = prism-labwc ]
     grep -Fxq 'WLR_RENDERER=vulkan' "$SESSION_TEST/environment"

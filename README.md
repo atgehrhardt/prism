@@ -239,10 +239,16 @@ rm -rf ~/.config/prism ~/.cache/prism
   BT.2020/PQ output colorimetry and passes its metadata to Iris/Moonlight. The host
   needs Vulkan color-management support and a working HEVC Main10 or AV1 10-bit
   GPU encoder. Proton games need a Wine Wayland/HDR-capable build. See
-  [headless HDR setup and assessment](docs/headless-hdr.md). Desktop HDR capture
+  [headless HDR setup and assessment](docs/headless-hdr.md). In Iris, press **Y**
+  on the host and choose **Headless HDR Configuration** to calibrate SDR brightness
+  and peak luminance for that paired device. Save closes the calibration stream.
+  Desktop HDR capture
   depends on your portal/compositor; KWin virtual HDR outputs need Plasma 6.
-- **VRR**: private headless outputs have no physical VRR target. KWin virtual outputs
-  still get `vrrpolicy.always`.
+- **VRR**: headless and virtual sessions always request Adaptive Sync where supported: labwc uses
+  `adaptiveSync=yes`, and KWin virtual outputs use `vrrpolicy.always`. Unsupported
+  outputs continue without VRR. The current wlroots headless backend does not
+  support Adaptive Sync and keeps the configured refresh rate. These host settings
+  do not guarantee VRR presentation on the client display.
 - **Virtual outputs match the client's refresh rate** (a custom mode is added via
   `kscreen-doctor` when the client requests more than the 60Hz default).
 - **Physical-display resolution switching is limited by your driver**: e.g. NVIDIA + DSC
