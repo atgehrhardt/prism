@@ -16,7 +16,7 @@ class CaptureSelectionTest(unittest.TestCase):
     """@brief Verify selection avoids unnecessary portal requests."""
 
     def test_startup_recovery(self):
-        """@brief Run the real discovery function with delayed display and EGL spies."""
+        """@brief Test real discovery with delayed display and EGL spies."""
         source = (ROOT / "src/platform/linux/misc.cpp").read_text()
         start = source.index(
             "  std::optional<std::bitset<source::MAX_FLAGS>> init_capture()"
@@ -33,7 +33,9 @@ class CaptureSelectionTest(unittest.TestCase):
 #include <gtest/gtest.h>
 using namespace std::literals;
 #define BOOST_LOG(level) std::cerr
-namespace source { enum { NVFBC, WAYLAND, KMS, X11, KWIN, PORTAL, MAX_FLAGS }; }
+namespace source {
+  enum { NVFBC, WAYLAND, KMS, X11, KWIN, PORTAL, MAX_FLAGS };
+}
 namespace config { struct { std::string capture = "kwin"; } video; }
 namespace lizardbyte::common {
   bool get_env(const char *, std::string &) { return false; }
@@ -51,7 +53,10 @@ bool verify_nvfbc() { return false; }
 bool verify_wl() { return false; }
 bool verify_kms() { return false; }
 bool verify_x11() { return false; }
-bool verify_portal() { ADD_FAILURE() << "Unexpected portal prompt"; return false; }
+bool verify_portal() {
+  ADD_FAILURE() << "Unexpected portal prompt";
+  return false;
+}
 IMPLEMENTATION
 /**
  * @brief Recover when the compositor exposes its first output after startup.
@@ -129,7 +134,7 @@ TEST(CaptureStartup, ConcurrentRequests) {
                 str(cpp), str(gtest / "src/gtest-all.cc"),
                 str(gtest / "src/gtest_main.cc"), "-o", str(binary),
             ], check=True)
-            # Each process starts with fresh function-local initialization state.
+            # Each process starts with fresh initialization state.
             for name in ("DelayedDisplay", "DelayedEgl", "ConcurrentRequests"):
                 with self.subTest(name=name):
                     subprocess.run([
