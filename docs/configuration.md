@@ -2026,7 +2026,10 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Default</td>
         <td colspan="2">Automatic.
-            Prism will use the first capture method available in the order of the table above.</td>
+            On Linux, Prism tries NvFBC, wlroots, KMS, X11, KWin, then the XDG desktop portal.
+            X11 is also checked as a software-encoding fallback for NvFBC.
+            The portal is only probed when no native backend is available, avoiding unnecessary
+            screen-sharing permission dialogs on startup. Set <code>capture = portal</code> to explicitly use it.</td>
     </tr>
     <tr>
         <td>Example</td>
@@ -2035,7 +2038,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="5">Choices</td>
+        <td rowspan="6">Choices</td>
         <td>nvfbc</td>
         <td>Use NVIDIA Frame Buffer Capture to capture direct to GPU memory. This is usually the fastest method for
             NVIDIA cards. NvFBC does not have native Wayland support and does not work with XWayland.
@@ -2053,13 +2056,18 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @note{Applies to Linux only.}</td>
     </tr>
     <tr>
+        <td>x11</td>
+        <td>Uses XCB. This is the slowest and most CPU intensive so should be avoided if possible.
+            @note{Applies to Linux only.}</td>
+    </tr>
+    <tr>
         <td>kwin</td>
         <td>Capture with KDE/KWin Wayland compositor via KDE screencasting.
             @note{Applies to Linux only.}</td>
     </tr>
     <tr>
-        <td>x11</td>
-        <td>Uses XCB. This is the slowest and most CPU intensive so should be avoided if possible.
+        <td>portal</td>
+        <td>Capture through the XDG desktop portal. The desktop may ask for screen-sharing permission.
             @note{Applies to Linux only.}</td>
     </tr>
 </table>
