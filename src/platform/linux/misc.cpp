@@ -18,6 +18,8 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
+#include <optional>
 #include <sstream>
 
 // platform includes
@@ -1170,9 +1172,80 @@ namespace platf {
 #endif
 
   /**
-   * @brief List display names accepted by the selected capture backend.
+   * @brief Initialize capture libraries and retry discovery until a backend is available.
+   *
+   * Display enumeration can be empty while the compositor starts or the monitor
+   * is asleep. Keep trying on subsequent capture requests without changing a
+   * backend that has already been selected. Serialize discovery and EGL loading
+   * so simultaneous requests cannot observe partially initialized state.
+   *
+   * @return A snapshot of the selected sources (possibly empty), or nullopt if EGL fails.
+   */
+  std::optional<std::bitset<source::MAX_FLAGS>> init_capture() {
+    static std::mutex mutex;
+    static bool egl_ready = false;
+    std::lock_guard lock(mutex);
+    if (!egl_ready) {
+      if (!gladLoaderLoadEGL(nullptr)) {
+        BOOST_LOG(error) << "Failed to load EGL library symbols"sv;
+        return std::nullopt;
+      }
+      egl_ready = true;
+    }
+    if (sources.any()) {
+      return sources;
+    }
+
+#ifdef PRISM_BUILD_CUDA
+    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "nvfbc") && verify_nvfbc()) {
+      sources[source::NVFBC] = true;
+    }
+#endif
+#ifdef PRISM_BUILD_WAYLAND
+    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "wlr") && verify_wl()) {
+      sources[source::WAYLAND] = true;
+    }
+#endif
+#ifdef PRISM_BUILD_DRM
+    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "kms") && verify_kms()) {
+      sources[source::KMS] = true;
+    }
+#endif
+#ifdef PRISM_BUILD_X11
+    // We enumerate this capture backend regardless of other suitable sources,
+    // since it may be needed as a NvFBC fallback for software encoding on X11.
+    if ((config::video.capture.empty() || config::video.capture == "x11") && verify_x11()) {
+      sources[source::X11] = true;
+    }
+#endif
+#ifdef PRISM_BUILD_KWIN
+    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "kwin") && verify_kwin()) {
+      sources[source::KWIN] = true;
+    }
+#endif
+#ifdef PRISM_BUILD_PORTAL
+    // Probing the portal can open a permission dialog. Only do so when no native
+    // backend is available, or when the user explicitly requests portal capture.
+    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "portal") && verify_portal()) {
+      sources[source::PORTAL] = true;
+    }
+#endif
+
+    return sources;
+  }
+
+  /**
+   * @brief List display names, retrying capture discovery after an empty startup probe.
+   *
+   * @param hwdevice_type Hardware device type requested by the encoder.
+   * @return Available display names, or an empty list when discovery or EGL loading fails.
    */
   std::vector<std::string> display_names(mem_type_e hwdevice_type) {
+    const auto capture_sources = init_capture();
+    if (!capture_sources) {
+      return {};
+    }
+    const auto sources = *capture_sources;
 #ifdef PRISM_BUILD_CUDA
     // display using NvFBC only supports mem_type_e::cuda
     if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) {
@@ -1225,7 +1298,20 @@ namespace platf {
     return true;
   }
 
+  /**
+   * @brief Create a capture display, retrying backend discovery if startup found none.
+   *
+   * @param hwdevice_type Hardware device type requested by the encoder.
+   * @param display_name Display name accepted by the selected capture backend.
+   * @param config Video configuration for the capture session.
+   * @return Capture display, or nullptr when initialization fails.
+   */
   std::shared_ptr<display_t> display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+    const auto capture_sources = init_capture();
+    if (!capture_sources) {
+      return nullptr;
+    }
+    const auto sources = *capture_sources;
     // Runtime-owned capture overrides are authoritative. Recognized overrides
     // fail closed so a broken isolated session can never expose the desktop.
     std::string prism_override;
@@ -1355,7 +1441,8 @@ namespace platf {
 
   /**
    * @brief Initialize Linux capture backends, preferring native capture over the interactive portal.
-   * @return Platform cleanup handle, or nullptr when capture or EGL initialization fails.
+   * @return Platform cleanup handle, or nullptr when EGL initialization fails.
+   *         Missing displays are retried by later capture requests.
    */
   std::unique_ptr<deinit_t> init() {
     // enable low latency mode for AMD
@@ -1386,49 +1473,13 @@ namespace platf {
     }
 #endif
 
-#ifdef PRISM_BUILD_CUDA
-    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "nvfbc") && verify_nvfbc()) {
-      sources[source::NVFBC] = true;
+    const auto capture_sources = init_capture();
+    if (!capture_sources) {
+      return nullptr;
     }
-#endif
-#ifdef PRISM_BUILD_WAYLAND
-    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "wlr") && verify_wl()) {
-      sources[source::WAYLAND] = true;
-    }
-#endif
-#ifdef PRISM_BUILD_DRM
-    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "kms") && verify_kms()) {
-      sources[source::KMS] = true;
-    }
-#endif
-#ifdef PRISM_BUILD_X11
-    // We enumerate this capture backend regardless of other suitable sources,
-    // since it may be needed as a NvFBC fallback for software encoding on X11.
-    if ((config::video.capture.empty() || config::video.capture == "x11") && verify_x11()) {
-      sources[source::X11] = true;
-    }
-#endif
-#ifdef PRISM_BUILD_KWIN
-    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "kwin") && verify_kwin()) {
-      sources[source::KWIN] = true;
-    }
-#endif
-#ifdef PRISM_BUILD_PORTAL
-    // Probing the portal can open a permission dialog. Only do so when no native
-    // backend is available, or when the user explicitly requests portal capture.
-    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "portal") && verify_portal()) {
-      sources[source::PORTAL] = true;
-    }
-#endif
-
+    const auto sources = *capture_sources;
     if (sources.none()) {
-      BOOST_LOG(error) << "Unable to initialize capture method"sv;
-      return nullptr;
-    }
-
-    if (!gladLoaderLoadEGL(NULL)) {
-      BOOST_LOG(error) << "Failed to load EGL library symbols"sv;
-      return nullptr;
+      BOOST_LOG(warning) << "No capture source available yet; discovery will be retried on the next capture request"sv;
     }
 
     return std::make_unique<deinit_t>();
