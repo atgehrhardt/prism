@@ -1370,6 +1370,8 @@ namespace input {
    *
    * @param input Platform input backend that receives the event.
    * @param packet Protocol packet being processed.
+   * @note Controller Back/Select is distinct from the Android Escape-key shortcut.
+   * The android_back_as_guide option applies only to keyboard packets.
    */
   void passthrough(std::shared_ptr<input_t> &input, PNV_MULTI_CONTROLLER_PACKET packet) {
     if (!config::input.controller) {
@@ -1423,11 +1425,6 @@ namespace input {
       packet->rightStickX,
       packet->rightStickY
     };
-
-    // Map the Android back button (gamepad Back/Select) to Guide when enabled.
-    if (config::input.android_back_as_guide && (gamepad_state.buttonFlags & platf::BACK)) {
-      gamepad_state.buttonFlags = (gamepad_state.buttonFlags & ~platf::BACK) | platf::HOME;
-    }
 
     auto bf_new = gamepad_state.buttonFlags;
     switch (gamepad.back_button_state) {
