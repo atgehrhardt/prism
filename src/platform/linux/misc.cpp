@@ -1354,7 +1354,8 @@ namespace platf {
   }
 
   /**
-   * @brief Initialize the Linux high-precision timer file descriptor.
+   * @brief Initialize Linux capture backends, preferring native capture over the interactive portal.
+   * @return Platform cleanup handle, or nullptr when capture or EGL initialization fails.
    */
   std::unique_ptr<deinit_t> init() {
     // enable low latency mode for AMD
@@ -1407,14 +1408,16 @@ namespace platf {
       sources[source::X11] = true;
     }
 #endif
-#ifdef PRISM_BUILD_PORTAL
-    if ((config::video.capture.empty() || config::video.capture == "portal") && verify_portal()) {
-      sources[source::PORTAL] = true;
-    }
-#endif
 #ifdef PRISM_BUILD_KWIN
     if (((config::video.capture.empty() && sources.none()) || config::video.capture == "kwin") && verify_kwin()) {
       sources[source::KWIN] = true;
+    }
+#endif
+#ifdef PRISM_BUILD_PORTAL
+    // Probing the portal can open a permission dialog. Only do so when no native
+    // backend is available, or when the user explicitly requests portal capture.
+    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "portal") && verify_portal()) {
+      sources[source::PORTAL] = true;
     }
 #endif
 
