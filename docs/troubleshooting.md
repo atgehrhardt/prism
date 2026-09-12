@@ -133,6 +133,19 @@ resort suggestion.
 
 ## Linux
 
+### Capture fails after login with the monitor asleep
+
+If KWin has no outputs when Prism starts, initial encoder probes can report that
+no display or encoder is available. Wake or connect the monitor and retry the
+stream. Prism retries capture discovery on later display queries and capture
+requests until it finds a backend; restarting Prism is no longer required for
+an empty startup probe. The configured capture method is still respected.
+
+Steam can independently remain running without a usable window if its desktop
+autostart encounters the same missing-display condition. Once the desktop is
+visible, exit Steam and reopen it. Prism's capture recovery does not restart or
+modify the normal desktop Steam client.
+
 ### Hardware Encoders throttle/drop FPS during high GPU load
 Capture methods (`wlgrab`) or encoders (`nvenc`, `vaapi`) that utilize EGL contexts may exhibit FPS drops
 in conjunction with a Prism installation that runs in a sandboxed or reduced permissions state
