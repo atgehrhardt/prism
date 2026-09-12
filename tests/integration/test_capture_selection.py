@@ -13,10 +13,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class CaptureSelectionTest(unittest.TestCase):
-    """@brief Verify backend selection and absence of unnecessary portal requests."""
+    """@brief Verify selection avoids unnecessary portal requests."""
 
     def test_backend_matrix(self):
-        """@brief Exercise availability, explicit choices, and optional builds."""
+        """@brief Exercise availability, explicit choices, and builds."""
         source = (ROOT / "src/platform/linux/misc.cpp").read_text()
         init = source.index("std::unique_ptr<deinit_t> init()")
         start = source.index("#ifdef PRISM_BUILD_CUDA\n    if (((", init)
@@ -46,7 +46,9 @@ void select_capture() {
 SELECTION
 }
 int main() {
-  const char *names[] = {"nvfbc", "wlr", "kms", "x11", "kwin", "portal", "", "invalid"};
+  const char *names[] = {
+    "nvfbc", "wlr", "kms", "x11", "kwin", "portal", "", "invalid"
+  };
   for (unsigned mask = 0; mask < 64; ++mask) {
     for (int choice = 0; choice < 8; ++choice) {
       available = mask & BUILD_MASK;
@@ -65,8 +67,10 @@ int main() {
         expected[source::X11] = available[source::X11];
       }
       bool expect_portal_probe = (BUILD_MASK & (1 << source::PORTAL)) &&
-        (choice == source::PORTAL || (choice == 6 && (available.to_ulong() & 31) == 0));
-      if (sources != expected || probed[source::PORTAL] != expect_portal_probe) {
+        (choice == source::PORTAL ||
+         (choice == 6 && (available.to_ulong() & 31) == 0));
+      if (sources != expected ||
+          probed[source::PORTAL] != expect_portal_probe) {
         std::cerr << "availability=" << mask << " choice=" << names[choice]
                   << " selected=" << sources << " expected=" << expected
                   << " portal_probed=" << probed[source::PORTAL] << '\n';
@@ -80,18 +84,24 @@ int main() {
             cpp = Path(tmp) / "selection.cpp"
             binary = Path(tmp) / "selection"
             cpp.write_text(harness)
-            # Include builds with either or both optional desktop backends absent.
-            for kwin, portal in ((True, True), (False, True), (True, False), (False, False)):
+            # Include builds without either or both desktop backends.
+            for kwin, portal in (
+                (True, True), (False, True), (True, False), (False, False)
+            ):
                 with self.subTest(kwin=kwin, portal=portal):
                     definitions = ["CUDA", "WAYLAND", "DRM", "X11"]
                     if kwin:
                         definitions.append("KWIN")
                     if portal:
                         definitions.append("PORTAL")
+                    build_mask = (
+                        15 | (16 if kwin else 0) | (32 if portal else 0)
+                    )
                     subprocess.run([
-                        os.environ.get("CXX", "c++"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                        os.environ.get("CXX", "c++"), "-std=c++17",
+                        "-Wall", "-Wextra", "-Werror",
                         *[f"-DPRISM_BUILD_{name}" for name in definitions],
-                        f"-DBUILD_MASK={15 | (16 if kwin else 0) | (32 if portal else 0)}",
+                        f"-DBUILD_MASK={build_mask}",
                         str(cpp), "-o", str(binary),
                     ], check=True)
                     subprocess.run([str(binary)], check=True)
