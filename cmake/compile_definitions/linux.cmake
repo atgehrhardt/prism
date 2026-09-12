@@ -208,6 +208,7 @@ if(WAYLAND_FOUND)
     GEN_WAYLAND("${WAYLAND_PROTOCOLS_DIR}" "unstable/xdg-output" xdg-output-unstable-v1)
     GEN_WAYLAND("${WAYLAND_PROTOCOLS_DIR}" "unstable/linux-dmabuf" linux-dmabuf-unstable-v1)
     GEN_WAYLAND("${WAYLAND_PROTOCOLS_DIR}" "staging/color-management" color-management-v1)
+    GEN_WAYLAND("${WAYLAND_PROTOCOLS_DIR}" "stable/xdg-shell" xdg-shell)
     GEN_WAYLAND("${CMAKE_SOURCE_DIR}/third-party/wlr-protocols" "unstable" wlr-screencopy-unstable-v1)
     GEN_WAYLAND("${CMAKE_SOURCE_DIR}/third-party/wlr-protocols" "unstable" wlr-virtual-pointer-unstable-v1)
     GEN_WAYLAND("${CMAKE_SOURCE_DIR}/contrib/virtual-session/protocols" "" virtual-keyboard-unstable-v1)
@@ -218,6 +219,16 @@ if(WAYLAND_FOUND)
     )
 
     pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
+    pkg_check_modules(CAIRO REQUIRED IMPORTED_TARGET cairo)
+    add_executable(prism-hdr-calibration
+            "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-hdr-calibration.cpp"
+            "${CMAKE_BINARY_DIR}/generated-src/xdg-shell.c"
+            "${CMAKE_BINARY_DIR}/generated-src/color-management-v1.c")
+    target_include_directories(prism-hdr-calibration PRIVATE
+            "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/generated-src" ${WAYLAND_INCLUDE_DIRS})
+    target_link_libraries(prism-hdr-calibration PRIVATE ${WAYLAND_LIBRARIES} PkgConfig::CAIRO)
+    install(TARGETS prism-hdr-calibration RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    list(APPEND PRISM_TARGET_DEPENDENCIES prism-hdr-calibration)
     add_executable(prism-input-bridge
             "${CMAKE_SOURCE_DIR}/contrib/virtual-session/prism-input-bridge.c"
             "${CMAKE_BINARY_DIR}/generated-src/wlr-virtual-pointer-unstable-v1.c"

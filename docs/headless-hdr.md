@@ -8,6 +8,62 @@ the host's HDR metadata, so this feature does not require an Iris protocol chang
 
 ## Installation and use
 
+### Per-device calibration from Iris
+
+On Iris's host selection screen, press **Y** on a paired, online Prism host and
+choose **Headless HDR Configuration**. Stop any existing stream first. This opens
+a private HDR calibration stream even if normal streaming has HDR disabled; an
+HDR10 display and ten-bit HEVC or AV1 decoder are required. Calibration never
+quits another running application to make room for itself.
+
+Use the D-pad or left stick to adjust values, **A** to advance or save, **B** to go
+back (or cancel on the first page), and **Y** to reset. Keyboard equivalents are
+Left/Right, Enter, Escape and R. The wizard has three pages:
+
+1. **SDR brightness:** set comfortable text and white-patch brightness at your
+   usual device brightness. This controls the reference white of SDR content
+   composited into HDR (80–500 nits, default 203).
+2. **Highlight clipping:** adjust peak luminance until the brighter cross is
+   barely distinguishable. If device tone mapping keeps the cross visible, use
+   the display's rated peak instead of increasing to the limit. The supported
+   range is SDR white through 4,000 nits (default 1,000).
+3. **Review and save:** save both values and close the stream. Cancel discards
+   unsaved values. A save error stays on-screen so it can be retried.
+
+Profiles are saved under Prism's application-data directory in
+`hdr-clients/<paired-certificate-SHA256>.conf`. The paired certificate, rather
+than the legacy HTTP client ID, separates devices. A different certificate
+(for example after clearing Iris's app data) starts with a fresh profile.
+Calibration does not change the device's global HDR or brightness preferences.
+
+Each headless launch copies that client's profile into the session-local
+`$XDG_RUNTIME_DIR/prism-headless-hdr` file. The private compositor reads SDR-white
+changes and rebuilds its cached output transform, preserving absolute luminance
+for native HDR surfaces. Prism refreshes encoder/client mastering metadata when
+the preview peak changes; this can briefly reconfigure the decoder. SDR sessions
+retain their normal SDR rendering. Native HDR games still need their own HDR
+settings; this wizard does not convert SDR games into native HDR.
+
+The native wizard requires Cairo development files in addition to Wayland at
+build time. `install.sh` installs the executable and application entry; existing
+manual installations must install `prism-hdr-calibration` and add the entry from
+`src_assets/linux/assets/apps.json`. Rebuild the private compositor as well as
+Prism to enable live calibration.
+
+GPU integration validation can be run with the `hdr_keyboard.c` fixture built
+against the generated virtual-keyboard protocol as `hdr-test-keyboard` in the
+Prism build directory, then:
+
+```sh
+python3 tests/integration/test_hdr_calibration.py cmake-build-prism ~/.local/bin/prism-labwc
+```
+
+This starts a separate compositor, checks captured PQ pixel values, exercises
+controller-equivalent input, and verifies preview, save, cancel, failed-save and
+per-device isolation. It requires a working Vulkan/GBM GPU and `grim`.
+
+### Host installation
+
 On the Fedora Prism host, run `PRISM_SRC_DIR="$PWD" bash install.sh` from the updated Prism checkout. The
 installer builds `~/.local/bin/prism-labwc` in addition to Prism and installs the
 updated session helpers. It preserves a checkout with local changes.

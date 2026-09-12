@@ -40,12 +40,14 @@ fetch_source() {
 fetch_source https://github.com/labwc/labwc.git "$LABWC_REV" "$BUILD_ROOT/labwc"
 fetch_source https://gitlab.freedesktop.org/wlroots/wlroots.git "$WLROOTS_REV" \
   "$BUILD_ROOT/labwc/subprojects/wlroots"
-PATCH_FILE="$SCRIPT_DIR/patches/wlroots-headless-hdr.patch"
-if git -C "$BUILD_ROOT/labwc/subprojects/wlroots" apply --check "$PATCH_FILE"; then
-  git -C "$BUILD_ROOT/labwc/subprojects/wlroots" apply "$PATCH_FILE"
-else
-  git -C "$BUILD_ROOT/labwc/subprojects/wlroots" apply --reverse --check "$PATCH_FILE"
-fi
+for patch_name in wlroots-headless-hdr.patch wlroots-headless-calibration.patch; do
+  PATCH_FILE="$SCRIPT_DIR/patches/$patch_name"
+  if git -C "$BUILD_ROOT/labwc/subprojects/wlroots" apply --check "$PATCH_FILE"; then
+    git -C "$BUILD_ROOT/labwc/subprojects/wlroots" apply "$PATCH_FILE"
+  else
+    git -C "$BUILD_ROOT/labwc/subprojects/wlroots" apply --reverse --check "$PATCH_FILE"
+  fi
+done
 
 # Static linking keeps this headless-only change out of the user's desktop.
 meson setup --reconfigure "$BUILD_ROOT/build" "$BUILD_ROOT/labwc" \

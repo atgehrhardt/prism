@@ -103,6 +103,7 @@ rm -f "$HOME/.config/systemd/user/prism-labwc.service" \
 rm -rf "$HOME/.config/systemd/user/prism-labwc.service.wants"
 
 install -Dm755 "$SRC_DIR/cmake-build-prism/prism-input-bridge" "$HOME/.local/bin/prism-input-bridge"
+install -Dm755 "$SRC_DIR/cmake-build-prism/prism-hdr-calibration" "$HOME/.local/bin/prism-hdr-calibration"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-start.sh"   "$HOME/.local/bin/prism-steamos-start.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-stop.sh"    "$HOME/.local/bin/prism-steamos-stop.sh"
 install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-audio-common.sh"    "$HOME/.local/bin/prism-audio-common.sh"
@@ -153,7 +154,8 @@ data.setdefault("env", {"PATH": "$(PATH):$(HOME)/.local/bin"})
 data.setdefault("apps", [])
 # Remove stock example apps and any previous Prism entries; keep other custom apps.
 PRISM_APPS = ("Desktop", "Desktop (Mirror)", "Desktop (Virtual)", "Desktop Headless",
-              "Steam Headless", "SteamOS (Headless)", "Low Res Desktop", "Steam Big Picture")
+              "Steam Headless", "SteamOS (Headless)", "Low Res Desktop", "Steam Big Picture",
+              "Headless HDR Configuration")
 data["apps"] = [a for a in data["apps"] if a.get("name") not in PRISM_APPS]
 defaults = [
     ("Desktop (Mirror)", "desktop.png", "default"),
@@ -163,6 +165,8 @@ defaults = [
 ]
 for i, (name, image, mode) in enumerate(defaults):
     data["apps"].insert(i, {"name": name, "image-path": image, "prism-capture": mode})
+data["apps"].append({"name": "Headless HDR Configuration", "cmd": "prism-hdr-calibration",
+                     "prism-capture": "headless", "auto-detach": False, "wait-all": False})
 with open(apps_path, "w") as f:
     json.dump(data, f, indent=2)
 print("apps.json updated")

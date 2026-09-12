@@ -1159,6 +1159,12 @@ namespace nvhttp {
     const auto launch_session = make_launch_session(host_audio, args);
 
     if (no_active_sessions) {
+      if (proc::proc.prism_resume_hdr_profile(launch_session->client_cert) != 0) {
+        tree.put("root.resume", 0);
+        tree.put("root.<xmlattr>.status_code", 503);
+        tree.put("root.<xmlattr>.status_message", "Could not apply this device's headless HDR calibration");
+        return;
+      }
       // We want to prepare display only if there are no active sessions at
       // the moment. This should be done before probing encoders as it could
       // change the active displays.

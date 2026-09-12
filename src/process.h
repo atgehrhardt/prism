@@ -249,6 +249,13 @@ namespace proc {
      */
     void replace_apps(std::vector<ctx_t> &&apps);
 
+    /**
+     * @brief Load the resuming device's headless HDR profile when no stream is active.
+     * @param certificate Verified paired-client certificate.
+     * @return Zero on success or for non-headless apps; negative if calibration cannot be applied.
+     */
+    int prism_resume_hdr_profile(const std::string &certificate);
+
   private:
     int _app_id;
 

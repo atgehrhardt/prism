@@ -306,6 +306,7 @@ function add_arch_deps() {
     'udev'
     'vulkan-icd-loader'
     'wayland'
+    'cairo'  # Headless HDR calibration UI
   )
 
   if [[ "$skip_libva" == 0 ]]; then
@@ -353,6 +354,7 @@ function add_debian_based_deps() {
     "libsystemd-dev"
     "libudev-dev"
     "libwayland-dev"  # Wayland
+    "libcairo2-dev"  # Headless HDR calibration UI
     "libx11-dev"  # X11
     "libxcb-shm0-dev"  # X11
     "libxcb-xfixes0-dev"  # X11
@@ -460,6 +462,7 @@ function add_fedora_deps() {
     "libXrandr-devel"  # X11
     "libXtst-devel"  # X11
     "libxkbcommon-devel"
+    "cairo-devel"  # Headless HDR calibration UI
     "mesa-libGL-devel"
     "mesa-libgbm-devel"
     "miniupnpc-devel"

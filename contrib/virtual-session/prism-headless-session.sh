@@ -28,6 +28,8 @@ unset DISPLAY WAYLAND_DISPLAY GAMESCOPE_WAYLAND_DISPLAY
 export WLR_BACKENDS=headless
 export WLR_HEADLESS_OUTPUTS=1
 export LABWC_UPDATE_ACTIVATION_ENV=no
+## @brief Share the session's live SDR-white calibration with the private compositor.
+export PRISM_HDR_SETTINGS_FILE="$RUNTIME/prism-headless-hdr"
 export XDG_CONFIG_HOME="$LABWC_CONFIG_HOME"
 export XDG_SESSION_TYPE=wayland
 export PULSE_SINK=prism-headless
@@ -35,10 +37,11 @@ export PULSE_PROP="prism.session.id=$SESSION_ID"
 
 # Xwayland must be alive before startup waits for its owned socket. The
 # default lazy policy can otherwise leave startup waiting for its first app.
+## @brief Request Adaptive Sync for all session content; labwc tests backend support and falls back when unavailable.
 cat > "$LABWC_CONFIG_HOME/labwc/rc.xml" <<EOF
 <?xml version="1.0"?>
 <labwc_config>
-  <core><xwaylandPersistence>yes</xwaylandPersistence><hdr>$HDR</hdr></core>
+  <core><xwaylandPersistence>yes</xwaylandPersistence><hdr>$HDR</hdr><adaptiveSync>yes</adaptiveSync></core>
 </labwc_config>
 EOF
 
