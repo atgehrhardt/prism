@@ -14,23 +14,35 @@ import time
 
 
 def check_select(device, presses, timeout):
-    """@brief Require paired Select presses and reject any Guide or Start event."""
+    """@brief Require paired Select presses and reject Guide or Start events.
+
+    @param device Path to the stream's virtual gamepad event device.
+    @param presses Expected number of paired Select presses and releases.
+    @param timeout Maximum capture duration in seconds.
+    """
     event = struct.Struct("@llHHi")
     deadline = time.monotonic() + timeout
     downs = ups = 0
     held = False
     with open(device, "rb", buffering=0) as stream:
         while time.monotonic() < deadline:
-            if not select.select([stream], [], [], max(0, deadline - time.monotonic()))[0]:
+            if not select.select(
+                [stream], [], [], max(0, deadline - time.monotonic())
+            )[0]:
                 break
             payload = os.read(stream.fileno(), event.size)
             if len(payload) != event.size:
-                raise AssertionError("Virtual controller disconnected during capture")
+                raise AssertionError(
+                    "Virtual controller disconnected during capture"
+                )
             _, _, kind, code, value = event.unpack(payload)
             if kind != 1:  # EV_KEY
                 continue
             if code in (315, 316):  # BTN_START, BTN_MODE
-                raise AssertionError(f"Unexpected {'Guide' if code == 316 else 'Start'} event: {value}")
+                raise AssertionError(
+                    f"Unexpected {'Guide' if code == 316 else 'Start'} "
+                    f"event: {value}"
+                )
             if code != 314 or value == 2:  # BTN_SELECT; ignore repeat
                 continue
             if value == 1:
@@ -43,7 +55,9 @@ def check_select(device, presses, timeout):
                 ups += 1
             print(f"Select {'down' if value else 'up'}", flush=True)
         assert not held, "Select remained held"
-        assert downs == ups == presses, f"Expected {presses} presses; received {downs} down / {ups} up"
+        assert downs == ups == presses, (
+            f"Expected {presses} presses; received {downs} down / {ups} up"
+        )
 
 
 if __name__ == "__main__":
