@@ -10,7 +10,7 @@
 @@ -405,6 +407,40 @@
  	wlr_matrix_multiply(matrix, xyz_to_destination, source_to_xyz);
  }
- 
+
 +/**
 + * @brief Read Prism's session-local SDR reference white, with bounded polling.
 + * @return Validated reference white in nits, or the upstream 203-nit default.
@@ -64,7 +64,7 @@
  		struct wlr_color_transform *prev_supplied_color_transform;
  		struct wlr_color_transform *combined_color_transform;
 +		float prism_hdr_reference; ///< Reference white used by the cached output transform.
- 
+
  		struct wl_listener output_commit;
  		struct wl_listener output_damage;
 --- a/types/scene/wlr_scene.c
@@ -72,7 +72,7 @@
 @@ -2325,6 +2325,24 @@
  	enum wlr_scene_debug_damage_option debug_damage =
  		scene_output->scene->debug_damage_option;
- 
+
 +	/* Rebuild the cached output transform when live SDR-white calibration
 +	 * changes. Source HDR normalization and destination normalization must
 +	 * change together so native HDR pixels retain absolute luminance. */
@@ -110,6 +110,6 @@
  	}
 +
 +	scene_output->prism_hdr_reference = prism_reference;
- 
+
  	scene_output->in_point++;
  	struct wlr_render_pass *render_pass = wlr_renderer_begin_buffer_pass(output->renderer, buffer,
