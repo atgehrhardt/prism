@@ -7,6 +7,7 @@
 
 // local includes
 #include "cuda.h"
+#include "dmabuf_sync.h"
 #include "src/headless_hdr.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
@@ -237,7 +238,7 @@ namespace wl {
     }
 
     /**
-     * @brief Capture a display frame into the provided image object.
+     * @brief Capture a display frame and wait for compositor GPU writes to finish.
      *
      * @param pull_free_image_cb Callback that provides an available image buffer.
      * @param img_out Captured wlroots image returned to the streaming pipeline.
@@ -275,6 +276,18 @@ namespace wl {
         current_frame->sd.height != height
       ) {
         return platf::capture_e::reinit;
+      }
+
+      // The ready event acknowledges submission, but NVIDIA GL imports can
+      // still observe black pixels until the compositor's GPU writes finish.
+      switch (wait_for_dmabuf(current_frame->sd.fds, to)) {
+        case dmabuf_sync_e::timeout:
+          return platf::capture_e::timeout;
+        case dmabuf_sync_e::error:
+          BOOST_LOG(error) << "[wlgrab] Failed to wait for captured DMA-BUF writes"sv;
+          return platf::capture_e::reinit;
+        case dmabuf_sync_e::ready:
+          break;
       }
 
       if (hdr_metadata && !is_hdr_capture_format(current_frame->sd.fourcc)) {
