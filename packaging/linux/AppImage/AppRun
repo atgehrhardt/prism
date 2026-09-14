@@ -1,108 +1,60 @@
-#!/bin/bash
+#!/usr/bin/env bash
+## @file
+## @brief Launch Prism and its bundled service helpers from an AppImage or AppDir.
+set -euo pipefail
 
-# custom AppRun for Prism AppImage
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+export PRISM_SESSION_DIR="$HERE/usr/libexec/prism"
+export PRISM_BIN_DIR="$HERE/usr/bin"
+# Libraries use executable-relative RPATHs. Do not leak LD_LIBRARY_PATH into games.
+export PATH="$HERE/usr/bin:$PRISM_SESSION_DIR:$PATH"
+export XKB_CONFIG_ROOT="$HERE/usr/share/xkb"
+export XKB_BINDIR="$HERE/usr/bin"
+export WLR_XWAYLAND="$HERE/usr/bin/Xwayland"
+cd "$HERE"
 
-# path of the extracted AppRun
-HERE="$(dirname "$(readlink -f "${0}")")"
-PRISM_PATH=/usr/bin/prism
-PRISM_BIN_HERE=$HERE/usr/bin/prism
-PRISM_SHARE_HERE=$HERE/usr/share/prism
-PRISM_SESSION_DIR=$HERE/usr/libexec/prism
-export PRISM_SESSION_DIR
-
-# Set APPDIR when running directly from the AppDir:
-if [ -z "$APPDIR" ]; then
-    ARGV0="AppRun"
-fi
-
-cd "$HERE" || exit 1
-
-function help() {
-echo "
- ------------------------------
-   Prism AppImage package.
- ------------------------------
-
- prism.AppImage options
- ------------------------
-
- Usage:  $ARGV0  --help, -h
- ------            # This message
-
-         $ARGV0  --install, -i
-                   # Install input rules prism.service files. Restart required.
-
-         $ARGV0  --remove, -r
-                   # Remove input rules prism.service files.
-
-         $ARGV0  --appimage-help
-                   # Show available AppImage options
-
- prism options
- ----------------
-"
-# print prism binary help, replacing the prism command in usage statement
-"$PRISM_BIN_HERE" --help | sed -e "s#$PRISM_BIN_HERE#$ARGV0#g"
-}
-
-function install() {
-  # user input rules
-  # shellcheck disable=SC2002
-  cat "$PRISM_SHARE_HERE/udev/rules.d/60-prism.rules" | sudo tee /etc/udev/rules.d/60-prism.rules
-  cat "$PRISM_SHARE_HERE/modules-load.d/60-prism.conf" | sudo tee /etc/modules-load.d/60-prism.conf
-  sudo modprobe uhid
-  sudo udevadm control --reload-rules
-  sudo udevadm trigger --property-match=DEVNAME=/dev/uinput
-  sudo udevadm trigger --property-match=DEVNAME=/dev/uhid
-
-  # prism service
-  mkdir -p ~/.config/systemd/user
-  cp -r "$PRISM_SHARE_HERE/systemd/user/" ~/.config/systemd/
-  # patch service executable path
-  sed -i -e "s#$PRISM_PATH#$(readlink -f $ARGV0)#g" ~/.config/systemd/user/app-dev.lizardbyte.app.Prism.service
-
-  # setcap
-  sudo setcap cap_sys_admin,cap_sys_nice+p "$(readlink -f "$PRISM_BIN_HERE")"
-}
-
-function remove() {
-  # remove input rules
-  sudo rm -f /etc/udev/rules.d/60-prism.rules
-
-  # remove uhid module loading config
-  sudo rm -f /etc/modules-load.d/60-prism.conf
-
-  # remove service
-  sudo rm -f ~/.config/systemd/user/app-dev.lizardbyte.app.Prism.service
-}
-
-# process arguments
-if [ "x$1" == "xhelp" ] || [ "x$1" == "x--help" ] || [ "x$1" == "x-h" ] ; then
-    help
-    exit $?
-fi
-
-if [ "x$1" == "xinstall" ] || [ "x$1" == "x--install" ] || [ "x$1" == "x-i" ] ; then
-    install
-    exit $?
-fi
-
-if [ "x$1" == "xremove" ] || [ "x$1" == "x--remove" ] || [ "x$1" == "x-r" ] ; then
-    remove
-    exit $?
-fi
-
-if [ "x$1" == "x--internal" ]; then
-    if [ "x${2:-}" != "xsession-cleanup" ] || [ "$#" -ne 2 ]; then
-        echo "Unknown internal component" >&2
-        exit 64
-    fi
-    exec "$PRISM_SESSION_DIR/prism-session-cleanup.sh"
-fi
-
-# create config directory if it doesn't exist
-# https://github.com/LizardByte/Sunshine/issues/324
-mkdir -p ~/.config/prism
-
-# run prism
-"$PRISM_BIN_HERE" "$@"
+case "${1:-}" in
+  --check)
+    [ "$#" = 1 ] || exit 64
+    for executable in prism prism-input-bridge prism-hdr-calibration prism-labwc \
+      prism-kwin-mode Xwayland prism-Xwayland xkbcomp wayland-info wlr-randr pactl; do
+      [ -x "$HERE/usr/bin/$executable" ] || { echo "Missing payload: $executable" >&2; exit 1; }
+    done
+    for helper in appimage-manage.py install-appimage.sh \
+      prism-headless-session.sh prism-headless-steam-session.sh \
+      prism-steam-restore.sh prism-session-cleanup.sh prism-audio-common.sh \
+      prism-headless-common.sh prism-headless-exec.sh; do
+      [ -x "$PRISM_SESSION_DIR/$helper" ] || { echo "Missing helper: $helper" >&2; exit 1; }
+    done
+    for service in prism prism-headless-session prism-input-bridge prism-headless-steam prism-steam-restore; do
+      [ -f "$HERE/usr/share/prism/appimage-services/$service.service" ] || exit 1
+    done
+    [ -d "$HERE/usr/share/prism/web" ]
+    [ -d "$HERE/usr/share/xkb" ]
+    # --help exits before config parsing, unlike --version which creates config files.
+    "$HERE/usr/bin/prism" --help >/dev/null
+    "$HERE/usr/bin/prism-labwc" --version
+    ;;
+  --install)
+    [ "$#" = 2 ] || { echo 'Usage: --install /absolute/path/prism.AppImage' >&2; exit 64; }
+    exec python3 "$PRISM_SESSION_DIR/appimage-manage.py" install "$2"
+    ;;
+  --remove)
+    [ "$#" = 1 ] || exit 64
+    exec python3 "$PRISM_SESSION_DIR/appimage-manage.py" remove
+    ;;
+  --update)
+    [ "$#" = 1 ] || exit 64
+    exec bash "$PRISM_SESSION_DIR/install-appimage.sh"
+    ;;
+  --internal)
+    [ "$#" = 2 ] || exit 64
+    case "$2" in
+      session-cleanup|headless-session|headless-steam-session|steam-restore)
+        exec "$PRISM_SESSION_DIR/prism-$2.sh" ;;
+      input-bridge) exec "$HERE/usr/bin/prism-input-bridge" ;;
+      *) echo 'Unknown internal component' >&2; exit 64 ;;
+    esac
+    ;;
+  *) exec "$HERE/usr/bin/prism" "$@" ;;
+esac

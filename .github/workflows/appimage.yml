@@ -1,0 +1,128 @@
+---
+name: AppImage
+permissions: {}
+
+on:
+  pull_request:
+    paths:
+      - "packaging/linux/AppImage/**"
+      - "scripts/build-appimage.sh"
+      - "scripts/check-appimage.sh"
+      - "scripts/package-appimage-licenses.sh"
+      - "cmake/**"
+      - "contrib/virtual-session/**"
+      - "src/**"
+      - "src_assets/**"
+      - "third-party/**"
+      - "CMakeLists.txt"
+      - "package*.json"
+      - "vite.config.js"
+      - "install.sh"
+      - "tests/integration/test_appimage.py"
+      - ".github/workflows/appimage.yml"
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          submodules: recursive
+      - name: Test installer and integration
+        run: python3 tests/integration/test_appimage.py
+      - name: Build baseline container
+        run: docker build -f packaging/linux/AppImage/Dockerfile -t prism-appimage-build .
+      - name: Build and test AppImage
+        env:
+          BRANCH: ${{ github.ref_name }}
+          BUILD_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          COMMIT: ${{ github.sha }}
+        run: >-
+          docker run --rm
+          -e BRANCH -e BUILD_VERSION -e COMMIT
+          -v "$PWD:/src"
+          prism-appimage-build
+          bash scripts/build-appimage.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: prism-appimage-x86_64
+          path: cmake-build-appimage/artifacts/*
+          if-no-files-found: error
+
+  compatibility:
+    needs: build
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:24.04", "fedora:44"]
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: prism-appimage-x86_64
+          path: artifact
+      - name: Install host desktop libraries
+        shell: bash
+        run: |
+          if command -v apt-get >/dev/null; then
+            apt-get update
+            apt-get install -y file libgl1 libegl1 libgbm1 libvulkan1 libasound2t64 \
+              libpipewire-0.3-0t64 fontconfig-config \
+              libpulse0 libnss3 libxkbcommon0 libx11-6 libxcb1 libxext6 \
+              libxrandr2 libxfixes3 libxdamage1 libxcomposite1 libxcursor1 \
+              libxi6 libxtst6 libxrender1 libsm6 libice6 libdrm2 libwayland-client0
+          else
+            dnf install -y file mesa-libGL mesa-libEGL mesa-libgbm vulkan-loader \
+              pipewire-libs fontconfig \
+              alsa-lib pulseaudio-libs nss libxkbcommon libX11 libxcb libXext \
+              libXrandr libXfixes libXdamage libXcomposite libXcursor libXi \
+              libXtst libXrender libSM libICE libdrm libwayland-client
+          fi
+      - name: Verify portable payload without FUSE
+        shell: bash
+        run: |
+          cd artifact
+          sha256sum --check prism-x86_64.AppImage.sha256
+          chmod +x prism-x86_64.AppImage
+          ./prism-x86_64.AppImage --appimage-extract >/dev/null
+          bash ../scripts/check-appimage.sh squashfs-root
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'atgehrhardt/prism'
+    needs: [build, compatibility]
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: prism-appimage-x86_64
+          path: artifact
+      - name: Publish versioned release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" artifact/*
+          else
+            flags=()
+            if [[ "$RELEASE_TAG" == *-* ]]; then flags+=(--prerelease); fi
+            gh release create "$RELEASE_TAG" artifact/* \
+              --verify-tag --generate-notes "${flags[@]}"
+          fi

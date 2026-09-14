@@ -1,5 +1,19 @@
 # linux specific packaging
 
+# AppImages carry the complete integration payload; host setup uses a stable image path.
+if(PRISM_BUILD_APPIMAGE)
+    install(PROGRAMS "${CMAKE_SOURCE_DIR}/packaging/linux/AppImage/appimage-manage.py"
+            DESTINATION "${PRISM_SESSION_DIR}")
+    install(PROGRAMS "${CMAKE_SOURCE_DIR}/install.sh"
+            DESTINATION "${PRISM_SESSION_DIR}" RENAME install-appimage.sh)
+    install(FILES "${CMAKE_SOURCE_DIR}/contrib/virtual-session/61-prism-input.rules"
+            DESTINATION "${PRISM_ASSETS_DIR}/udev/rules.d")
+    foreach(service prism prism-headless-session prism-input-bridge prism-headless-steam prism-steam-restore)
+        install(FILES "${CMAKE_SOURCE_DIR}/contrib/virtual-session/${service}.service"
+                DESTINATION "${PRISM_ASSETS_DIR}/appimage-services")
+    endforeach()
+endif()
+
 install(DIRECTORY "${PRISM_SOURCE_ASSETS_DIR}/linux/assets/"
         DESTINATION "${PRISM_ASSETS_DIR}")
 
@@ -37,8 +51,13 @@ file(CREATE_LINK "${PRISM_SOURCE_ASSETS_DIR}/linux/assets/shaders"
 if(${PRISM_BUILD_APPIMAGE} OR ${PRISM_BUILD_FLATPAK})
     install(FILES "${PRISM_SOURCE_ASSETS_DIR}/linux/misc/60-prism.rules"
             DESTINATION "${PRISM_ASSETS_DIR}/udev/rules.d")
-    install(FILES "${PRISM_SOURCE_ASSETS_DIR}/linux/misc/60-prism.conf"
-            DESTINATION "${PRISM_ASSETS_DIR}/modules-load.d")
+    if(PRISM_BUILD_APPIMAGE)
+        install(FILES "${CMAKE_SOURCE_DIR}/packaging/linux/AppImage/60-prism.conf"
+                DESTINATION "${PRISM_ASSETS_DIR}/modules-load.d")
+    else()
+        install(FILES "${PRISM_SOURCE_ASSETS_DIR}/linux/misc/60-prism.conf"
+                DESTINATION "${PRISM_ASSETS_DIR}/modules-load.d")
+    endif()
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/app-${PROJECT_FQDN}.service"
             DESTINATION "${PRISM_ASSETS_DIR}/systemd/user")
 else()

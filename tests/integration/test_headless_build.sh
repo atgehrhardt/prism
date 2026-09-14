@@ -121,6 +121,18 @@ if PATH="$SANDBOX/bin" PRISM_TEST_MISSING_REQUIREMENT='wayland-protocols >= 1.47
   exit 1
 fi
 grep -q 'wayland-protocols >= 1.47' "$SANDBOX/deps-error"
+if PATH="$SANDBOX/bin" PRISM_TEST_MISSING_REQUIREMENT='pixman-1 >= 0.46.0' \
+  bash "$SOURCE_DIR/contrib/virtual-session/build-headless-compositor.sh" --check >"$SANDBOX/deps-error" 2>&1; then
+  echo 'Outdated Pixman passed the preflight' >&2
+  exit 1
+fi
+grep -q 'pixman-1 >= 0.46.0' "$SANDBOX/deps-error"
+if PATH="$SANDBOX/bin" PRISM_TEST_MISSING_REQUIREMENT=libinput \
+  bash "$SOURCE_DIR/contrib/virtual-session/build-headless-compositor.sh" --check >"$SANDBOX/deps-error" 2>&1; then
+  echo 'Missing libinput headers passed the preflight' >&2
+  exit 1
+fi
+grep -q libinput "$SANDBOX/deps-error"
 if PATH="$SANDBOX/bin" PRISM_TEST_MESON_VERSION=1.2.9 \
   bash "$SOURCE_DIR/contrib/virtual-session/build-headless-compositor.sh" --check >"$SANDBOX/meson-error" 2>&1; then
   echo 'Outdated Meson passed the preflight' >&2
@@ -156,6 +168,18 @@ chmod +x "$SANDBOX/home/.local/bin/prism-labwc"
 (
   export PATH="$SANDBOX/bin" HOME="$SANDBOX/home" XDG_RUNTIME_DIR="$SANDBOX/runtime"
   export PRISM_CLIENT_HDR=true PRISM_SESSION_ID='invalid/id' PRISM_STEAM=0
+  unset PRISM_CLIENT_WIDTH PRISM_CLIENT_HEIGHT PRISM_CLIENT_FPS PRISM_RENDER_DEVICE PRISM_STEAM_APP_ID
+  if bash "$SOURCE_DIR/contrib/virtual-session/prism-headless-start.sh"; then exit 1; fi
+)
+grep -q 'invalid session id' "$SANDBOX/home/.local/state/prism-headless.log"
+# The packaged compositor must take precedence over stale user-installed helpers.
+mkdir -p "$SANDBOX/packaged"
+cp "$SANDBOX/home/.local/bin/prism-labwc" "$SANDBOX/packaged/prism-labwc"
+printf '#!/bin/sh\nexit 29\n' > "$SANDBOX/home/.local/bin/prism-labwc"
+: > "$SANDBOX/home/.local/state/prism-headless.log"
+(
+  export PATH="$SANDBOX/bin" HOME="$SANDBOX/home" XDG_RUNTIME_DIR="$SANDBOX/runtime"
+  export PRISM_BIN_DIR="$SANDBOX/packaged" PRISM_CLIENT_HDR=true PRISM_SESSION_ID='invalid/id' PRISM_STEAM=0
   unset PRISM_CLIENT_WIDTH PRISM_CLIENT_HEIGHT PRISM_CLIENT_FPS PRISM_RENDER_DEVICE PRISM_STEAM_APP_ID
   if bash "$SOURCE_DIR/contrib/virtual-session/prism-headless-start.sh"; then exit 1; fi
 )

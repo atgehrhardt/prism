@@ -64,7 +64,7 @@ per-device isolation. It requires a working Vulkan/GBM GPU and `grim`.
 
 ### Host installation
 
-On the Fedora Prism host, run `PRISM_SRC_DIR="$PWD" bash install.sh` from the updated Prism checkout. The
+On the Fedora Prism host, run `PRISM_SRC_DIR="$PWD" bash install-source.sh` from the updated Prism checkout. The
 installer builds `~/.local/bin/prism-labwc` in addition to Prism and installs the
 updated session helpers. It preserves a checkout with local changes.
 
@@ -81,7 +81,7 @@ install `prism-labwc` on the session service's PATH. The helper supports
 
 The compositor/runtime code has no Fedora or KDE dependency. The source installer
 automatically installs packages only on Fedora; other distributions can supply
-dependencies and use `PRISM_SKIP_DEPENDENCIES=1 PRISM_SRC_DIR="$PWD" bash install.sh`.
+dependencies and use `PRISM_SKIP_DEPENDENCIES=1 PRISM_SRC_DIR="$PWD" bash install-source.sh`.
 The existing `scripts/linux_build.sh` has Prism dependency lists for Fedora,
 Debian/Ubuntu, and Arch. The extra compositor dependencies are checked by:
 
@@ -91,7 +91,7 @@ bash contrib/virtual-session/build-headless-compositor.sh --check
 
 This command only checks tools and pkg-config requirements; it does not fetch,
 build, install, or test the GPU. The pinned compositor needs Meson 1.3+, Wayland
-1.24+, wayland-protocols 1.47+, libdrm 2.4.129+, xkbcommon 1.8+, pixman 0.43+,
+1.24+, wayland-protocols 1.47+, libdrm 2.4.129+, xkbcommon 1.8+, pixman 0.46+,
 GBM 21.1+, Vulkan headers/loader 1.2.182+, Xwayland development files, and the
 remaining libraries listed by the check. Older stable distributions may need a
 separate dependency prefix supplied via `PKG_CONFIG_PATH`. Skipping package
@@ -109,7 +109,7 @@ explicit selection is never replaced automatically. For example, when the CUDA
 toolkit rejects GCC 16 but GCC 15 is installed:
 
 ```bash
-CUDAHOSTCXX=/usr/bin/gcc-15 bash install.sh
+CUDAHOSTCXX=/usr/bin/gcc-15 bash install-source.sh
 ```
 
 If none passes, install a host compiler supported by the toolkit and rerun.

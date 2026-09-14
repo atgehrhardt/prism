@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+## @file
+## @brief Run bundled Xwayland from the root used by its relative keyboard paths.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+# Xwayland's GLX loader accepts a colon-separated search path for host drivers.
+export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH:-/usr/lib/x86_64-linux-gnu/dri:/usr/lib64/dri:/usr/lib/dri}"
+exec "$ROOT/usr/bin/prism-Xwayland" -xkbdir "$ROOT/usr/share/xkb" "$@"

@@ -78,6 +78,21 @@ for hdr in false true; do
     [ "$(head -1 "$SESSION_TEST/args")" = labwc ]
   fi
 done
+
+# An AppImage must not select a compositor left by an older source install.
+mkdir -p "$SESSION_TEST/packaged"
+printf '#!/bin/sh\nexit 29\n' > "$SESSION_TEST/packaged/prism-labwc"
+chmod +x "$SESSION_TEST/packaged/prism-labwc"
+if env PATH="$SESSION_TEST/bin:$PATH" HOME="$SESSION_TEST/home" \
+  PRISM_BIN_DIR="$SESSION_TEST/packaged" XDG_RUNTIME_DIR="$SESSION_TEST/runtime" \
+  PRISM_SESSION_ID=packaged PRISM_CLIENT_WIDTH=1920 PRISM_CLIENT_HEIGHT=1080 \
+  PRISM_CLIENT_FPS=60 PRISM_CLIENT_HDR=true PRISM_PHYSICAL_SINK=speakers \
+  bash "$SESSION_TEST/prism-headless-session.sh"; then
+  echo 'Packaged compositor did not take precedence' >&2
+  exit 1
+else
+  [ "$?" = 29 ]
+fi
 (
   unset PROTON_ENABLE_WAYLAND PROTON_ENABLE_HDR DXVK_HDR
   export PRISM_CLIENT_HDR=false

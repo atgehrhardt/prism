@@ -3,8 +3,9 @@
 set -euo pipefail
 
 SOURCE_DIR="${1:?source directory required}"
-INSTALLER="$SOURCE_DIR/install.sh"
+INSTALLER="$SOURCE_DIR/install-source.sh"
 python3 "$SOURCE_DIR/tests/integration/test_install_bootstrap.py" "$INSTALLER"
+python3 "$SOURCE_DIR/tests/integration/test_appimage.py"
 README="$SOURCE_DIR/README.md"
 NATIVE_SERVICE="$SOURCE_DIR/contrib/virtual-session/prism.service"
 SERVICE_TEMPLATE="$SOURCE_DIR/packaging/linux/app-dev.lizardbyte.app.Prism.service.in"
@@ -25,7 +26,7 @@ grep -Fq 'RPM Fusion' "$README"
 
 grep -Fq 'ExecStopPost=%h/.local/bin/prism-session-cleanup.sh' "$NATIVE_SERVICE"
 grep -Fq '@PRISM_SERVICE_CLEANUP_COMMAND@' "$SERVICE_TEMPLATE"
-grep -Fq 'xsession-cleanup' "$APP_RUN"
+grep -Fq 'session-cleanup|headless-session' "$APP_RUN"
 grep -Fq 'exit 64' "$APP_RUN"
 
 for payload in \
