@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Run Prism's private, session-owned labwc compositor.
+## @file
+## @brief Run the compositor and audio helper from the active Prism installation.
 set -euo pipefail
 
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 LOG="$HOME/.local/state/prism-headless.log"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # User services do not necessarily inherit the login shell's ~/.local/bin.
-export PATH="$SCRIPT_DIR:$HOME/.local/bin:$PATH"
+## @brief Prefer this release's binaries over helpers from an older source install.
+export PATH="$SCRIPT_DIR:${PRISM_BIN_DIR:-$HOME/.local/bin}:$PATH"
 SESSION_ID="${PRISM_SESSION_ID:?missing PRISM_SESSION_ID}"
 W="${PRISM_CLIENT_WIDTH:?missing PRISM_CLIENT_WIDTH}"
 H="${PRISM_CLIENT_HEIGHT:?missing PRISM_CLIENT_HEIGHT}"

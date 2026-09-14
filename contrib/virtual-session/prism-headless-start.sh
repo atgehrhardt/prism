@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Bring up a verified, session-owned labwc headless environment.
+## @file
+## @brief Start a private session using packaged or native user-installed helpers.
 set -u
 
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -12,7 +14,8 @@ READY_FILE="$RUNTIME/prism-headless-session.ready"
 INPUT_READY_FILE="$RUNTIME/prism-headless-input.ready"
 LOG="$HOME/.local/state/prism-headless.log"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-export PATH="$SCRIPT_DIR:$HOME/.local/bin:$PATH"
+## @brief Prefer this release's binaries over helpers from an older source install.
+export PATH="$SCRIPT_DIR:${PRISM_BIN_DIR:-$HOME/.local/bin}:$PATH"
 # shellcheck source=contrib/virtual-session/prism-headless-common.sh
 . "$SCRIPT_DIR/prism-headless-common.sh"
 

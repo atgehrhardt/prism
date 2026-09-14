@@ -1,203 +1,151 @@
 #!/usr/bin/env bash
-# Prism source installer. Automatic dependency installation targets Fedora;
-# other distributions can supply dependencies with PRISM_SKIP_DEPENDENCIES=1.
-#   curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
 ## @file
-## @brief Install Prism from any directory, including through a shell pipeline.
+## @brief Download, verify, and install a Prism release without a source checkout.
 set -euo pipefail
 
-## @brief Clone, build, and install with stdin isolated from the downloaded script.
-main() {
-REPO="https://github.com/atgehrhardt/prism.git"
-BRANCH="master"
-SRC_DIR="${PRISM_SRC_DIR:-$HOME/Dev/prism}"
-BUILD_JOBS="$(nproc)"
+## @brief Install a verified AppImage, restoring the previous image on failure.
+main() (
+  [ "$(uname -s)" = Linux ] || { echo 'Prism requires Linux.' >&2; exit 1; }
+  [ "$(id -u)" != 0 ] || { echo 'Run as your desktop user, without sudo.' >&2; exit 1; }
+  case "$(uname -m)" in
+    x86_64) architecture=x86_64 ;;
+    *) echo 'AppImage releases currently support x86_64 only.' >&2; exit 1 ;;
+  esac
+  for command in curl python3 sha256sum systemctl flock; do
+    command -v "$command" >/dev/null || { echo "Missing command: $command" >&2; exit 1; }
+  done
+  systemctl --user show-environment >/dev/null
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  case "$data_home" in /*) ;; *) data_home="$HOME/.local/share" ;; esac
+  destination="$data_home/prism"
+  mkdir -p "$destination"
+  exec 9>"$destination/.install.lock"
+  flock -n 9 || { echo 'Another Prism installation is running.' >&2; exit 1; }
+  temporary="$(mktemp -d "$destination/.install.XXXXXXXX")"
+  image="$destination/prism.AppImage"
+  replaced=0
+  committed=0
+  was_active=0
+  integration_saved=0
+  systemctl --user is-active --quiet prism.service && was_active=1
 
-log() { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
+  ## @brief Save or restore only the user files touched by AppImage integration.
+  ## @param $1 Either save or restore.
+  integration() {
+    python3 - "$1" "$temporary/integration.json" <<'PY'
+import base64, json, os, pathlib, sys
+home = pathlib.Path.home()
+config = pathlib.Path(os.environ.get('XDG_CONFIG_HOME') or home / '.config')
+if not config.is_absolute():
+    config = home / '.config'
+units = config / 'systemd/user'
+names = ('prism', 'prism-headless-session', 'prism-input-bridge', 'prism-headless-steam', 'prism-steam-restore')
+paths = [units / (name + '.service') for name in names]
+paths += [units / 'graphical-session.target.wants/prism.service', home / '.local/bin/prism',
+          config / 'prism/apps.json', config / 'prism/prism.conf']
+snapshot = pathlib.Path(sys.argv[2])
+if sys.argv[1] == 'save':
+    data = {}
+    for path in paths:
+        if path.is_symlink():
+            value = {'link': os.readlink(path)}
+        elif path.exists():
+            value = {'data': base64.b64encode(path.read_bytes()).decode(), 'mode': path.stat().st_mode & 0o777}
+        else:
+            value = None
+        data[str(path)] = value
+    snapshot.write_text(json.dumps(data))
+else:
+    for name, value in json.loads(snapshot.read_text()).items():
+        path = pathlib.Path(name)
+        path.unlink(missing_ok=True)
+        if value is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if 'link' in value:
+                path.symlink_to(value['link'])
+            else:
+                path.write_bytes(base64.b64decode(value['data']))
+                path.chmod(value['mode'])
+PY
+  }
 
-# --- 1. Dependencies -------------------------------------------------------
-if [ "${PRISM_SKIP_DEPENDENCIES:-0}" != 1 ]; then
-  log "Installing build and runtime dependencies (sudo may ask for your password)"
-  if ! command -v dnf >/dev/null 2>&1; then
-    echo 'Install the build/runtime dependencies for your distro, then rerun with PRISM_SKIP_DEPENDENCIES=1. See docs/headless-hdr.md.' >&2
-    exit 1
-  fi
-# Keep the package transaction explicit for distro packagers.
-sudo dnf install -y \
-  git cmake gcc-c++ ninja-build nodejs-npm wget which desktop-file-utils \
-  libcap-devel libcurl-devel libdrm-devel libevdev-devel libnotify-devel \
-  libva-devel libX11-devel libxcb-devel libXcursor-devel libXfixes-devel \
-  libXi-devel libXinerama-devel libXrandr-devel libXtst-devel \
-  openssl-devel pipewire-devel glslc vulkan-loader-devel \
-  libgudev mesa-libGL-devel mesa-libgbm-devel miniupnpc-devel \
-  numactl-devel opus-devel pulseaudio-libs-devel qt6-qtbase-devel qt6-qtsvg-devel \
-  wayland-devel libxkbcommon-devel python3-jinja2 bubblewrap \
-  kscreen krfb labwc wlr-randr wayland-utils xorg-x11-server-Xwayland \
-  meson patch wayland-protocols-devel libinput-devel libdisplay-info-devel \
-  lcms2-devel pixman-devel libxml2-devel cairo-devel pango-devel libpng-devel \
-  xcb-util-wm-devel xorg-x11-server-Xwayland-devel glslang
-fi
+  ## @brief Restore the previous release after failure and remove temporary files.
+  # shellcheck disable=SC2317 # Invoked indirectly by the EXIT trap.
+  cleanup() {
+    status=$?
+    if [ "$integration_saved" = 1 ] && [ "$committed" = 0 ]; then
+      systemctl --user stop prism.service >/dev/null 2>&1 || true
+      integration restore
+      systemctl --user daemon-reload || true
+    fi
+    if [ "$replaced" = 1 ] && [ "$committed" = 0 ]; then
+      if [ -f "$temporary/previous.AppImage" ]; then
+        mv -f "$temporary/previous.AppImage" "$image"
+      else
+        rm -f "$image"
+      fi
+      echo 'Installation failed; the previous AppImage was restored if present.' >&2
+    fi
+    if [ "$integration_saved" = 1 ] && [ "$committed" = 0 ] && [ "$was_active" = 1 ]; then
+      systemctl --user restart prism.service || true
+    fi
+    rm -rf "$temporary"
+    exit "$status"
+  }
+  trap cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
 
-# --- 2. Source --------------------------------------------------------------
-if [ -d "$SRC_DIR/.git" ]; then
-  if [ -n "$(git -C "$SRC_DIR" status --porcelain --untracked-files=all)" ]; then
-    log "Using existing checkout in $SRC_DIR without updating because it has local changes"
+  version="${PRISM_VERSION:-latest}"
+  case "$version" in ''|*[!a-zA-Z0-9._-]*) echo 'Invalid PRISM_VERSION.' >&2; exit 1 ;; esac
+  base=https://github.com/atgehrhardt/prism/releases
+  if [ "$version" = latest ]; then
+    base="$base/latest/download"
   else
-    log "Updating existing checkout in $SRC_DIR"
-    git -C "$SRC_DIR" fetch origin "$BRANCH"
-    git -C "$SRC_DIR" checkout "$BRANCH"
-    git -C "$SRC_DIR" merge --ff-only "origin/$BRANCH"
+    base="$base/download/$version"
   fi
-  git -C "$SRC_DIR" submodule update --init --recursive
-else
-  log "Cloning Prism into $SRC_DIR"
-  git clone --branch "$BRANCH" --recurse-submodules "$REPO" "$SRC_DIR"
-fi
-
-# Build helpers may run Git commands relative to their working directory.
-# Resolve relative PRISM_SRC_DIR overrides before changing directories.
-SRC_DIR="$(cd "$SRC_DIR" && pwd)"
-cd "$SRC_DIR"
-
-# --- 3. Build ----------------------------------------------------------------
-log "Building Prism (this takes a while)"
-# shellcheck source=scripts/linux_cuda_config.sh
-. "$SRC_DIR/scripts/linux_cuda_config.sh"
-prism_configure_cuda /sys/class/drm
-# Check before spending time building Prism or changing the installed session.
-bash "$SRC_DIR/contrib/virtual-session/build-headless-compositor.sh" --check
-cmake -S "$SRC_DIR" -B "$SRC_DIR/cmake-build-prism" -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
-  -DPRISM_ENABLE_CUDA="$CUDA_FLAG" \
-  "${CUDA_FLAGS[@]}" \
-  -DCUDA_FAIL_ON_MISSING=ON \
-  -DBUILD_DOCS=OFF -DBUILD_TESTS=OFF
-cmake --build "$SRC_DIR/cmake-build-prism" --parallel "$BUILD_JOBS"
-
-# --- 4. Install --------------------------------------------------------------
-log "Installing to ~/.local"
-# shellcheck disable=SC1007 # intentional empty DESTDIR env prefix
-DESTDIR= cmake --install "$SRC_DIR/cmake-build-prism" --prefix "$HOME/.local" 2>/dev/null || {
-  # Fallback: install the binary and assets manually
-  install -Dm755 "$SRC_DIR/cmake-build-prism/prism" "$HOME/.local/bin/prism"
-  if [ -d "$SRC_DIR/cmake-build-prism/assets" ]; then
-    rm -rf "$HOME/.local/assets"
-    cp -r "$SRC_DIR/cmake-build-prism/assets" "$HOME/.local/assets"
+  asset="prism-$architecture.AppImage"
+  if [ -n "${PRISM_APPIMAGE:-}" ]; then
+    echo "Verifying local AppImage: $PRISM_APPIMAGE"
+    cp "$PRISM_APPIMAGE" "$temporary/$asset"
+    cp "$PRISM_APPIMAGE.sha256" "$temporary/checksum"
+  else
+    echo "Downloading Prism $version ($architecture)"
+    curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 \
+      "$base/$asset" --output "$temporary/$asset"
+    curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 \
+      "$base/$asset.sha256" --output "$temporary/checksum"
   fi
-}
+  # Read only the digest; never let a downloaded checksum name arbitrary files.
+  read -r digest _ < "$temporary/checksum"
+  [[ "$digest" =~ ^[a-fA-F0-9]{64}$ ]] || { echo 'Invalid SHA-256 checksum.' >&2; exit 1; }
+  (cd "$temporary" && printf '%s  %s\n' "$digest" "$asset" | sha256sum --check --status)
+  chmod 755 "$temporary/$asset"
+  "$temporary/$asset" --check
+  integration save
+  integration_saved=1
+  # Stop existing services before replacing their unit definitions or mounted image.
+  for unit in prism-steam-restore prism-headless-steam prism-input-bridge prism-headless-session prism; do
+    if systemctl --user cat "$unit.service" >/dev/null 2>&1; then
+      systemctl --user stop "$unit.service"
+    fi
+  done
+  # All new units use the stable path, never the temporary download or mount.
+  "$temporary/$asset" --install "$image"
+  if [ -f "$image" ]; then
+    cp -p "$image" "$temporary/previous.AppImage"
+  fi
+  replaced=1
+  mv -f "$temporary/$asset" "$image"
+  systemctl --user enable prism.service
+  systemctl --user restart prism.service
+  # Detect immediate startup failures, including missing host libraries.
+  sleep 2
+  systemctl --user is-active --quiet prism.service
+  committed=1
+  echo "Prism installed: $image"
+  echo 'Open https://localhost:47990 to configure Prism and pair Moonlight.'
+)
 
-# --- 5. Session stack ---------------------------------------------------------
-log "Building the isolated HDR headless compositor"
-bash "$SRC_DIR/contrib/virtual-session/build-headless-compositor.sh"
-log "Installing Prism scripts and systemd user units"
-# Stop and remove obsolete persistent/nested units before installing the
-# transient single-compositor labwc stack.
-systemctl --user disable --now prism-input-bridge.service prism-labwc.service \
-  >/dev/null 2>&1 || true
-rm -f "$HOME/.config/systemd/user/prism-labwc.service" \
-  "$HOME/.local/bin/prism-labwc-link-socket.sh" \
-  "$HOME/.local/bin/prism-gamescope-query" \
-  "$HOME/.config/systemd/user/default.target.wants/prism-labwc.service" \
-  "$HOME/.config/systemd/user/default.target.wants/prism-input-bridge.service"
-rm -rf "$HOME/.config/systemd/user/prism-labwc.service.wants"
-
-install -Dm755 "$SRC_DIR/cmake-build-prism/prism-input-bridge" "$HOME/.local/bin/prism-input-bridge"
-install -Dm755 "$SRC_DIR/cmake-build-prism/prism-hdr-calibration" "$HOME/.local/bin/prism-hdr-calibration"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-start.sh"   "$HOME/.local/bin/prism-steamos-start.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steamos-stop.sh"    "$HOME/.local/bin/prism-steamos-stop.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-audio-common.sh"    "$HOME/.local/bin/prism-audio-common.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-common.sh" "$HOME/.local/bin/prism-headless-common.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-exec.sh"   "$HOME/.local/bin/prism-headless-exec.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-start.sh"  "$HOME/.local/bin/prism-headless-start.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-stop.sh"   "$HOME/.local/bin/prism-headless-stop.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-session.sh" "$HOME/.local/bin/prism-headless-session.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-steam.sh"  "$HOME/.local/bin/prism-headless-steam.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-steam-session.sh" "$HOME/.local/bin/prism-headless-steam-session.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-headless-audio.sh"  "$HOME/.local/bin/prism-headless-audio.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steam-game.sh"      "$HOME/.local/bin/prism-steam-game.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-steam-restore.sh"   "$HOME/.local/bin/prism-steam-restore.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-common.sh"  "$HOME/.local/bin/prism-virtual-common.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-start.sh"   "$HOME/.local/bin/prism-virtual-start.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-stop.sh"    "$HOME/.local/bin/prism-virtual-stop.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-virtual-audio.sh"   "$HOME/.local/bin/prism-virtual-audio.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-mirror-audio.sh"    "$HOME/.local/bin/prism-mirror-audio.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-session-cleanup.sh" "$HOME/.local/bin/prism-session-cleanup.sh"
-install -Dm755 "$SRC_DIR/contrib/virtual-session/prism-desktop-session.sh" "$HOME/.local/bin/prism-desktop-session.sh"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-headless-session.service" \
-  "$HOME/.config/systemd/user/prism-headless-session.service"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-input-bridge.service" \
-  "$HOME/.config/systemd/user/prism-input-bridge.service"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-headless-steam.service" \
-  "$HOME/.config/systemd/user/prism-headless-steam.service"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/prism-steam-restore.service" \
-  "$HOME/.config/systemd/user/prism-steam-restore.service"
-install -Dm644 "$SRC_DIR/contrib/virtual-session/prism.service" \
-  "$HOME/.config/systemd/user/prism.service"
-
-"$SRC_DIR/contrib/virtual-session/build-kwin-mode.sh"
-
-# --- 6. apps.json (idempotent merge, with backup) ------------------------------
-APPS="$HOME/.config/prism/apps.json"
-mkdir -p "$HOME/.config/prism"
-if [ -f "$APPS" ]; then
-  cp "$APPS" "$APPS.bak.$(date +%s)"
-fi
-python3 - <<'EOF'
-import json, os
-apps_path = os.path.expanduser("~/.config/prism/apps.json")
-try:
-    with open(apps_path) as f: data = json.load(f)
-except Exception:
-    data = {"env": {"PATH": "$(PATH):$(HOME)/.local/bin"}, "apps": []}
-data.setdefault("env", {"PATH": "$(PATH):$(HOME)/.local/bin"})
-data.setdefault("apps", [])
-# Remove stock example apps and any previous Prism entries; keep other custom apps.
-PRISM_APPS = ("Desktop", "Desktop (Mirror)", "Desktop (Virtual)", "Desktop Headless",
-              "Steam Headless", "SteamOS (Headless)", "Low Res Desktop", "Steam Big Picture",
-              "Headless HDR Configuration")
-data["apps"] = [a for a in data["apps"] if a.get("name") not in PRISM_APPS]
-defaults = [
-    ("Desktop (Mirror)", "desktop.png", "default"),
-    ("Desktop (Virtual)", "desktop.png", "virtual"),
-    ("Desktop Headless", "desktop.png", "headless"),
-    ("Steam Headless", "steam.png", "headless"),
-]
-for i, (name, image, mode) in enumerate(defaults):
-    data["apps"].insert(i, {"name": name, "image-path": image, "prism-capture": mode})
-data["apps"].append({"name": "Headless HDR Configuration", "cmd": "prism-hdr-calibration",
-                     "prism-capture": "headless", "auto-detach": False, "wait-all": False})
-with open(apps_path, "w") as f:
-    json.dump(data, f, indent=2)
-print("apps.json updated")
-EOF
-
-# --- 6b. prism.conf: dedicated capture sink --------------------------------
-# Point Prism's audio capture at a dedicated "prism-stream" null sink so
-# each capture mode can route exactly the right audio into the stream (mirror
-# loops the desktop in; virtual/headless route only session audio). Respect an
-# audio_sink the user set themselves.
-CONF="$HOME/.config/prism/prism.conf"
-touch "$CONF"
-if ! grep -q '^audio_sink' "$CONF"; then
-  log "Setting audio_sink=prism-stream in prism.conf"
-  printf '\naudio_sink = prism-stream\n' >> "$CONF"
-fi
-
-# --- 7. Enable services --------------------------------------------------------
-log "Enabling services"
-systemctl --user daemon-reload
-# udev rule: read access to Prism's evdev nodes for the input bridge
-sudo install -Dm644 "$SRC_DIR/contrib/virtual-session/61-prism-input.rules" \
-  /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
-
-systemctl --user enable prism.service
-systemctl --user restart prism.service
-
-log "Done. Open https://$(hostname -I | awk '{print $1}'):47990 to pair Moonlight."
-log "Apps available: Desktop (Mirror), Desktop (Virtual), Desktop Headless, Steam Headless."
-}
-
-# Parse the complete installer before running subprocesses, and prevent them
-# from consuming script bytes from `curl | bash`. sudo still prompts on the TTY.
+# Parse the full script before subprocesses run; curl | bash must not share stdin.
 main "$@" </dev/null

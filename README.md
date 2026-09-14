@@ -98,72 +98,58 @@ GPU capabilities above. The private HDR compositor also needs recent build depen
 see the [HDR setup and validation notes](docs/headless-hdr.md) for version checks,
 NVIDIA/AMD requirements, and installation on other distributions.
 
-## Install (Fedora 44)
+## Install (AppImage)
+
+Prism is distributed as one x86_64 AppImage for supported Linux desktops. No
+source checkout or compiler is required. The release build targets glibc 2.39
+(Ubuntu 24.04) and newer; GPU drivers and a systemd desktop user session remain
+host requirements. See [AppImage installation and compatibility](docs/appimage.md).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/atgehrhardt/prism/master/install.sh | bash
 ```
 
-Run this as your normal user from any directory on the target machine; no manual
-clone is needed. The installer clones sources into `~/Dev/prism`, builds and
-installs the server, and starts the user service. It prompts for sudo when
-installing system dependencies. Set `PRISM_SRC_DIR` on `bash` to choose another
-source directory.
+Run as your normal desktop user. The installer downloads the latest published
+AppImage and its SHA-256 checksum, verifies it, installs it under
+`${XDG_DATA_HOME:-$HOME/.local/share}/prism/prism.AppImage`, and starts `prism.service`.
+A `~/.local/bin/prism` launcher provides the command-line entry point. Setup asks
+for sudo to register virtual input permissions and kernel module loading.
+The download command requires a published release containing the AppImage assets;
+it does not fall back to compiling source when a release is unavailable.
 
-The Fedora source installer uses only Fedora's enabled repositories. It does not install
-Steam or enable third-party repositories; in particular, RPM Fusion is no longer required
-solely to satisfy Steam. Install Steam separately if you want Steam discovery, synchronized
-game launching, or Steam Headless. The default Steam Headless entry remains visible and
-reports a clear runtime error if selected without Steam installed.
+The image includes the private HDR compositor, input bridge, calibration tool,
+session scripts, and web UI. It registers the headless session, input bridge,
+headless Steam, and Steam restoration services. Existing configuration and custom
+apps are preserved; fresh installations receive the default apps.
 
-Installs dependencies, builds Prism, and sets up:
+Steam is optional and must be installed separately for Steam Headless. The
+installer does not enable third-party repositories such as RPM Fusion or install
+Steam. KDE-specific display features still require KDE Plasma on the host.
 
-- `prism.service` — the stream host (`~/.local/bin/prism`)
-- `prism-headless-session.service` — owns the private labwc compositor and Xwayland
-- `prism-steam-restore.service` — cancelable five-second handoff back to desktop Steam
-- `prism-input-bridge.service` — transiently routes Prism's virtual keyboard/mouse
-  devices into labwc, exclusively while one headless session is active
-- `prism-headless-steam.service` — owns Steam and its session-launched process tree
-- the four default apps in `~/.config/prism/apps.json` (existing file is backed up;
-  other custom apps are preserved)
-
-Then open `https://<host>:47990`, set credentials, and pair Moonlight as usual.
+Then open `https://localhost:47990`, set credentials, and pair Moonlight.
 
 ## Update
 
 ```bash
-~/Dev/prism/update.sh
+prism --update
 ```
 
-Fetches the latest upstream Sunshine release tag, rebases the `master` branch onto
-it, rebuilds, and reinstalls. Prism is a **hard fork** (the rebrand lives in source), so a
-rebase can occasionally conflict in rebranded files — the script stops and tells you how to
-resolve. The functional Prism layer stays small.
+This installs the latest **Prism release**, verifies its checksum, and restarts
+the service. If initial startup fails, the previous image and user integration
+are restored. To select a particular published release, use
+`PRISM_VERSION=vX.Y.Z prism --update`. Re-running the installation command also
+updates Prism. Configuration is retained.
 
 ## Uninstall
 
 ```bash
-systemctl --user stop prism.service prism-input-bridge.service prism-headless-session.service
-systemctl --user disable prism.service
-rm -f ~/.local/bin/prism \
-      ~/.local/bin/prism-*.sh \
-      ~/.local/bin/prism-input-bridge \
-      ~/.local/bin/prism-labwc \
-      ~/.local/bin/prism-kwin-mode \
-      ~/.config/systemd/user/prism.service \
-      ~/.config/systemd/user/prism-headless-session.service \
-      ~/.config/systemd/user/prism-input-bridge.service \
-      ~/.config/systemd/user/prism-headless-steam.service
-systemctl --user daemon-reload
+prism --remove
 ```
 
-To also remove the input-bridge udev rule and wipe configuration, credentials, and app
-data (full clean slate):
-
-```bash
-sudo rm -f /etc/udev/rules.d/61-prism-input.rules && sudo udevadm control --reload
-rm -rf ~/.config/prism ~/.cache/prism
-```
+This stops and removes the managed user services, launcher, installed AppImage,
+and system input rules. Configuration, credentials, and application data are
+retained. See the [AppImage notes](docs/appimage.md) for migration from source
+installs, remaining host dependencies, and developer builds.
 
 ## How it works
 

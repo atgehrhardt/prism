@@ -28,9 +28,9 @@ fi
 requirements=(
   'wayland-server >= 1.24.0' 'wayland-client >= 1.24.0'
   'wayland-scanner >= 1.24.0' 'wayland-protocols >= 1.47' 'libdrm >= 2.4.129'
-  'xkbcommon >= 1.8.0' 'pixman-1 >= 0.43.0' 'gbm >= 21.1'
+  'xkbcommon >= 1.8.0' 'pixman-1 >= 0.46.0' 'gbm >= 21.1'
   'vulkan >= 1.2.182' 'xwayland >= 21.1.9'
-  egl glesv2 lcms2 libxml-2.0 glib-2.0 cairo pangocairo libpng
+  egl glesv2 lcms2 libxml-2.0 glib-2.0 cairo pangocairo libpng libinput
   xcb xcb-ewmh xcb-icccm xcb-composite xcb-render xcb-res 'xcb-xfixes >= 1.15'
 )
 if command -v pkg-config >/dev/null 2>&1; then
