@@ -18,7 +18,6 @@ jobs:
     name: Build and test
     permissions:
       contents: read
-      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -30,14 +29,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        env:
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: submodule.fetchJobs
-          GIT_CONFIG_VALUE_0: "4"
         with:
-          submodules: recursive
+          fetch-depth: 2
+
+      - name: Detect documentation-only changes
+        id: changes
+        run: python3 scripts/ci-needs-build.py
+
+      - name: Checkout Linux build dependencies
+        if: steps.changes.outputs.build == 'true'
+        run: bash scripts/checkout-linux-submodules.sh
 
       - name: Restore compiler and npm caches
+        if: steps.changes.outputs.build == 'true'
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
           path: |
@@ -47,24 +51,33 @@ jobs:
           restore-keys: linux-build-v1-${{ runner.arch }}-
 
       - name: Install build dependencies
+        if: steps.changes.outputs.build == 'true'
         run: |
           ./scripts/linux_build.sh --step=deps --skip-cuda --ubuntu-test-repo
           sudo apt-get install -y --no-install-recommends ccache
 
+      - name: Test CI build optimizations
+        if: steps.changes.outputs.build == 'true'
+        run: python3 tests/integration/test_ci_build.py
+
       - name: Set up Python
+        if: steps.changes.outputs.build == 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Test Linux capture selection
+        if: steps.changes.outputs.build == 'true'
         run: python3 tests/integration/test_capture_selection.py
 
       - name: Set up uv
+        if: steps.changes.outputs.build == 'true'
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
         with:
           enable-cache: true
 
       - name: Sync coverage tools
+        if: steps.changes.outputs.build == 'true'
         run: >-
           uv sync
           --locked
@@ -73,6 +86,7 @@ jobs:
           --no-install-project
 
       - name: Configure
+        if: steps.changes.outputs.build == 'true'
         run: |
           cmake \
             -S . \
@@ -88,12 +102,14 @@ jobs:
             -DPRISM_ENABLE_CUDA=OFF
 
       - name: Build
+        if: steps.changes.outputs.build == 'true'
         id: build
         run: |
           cmake --build cmake-build-ci --parallel "$(nproc)"
           ccache --show-stats
 
       - name: Run tests
+        if: steps.changes.outputs.build == 'true'
         id: test
         working-directory: cmake-build-ci/tests
         run: >-
@@ -105,7 +121,7 @@ jobs:
 
       - name: Generate coverage report
         if: >-
-          always() &&
+          always() && steps.changes.outputs.build == 'true' &&
           (steps.test.outcome == 'success' || steps.test.outcome == 'failure')
         run: |
           uv run --locked --no-sync gcovr \
@@ -119,7 +135,7 @@ jobs:
             --output cmake-build-ci/coverage.xml
 
       - name: Upload test artifacts
-        if: always()
+        if: always() && steps.changes.outputs.build == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: linux-test-results
@@ -129,25 +145,3 @@ jobs:
             cmake-build-ci/tests/test_prism.log
           if-no-files-found: warn
           retention-days: 14
-
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() && hashFiles('cmake-build-ci/coverage.xml') != '' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
-        with:
-          disable_search: true
-          fail_ci_if_error: true
-          files: cmake-build-ci/coverage.xml
-          report_type: coverage
-          use_oidc: true
-          verbose: true
-
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() && hashFiles('cmake-build-ci/tests/test-results.xml') != '' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
-        with:
-          disable_search: true
-          fail_ci_if_error: true
-          files: cmake-build-ci/tests/test-results.xml
-          report_type: test_results
-          use_oidc: true
-          verbose: true

@@ -43,4 +43,10 @@ RUN bash /opt/build-xwayland.sh
 RUN apt-get update && apt-get install -y --no-install-recommends qt6-wayland ccache && rm -rf /var/lib/apt/lists/*
 # The CI checkout is owned by the runner, while packaging runs as root in this image.
 RUN git config --system --add safe.directory /src
+COPY contrib/virtual-session/build-headless-compositor.sh contrib/virtual-session/check-headless-build-deps.sh /opt/prism-compositor-src/contrib/virtual-session/
+COPY contrib/virtual-session/patches/ /opt/prism-compositor-src/contrib/virtual-session/patches/
+COPY packaging/linux/AppImage/build-compositor.sh /opt/prism-compositor-src/packaging/linux/AppImage/build-compositor.sh
+RUN bash /opt/prism-compositor-src/packaging/linux/AppImage/build-compositor.sh
+# CMake reads this submodule's tag to select the pinned prebuilt FFmpeg release.
+RUN git config --system --add safe.directory /src/third-party/build-deps
 WORKDIR /src

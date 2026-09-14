@@ -4,23 +4,6 @@ permissions: {}
 
 on:
   pull_request:
-    paths:
-      - "packaging/linux/AppImage/**"
-      - "scripts/build-appimage.sh"
-      - "scripts/check-appimage.sh"
-      - "scripts/package-appimage-licenses.sh"
-      - "cmake/**"
-      - "contrib/virtual-session/**"
-      - "src/**"
-      - "src_assets/**"
-      - "third-party/**"
-      - "CMakeLists.txt"
-      - "package*.json"
-      - "vite.config.js"
-      - "install.sh"
-      - "tests/integration/test_appimage.py"
-      - "tests/integration/test_appimage_build_ownership.sh"
-      - ".github/workflows/appimage.yml"
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -35,17 +18,25 @@ jobs:
       contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    outputs:
+      native: ${{ steps.changes.outputs.build }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        env:
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: submodule.fetchJobs
-          GIT_CONFIG_VALUE_0: "4"
         with:
-          submodules: recursive
+          fetch-depth: 2
+
+      - name: Detect documentation-only changes
+        id: changes
+        run: python3 scripts/ci-needs-build.py
+
+      - name: Checkout Linux build dependencies
+        if: steps.changes.outputs.build == 'true'
+        run: bash scripts/checkout-linux-submodules.sh
       - name: Test installer and integration
+        if: steps.changes.outputs.build == 'true'
         run: python3 tests/integration/test_appimage.py
       - name: Restore compiler and npm caches
+        if: steps.changes.outputs.build == 'true'
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
           path: |
@@ -54,8 +45,10 @@ jobs:
           key: appimage-build-v1-${{ runner.arch }}-${{ github.sha }}
           restore-keys: appimage-build-v1-${{ runner.arch }}-
       - name: Set up Docker Buildx
+        if: steps.changes.outputs.build == 'true'
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4
       - name: Build baseline container
+        if: steps.changes.outputs.build == 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7
         with:
           context: .
@@ -65,6 +58,7 @@ jobs:
           cache-from: type=gha,scope=prism-appimage-builder
           cache-to: type=gha,scope=prism-appimage-builder,mode=max
       - name: Build and test AppImage
+        if: steps.changes.outputs.build == 'true'
         env:
           BRANCH: ${{ github.ref_name }}
           BUILD_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -83,8 +77,10 @@ jobs:
           prism-appimage-build
           bash -ec 'trap "ccache --show-stats" EXIT;
           bash tests/integration/test_appimage_build_ownership.sh /src;
+          bash tests/integration/test_cached_compositor.sh /src;
           bash scripts/build-appimage.sh'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: steps.changes.outputs.build == 'true'
         with:
           name: prism-appimage-x86_64
           compression-level: 0
@@ -103,11 +99,14 @@ jobs:
     container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        if: needs.build.outputs.native == 'true'
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        if: needs.build.outputs.native == 'true'
         with:
           name: prism-appimage-x86_64
           path: artifact
       - name: Install host desktop libraries
+        if: needs.build.outputs.native == 'true'
         shell: bash
         run: |
           if command -v apt-get >/dev/null; then
@@ -125,6 +124,7 @@ jobs:
               libXtst libXrender libSM libICE libdrm libwayland-client
           fi
       - name: Verify portable payload without FUSE
+        if: needs.build.outputs.native == 'true'
         shell: bash
         run: |
           cd artifact
@@ -132,6 +132,7 @@ jobs:
           chmod +x prism-x86_64.AppImage
           ./prism-x86_64.AppImage --appimage-extract >/dev/null
           bash ../scripts/check-appimage.sh squashfs-root
+
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'atgehrhardt/prism'

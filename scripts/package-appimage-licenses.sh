@@ -11,7 +11,6 @@ cp -a /opt/prism-deps/share/licenses "$LICENSES/compositor-dependencies"
 find /usr/share/doc -mindepth 2 -maxdepth 2 -name copyright -type f \
   -exec cp --parents -t "$LICENSES/system" {} +
 find "$ROOT/third-party" "$ROOT/cmake-build-appimage/_deps" \
-  "$ROOT/cmake-build-headless-compositor/labwc" \
   -type d \( -name .git -o -name CMakeFiles -o -name node_modules \) -prune -o \
   -type f \( -iname 'LICENSE*' -o -iname 'COPYING*' \) \
   -exec cp --parents -t "$LICENSES/sources" {} +

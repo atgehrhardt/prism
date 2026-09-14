@@ -8,6 +8,7 @@ APPDIR="$BUILD/AppDir"
 TOOLS="$BUILD/tools"
 [ "$(uname -m)" = x86_64 ] || { echo 'AppImage packaging currently requires x86_64.' >&2; exit 1; }
 mkdir -p "$BUILD" "$TOOLS"
+bash "$ROOT/packaging/linux/AppImage/stage-compositor.sh" --check
 
 ## @brief Download and verify an immutable packaging tool release.
 ## @param $1 HTTPS release asset URL.
@@ -40,7 +41,7 @@ if [ "${PRISM_BUILD_TESTS:-OFF}" = ON ]; then
 fi
 rm -rf "$APPDIR"
 DESTDIR="$APPDIR" cmake --install "$BUILD"
-PRISM_INSTALL_PREFIX="$APPDIR/usr" bash "$ROOT/contrib/virtual-session/build-headless-compositor.sh"
+bash "$ROOT/packaging/linux/AppImage/stage-compositor.sh" "$APPDIR"
 PRISM_INSTALL_PREFIX="$APPDIR/usr" bash "$ROOT/contrib/virtual-session/build-kwin-mode.sh"
 ln -s prism-labwc "$APPDIR/usr/bin/labwc"
 for program in wayland-info wlr-randr pactl; do
