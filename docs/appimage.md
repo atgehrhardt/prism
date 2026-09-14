@@ -7,9 +7,29 @@
 
 Prism's primary binary distribution is `prism-x86_64.AppImage`, accompanied by
 `prism-x86_64.AppImage.sha256`. Build and publication are defined in
-`.github/workflows/appimage.yml`. A manual workflow run produces reviewable CI
-artifacts; a `v*` tag in `atgehrhardt/prism` publishes them after build and
-compatibility checks. The installer requires these release assets to exist.
+`.github/workflows/appimage.yml`. A manual workflow run can produce CI artifacts
+or publish a new release; a `v*` tag in `atgehrhardt/prism` also publishes after
+build and compatibility checks. The installer requires these release assets to exist.
+
+## Publishing a release
+
+In `atgehrhardt/prism`, open **Actions → AppImage → Run workflow**. Select the
+branch or tag to build (normally `master`) and enter a new
+`release_tag`, such as `v1.0.0`. Leave it blank to build downloadable CI artifacts
+without publishing. The workflow must be present on the default branch for the
+manual run button to appear.
+
+The action builds the x86_64 AppImage with that version, checks its payload on
+Ubuntu and Fedora, then creates a tag at the exact workflow commit and a GitHub
+release with generated notes, the AppImage, and its SHA-256 checksum. Versions
+with a suffix, such as `v1.0.0-rc.1`, become prereleases. Existing tags are rejected
+before building; publishing also refuses to overwrite a tag created concurrently.
+No personal access token is needed: the release job uses `GITHUB_TOKEN` with
+`contents: write`. Publication is restricted to `atgehrhardt/prism`.
+
+If tag creation succeeds but release publication fails, rerun the AppImage
+workflow on that tag with `release_tag` blank to finish publishing its artifacts.
+Release runs are not cancelled when a newer run starts on the same branch.
 
 ## Compatibility
 
