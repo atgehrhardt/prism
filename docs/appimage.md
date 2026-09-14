@@ -93,6 +93,7 @@ docker run --rm -v "$PWD:/src" prism-appimage-build bash scripts/build-appimage.
 Output is under `cmake-build-appimage/artifacts`. The existing Linux CI runs the
 C++ suite. Add `-e PRISM_BUILD_TESTS=ON` to the Docker command to also run gtest
 through `cmake-build-appimage/tests/test_prism` during packaging.
+See [CI build performance](ci-performance.md) for compiler and container caching.
 Packaging tools and upgraded compositor
 sources are pinned to release hashes or immutable commits. Host distribution
 packages receive the baseline distribution's updates.

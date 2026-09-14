@@ -26,6 +26,7 @@ ENV CC=gcc-14 CXX=g++-14
 COPY packaging/linux/AppImage/build-dependencies.sh /opt/build-dependencies.sh
 RUN bash /opt/build-dependencies.sh
 RUN apt-get update && apt-get install -y --no-install-recommends squashfs-tools && rm -rf /var/lib/apt/lists/*
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Compiler/runtime development files only; no host driver is installed or bundled.
 RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb && \
     echo 'd2a6b11c096396d868758b86dab1823b25e14d70333f1dfa74da5ddaf6a06dba  /tmp/cuda-keyring.deb' | sha256sum --check --status && \
@@ -39,5 +40,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xtrans-dev x11proto-dev mesa-common-dev && rm -rf /var/lib/apt/lists/*
 COPY packaging/linux/AppImage/build-xwayland.sh /opt/build-xwayland.sh
 RUN bash /opt/build-xwayland.sh
-RUN apt-get update && apt-get install -y --no-install-recommends qt6-wayland && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends qt6-wayland ccache && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
