@@ -54,6 +54,8 @@ does not invoke npm; removing the output directory regenerates it.
 Coverage generation and XML/log artifacts remain in GitHub Actions. Codecov
 uploads and its Vite bundle-analysis plugin are removed. No Codecov account,
 token, or dashboard is needed to build, test, or review these artifacts.
+`tools/coverage` has a dedicated lockfile so installing gcovr does not resolve
+optional Flatpak tooling or require its submodule to be present.
 
 Caches are optional accelerators. A cache miss, eviction, or new branch without an
 accessible cache triggers a normal build. The first run populates the caches and
