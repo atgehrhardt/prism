@@ -19,6 +19,7 @@ on:
       - "vite.config.js"
       - "install.sh"
       - "tests/integration/test_appimage.py"
+      - "tests/integration/test_appimage_build_ownership.sh"
       - ".github/workflows/appimage.yml"
   push:
     tags: ["v*"]
@@ -80,7 +81,9 @@ jobs:
           -v "$HOME/.npm:/root/.npm"
           -v "$PWD:/src"
           prism-appimage-build
-          bash -c 'trap "ccache --show-stats" EXIT; bash scripts/build-appimage.sh'
+          bash -ec 'trap "ccache --show-stats" EXIT;
+          bash tests/integration/test_appimage_build_ownership.sh /src;
+          bash scripts/build-appimage.sh'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: prism-appimage-x86_64

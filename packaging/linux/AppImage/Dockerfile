@@ -41,4 +41,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY packaging/linux/AppImage/build-xwayland.sh /opt/build-xwayland.sh
 RUN bash /opt/build-xwayland.sh
 RUN apt-get update && apt-get install -y --no-install-recommends qt6-wayland ccache && rm -rf /var/lib/apt/lists/*
+# The CI checkout is owned by the runner, while packaging runs as root in this image.
+RUN git config --system --add safe.directory /src
 WORKDIR /src
