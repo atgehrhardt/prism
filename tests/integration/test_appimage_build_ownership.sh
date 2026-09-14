@@ -9,8 +9,10 @@ trap 'rm -rf "$TEMPORARY"' EXIT
 # Exercise Git's ownership guard even when Docker maps the checkout to root locally.
 GIT_TEST_ASSUME_DIFFERENT_OWNER=true git -C "$ROOT" rev-parse --verify HEAD > "$TEMPORARY/revision"
 GIT_TEST_ASSUME_DIFFERENT_OWNER=true git -C "$ROOT" submodule status --recursive > "$TEMPORARY/submodules"
+GIT_TEST_ASSUME_DIFFERENT_OWNER=true git -C "$ROOT/third-party/build-deps" rev-parse --verify HEAD > "$TEMPORARY/build-deps"
 test -s "$TEMPORARY/revision"
 test -s "$TEMPORARY/submodules"
+test -s "$TEMPORARY/build-deps"
 
 # Trust must remain limited to the mounted checkout, not arbitrary repositories.
 git init -q "$TEMPORARY/unrelated"

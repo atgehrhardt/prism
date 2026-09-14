@@ -146,11 +146,13 @@ To see all available options, run the tests with the `--help` flag.
 > [!TIP]
 > See the googletest [FAQ](https://google.github.io/googletest/faq.html) for more information on how to use Google Test.
 
-The required `Linux / Build and test` GitHub check runs the complete Google Test suite under Xvfb. It uses
-[gcovr](https://www.gcovr.com) to generate coverage and uploads coverage and test results to
-[Codecov](https://about.codecov.io) for pull requests and commits on `master`.
+The required `Linux / Build and test` GitHub check runs the complete Google Test suite under Xvfb for
+build-affecting changes. Documentation-only changes complete the check without compiling.
+It uses [gcovr](https://www.gcovr.com) to generate coverage and uploads `coverage.xml`, Google Test XML,
+and test logs as the `linux-test-results` GitHub Actions artifact. Coverage reporting does not require
+an external service. Review coverage alongside the tests; there is no automatic coverage-regression
+threshold configured.
 
-Codecov will fail a PR if the total coverage is reduced too much, or if not enough of the diff is covered by tests.
 In some cases, the code cannot be covered when running the tests inside of GitHub runners. For example, any test that
 needs access to the GPU will not be able to run. In these cases, the coverage can be omitted by adding comments to the
 code. See the [gcovr documentation](https://gcovr.com/en/stable/guide/exclusion-markers.html#exclusion-markers) for
