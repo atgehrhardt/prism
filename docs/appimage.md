@@ -94,10 +94,11 @@ Output is under `cmake-build-appimage/artifacts`. The existing Linux CI runs the
 C++ suite. Add `-e PRISM_BUILD_TESTS=ON` to the Docker command to also run gtest
 through `cmake-build-appimage/tests/test_prism` during packaging.
 See [CI build performance](ci-performance.md) for compiler and container caching.
-The build container trusts Git ownership only for its `/src` checkout mount, so
-runner-owned sources can supply commit and recursive submodule metadata during
-packaging. CI checks this before compilation and verifies that unrelated
-repositories still fail Git's ownership guard.
+The build container trusts Git ownership for `/src` and its `third-party/build-deps`
+submodule, so runner-owned sources can supply commit metadata and the pinned
+FFmpeg release tag. CI checks this before compilation and verifies that unrelated
+repositories still fail Git's ownership guard. The private compositor and its
+notices are cached in the builder; packaging rejects outdated compositor inputs.
 Packaging tools and upgraded compositor
 sources are pinned to release hashes or immutable commits. Host distribution
 packages receive the baseline distribution's updates.

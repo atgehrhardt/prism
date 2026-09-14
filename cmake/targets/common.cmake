@@ -25,24 +25,7 @@ endif()
 target_compile_options(prism PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${PRISM_COMPILE_OPTIONS}>;$<$<COMPILE_LANGUAGE:CUDA>:${PRISM_COMPILE_OPTIONS_CUDA};-std=c++17>)  # cmake-lint: disable=C0301
 target_link_options(prism PRIVATE ${PRISM_LINK_OPTIONS})
 
-set(NPM_SOURCE_ASSETS_DIR ${PRISM_SOURCE_ASSETS_DIR})
-set(NPM_ASSETS_DIR ${CMAKE_BINARY_DIR})
-
-#WebUI build
-find_program(NPM npm REQUIRED)
-
-set(NPM_INSTALL_FLAGS "--ignore-scripts")
-if (NPM_OFFLINE)
-    set(NPM_INSTALL_FLAGS "${NPM_INSTALL_FLAGS} --offline")
-endif()
-
-add_custom_target(web-ui ALL
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        COMMENT "Installing NPM Dependencies and Building the Web UI"
-        COMMAND "${NPM}" ci ${NPM_INSTALL_FLAGS}
-        COMMAND "${CMAKE_COMMAND}" -E env "PRISM_SOURCE_ASSETS_DIR=${NPM_SOURCE_ASSETS_DIR}" "PRISM_ASSETS_DIR=${NPM_ASSETS_DIR}" "${NPM}" run build  # cmake-lint: disable=C0301
-        COMMAND_EXPAND_LISTS
-        VERBATIM)
+include(targets/web)
 
 # docs
 if(BUILD_DOCS)
