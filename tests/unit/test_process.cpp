@@ -610,3 +610,141 @@ TEST(WlrootsCaptureOverrideTest, RejectsMalformedOrDifferentContracts) {
   EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("wlroots:session\nextra").has_value());
   EXPECT_FALSE(proc::prism_parse_wlroots_capture_override("wlroots:" + std::string(129, 'a')).has_value());
 }
+
+/**
+ * @brief Exercise capture validation with isolated virtual-display lifecycle helpers.
+ */
+class CaptureLaunchTest: public SessionCleanupTest {
+protected:
+  /**
+   * @brief Install synthetic capture helpers without changing host displays.
+   */
+  void SetUp() override {
+    SessionCleanupTest::SetUp();
+    writeHelper("prism-virtual-start.sh", "touch capture-ready");
+    writeHelper("prism-virtual-stop.sh", "rm -f capture-ready; touch capture-stopped");
+    writeHelper("prepare.sh", "touch prep-ready");
+    writeHelper("undo.sh", "rm -f prep-ready; touch prep-undone");
+    writeHelper("app.sh", "touch app-started");
+  }
+
+  /**
+   * @brief Write a helper whose marker files stay inside the test directory.
+   *
+   * @param name Helper filename.
+   * @param command Shell commands to run after entering the test directory.
+   */
+  void writeHelper(const std::string &name, const std::string &command) const {
+    const auto path = test_dir / name;
+    std::ofstream file(path);
+    file << "#!/bin/sh\ncd \"$(dirname \"$0\")\"\n"
+         << command << '\n';
+    file.close();
+    fs::permissions(path, fs::perms::owner_all);
+  }
+
+  /**
+   * @brief Build an application with reversible prep and a virtual capture mode.
+   *
+   * @return Isolated process manager.
+   */
+  proc::proc_t makeProcess() const {
+    proc::ctx_t app {};
+    app.id = "123";
+    app.name = "Capture validation test";
+    app.prism_capture = "virtual";
+    app.prep_cmds.emplace_back((test_dir / "prepare.sh").string(), (test_dir / "undo.sh").string(), false);
+    return proc::proc_t(boost::this_process::environment(), {app});
+  }
+};
+
+/**
+ * @brief Verify that capture validation observes prepared outputs before application commands start.
+ */
+TEST_F(CaptureLaunchTest, ValidatesAfterCaptureAndPrepBeforeLaunchingCommands) {
+  auto process = makeProcess();
+  process.get_apps()[0].cmd = (test_dir / "app.sh").string();
+  process.get_apps()[0].auto_detach = false;
+  int probes = 0;
+  EXPECT_EQ(process.execute(123, std::make_shared<rtsp_stream::launch_session_t>(), [&]() {
+    ++probes;
+    EXPECT_TRUE(fs::exists(test_dir / "capture-ready"));
+    EXPECT_TRUE(fs::exists(test_dir / "prep-ready"));
+    EXPECT_FALSE(fs::exists(test_dir / "app-started"));
+    return 0;
+  }),
+            0);
+  process.terminate();
+  EXPECT_EQ(probes, 1);
+  EXPECT_TRUE(fs::exists(test_dir / "capture-stopped"));
+  EXPECT_TRUE(fs::exists(test_dir / "prep-undone"));
+}
+
+/**
+ * @brief Verify failed validation restores resources and allows the next launch to succeed.
+ */
+TEST_F(CaptureLaunchTest, FailedProbeRollsBackAndAllowsRetry) {
+  auto process = makeProcess();
+  process.get_apps()[0].cmd = (test_dir / "app.sh").string();
+  process.get_apps()[0].detached.push_back((test_dir / "app.sh").string());
+  EXPECT_EQ(process.execute(123, std::make_shared<rtsp_stream::launch_session_t>(), []() {
+    return 503;
+  }),
+            503);
+  EXPECT_EQ(process.running(), 0);
+  EXPECT_FALSE(fs::exists(test_dir / "capture-ready"));
+  EXPECT_FALSE(fs::exists(test_dir / "prep-ready"));
+  EXPECT_FALSE(fs::exists(test_dir / "app-started"));
+  EXPECT_TRUE(fs::exists(test_dir / "capture-stopped"));
+  EXPECT_TRUE(fs::exists(test_dir / "prep-undone"));
+
+  process.get_apps()[0].cmd.clear();
+  process.get_apps()[0].detached.clear();
+  EXPECT_EQ(process.execute(123, std::make_shared<rtsp_stream::launch_session_t>(), []() {
+    return 0;
+  }),
+            0);
+  EXPECT_EQ(process.running(), 123);
+  process.terminate();
+}
+
+/**
+ * @brief Verify partial capture setup is rolled back without attempting validation.
+ */
+TEST_F(CaptureLaunchTest, CaptureFailureSkipsProbeAndCleansUp) {
+  writeHelper("prism-virtual-start.sh", "touch capture-ready; exit 1");
+  auto process = makeProcess();
+  EXPECT_EQ(process.execute(123, std::make_shared<rtsp_stream::launch_session_t>(), []() {
+    ADD_FAILURE() << "Capture validation ran before capture setup succeeded";
+    return 0;
+  }),
+            -1);
+  EXPECT_FALSE(fs::exists(test_dir / "capture-ready"));
+  EXPECT_FALSE(fs::exists(test_dir / "prep-ready"));
+  EXPECT_TRUE(fs::exists(test_dir / "capture-stopped"));
+}
+
+/**
+ * @brief Verify a failed preparation command prevents capture validation.
+ */
+TEST_F(CaptureLaunchTest, PrepFailureSkipsProbe) {
+  writeHelper("prepare.sh", "exit 1");
+  auto process = makeProcess();
+  EXPECT_EQ(process.execute(123, std::make_shared<rtsp_stream::launch_session_t>(), []() {
+    ADD_FAILURE() << "Capture validation ran after failed prep";
+    return 0;
+  }),
+            -1);
+  EXPECT_FALSE(fs::exists(test_dir / "capture-ready"));
+  EXPECT_TRUE(fs::exists(test_dir / "capture-stopped"));
+}
+
+/**
+ * @brief Preserve application launches that do not request capture validation.
+ */
+TEST_F(CaptureLaunchTest, SupportsLaunchWithoutValidation) {
+  auto process = makeProcess();
+  EXPECT_EQ(process.execute(123, std::make_shared<rtsp_stream::launch_session_t>()), 0);
+  EXPECT_EQ(process.running(), 123);
+  process.terminate();
+}

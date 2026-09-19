@@ -988,7 +988,7 @@ namespace nvhttp {
   }
 
   /**
-   * @brief Launch the requested application for a GameStream session.
+   * @brief Prepare the application capture output, validate encoding, and launch a GameStream session.
    *
    * @param host_audio Host audio.
    * @param response HTTP response object to populate.
@@ -1043,27 +1043,17 @@ namespace nvhttp {
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
     auto launch_session = make_launch_session(host_audio, args);
 
-    if (rtsp_stream::session_count() == 0) {
-      // The display should be restored in case something fails as there are no other sessions.
-      revert_display_configuration = true;
-
-      // We want to prepare display only if there are no active sessions at
-      // the moment. This should be done before probing encoders as it could
-      // change the active displays.
-      display_device::configure_display(config::video, *launch_session);
-
-      // Probe encoders again before streaming to ensure our chosen
-      // encoder matches the active GPU (which could have changed
-      // due to hotplugging, driver crash, primary monitor change,
-      // or any number of other factors).
-      if (video::probe_encoders()) {
-        tree.put("root.<xmlattr>.status_code", 503);
-        tree.put("root.<xmlattr>.status_message", "Failed to initialize video capture/encoding. Is a display connected and turned on?");
-        tree.put("root.gamesession", 0);
-
-        return;
+    // Validate only after execute() has created the selected capture output and
+    // run prep commands. Probing the desktop first prevents headless launches.
+    const bool no_active_sessions {rtsp_stream::session_count() == 0};
+    const auto validate_capture = [&]() -> int {
+      if (!no_active_sessions) {
+        return 0;
       }
-    }
+      revert_display_configuration = true;
+      display_device::configure_display(config::video, *launch_session);
+      return video::probe_encoders() ? 503 : 0;
+    };
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1076,15 +1066,14 @@ namespace nvhttp {
       return;
     }
 
-    if (appid > 0) {
-      auto err = proc::proc.execute((int) appid, launch_session);
-      if (err) {
-        tree.put("root.<xmlattr>.status_code", err);
-        tree.put("root.<xmlattr>.status_message", "Failed to start the specified application");
-        tree.put("root.gamesession", 0);
-
-        return;
-      }
+    const auto err = appid > 0 ?
+                       proc::proc.execute((int) appid, launch_session, validate_capture) :
+                       validate_capture();
+    if (err) {
+      tree.put("root.<xmlattr>.status_code", err);
+      tree.put("root.<xmlattr>.status_message", err == 503 ? "Failed to initialize video capture/encoding after display setup. Check the Prism log for details." : "Failed to start the specified application");
+      tree.put("root.gamesession", 0);
+      return;
     }
 
     tree.put("root.<xmlattr>.status_code", 200);
