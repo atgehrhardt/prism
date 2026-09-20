@@ -718,7 +718,7 @@ namespace proc {
     }
   }
 
-  int proc_t::execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
+  int proc_t::execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session, const std::function<int()> &validate_capture) {
     // Ensure starting from a clean slate
     terminate();
 
@@ -817,6 +817,14 @@ namespace proc {
       if (ret != 0) {
         BOOST_LOG(error) << '[' << cmd.do_cmd << "] exited with code ["sv << ret << ']';
         return -1;
+      }
+    }
+
+    // Capture must be probed against the output created by this launch, even
+    // when no physical display was available before the session helpers ran.
+    if (validate_capture) {
+      if (const auto status = validate_capture(); status != 0) {
+        return status;
       }
     }
 

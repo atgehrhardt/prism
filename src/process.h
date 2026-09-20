@@ -14,6 +14,7 @@
 
 // standard includes
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -195,9 +196,11 @@ namespace proc {
      *
      * @param app_id App ID.
      * @param launch_session Launch session.
+     * @param validate_capture Optional validation after capture setup and prep commands, before spawning application commands.
+     * A nonzero result aborts launch and rolls back capture setup and completed prep commands.
      * @return Process exit code or launch error status.
      */
-    int execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
+    int execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session, const std::function<int()> &validate_capture = {});
 
     /**
      * @return `_app_id` if a process is running, otherwise returns `0`
