@@ -42,7 +42,7 @@ jobs:
 
       - name: Restore compiler and npm caches
         if: steps.changes.outputs.build == 'true'
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ${{ env.CCACHE_DIR }}
@@ -72,7 +72,7 @@ jobs:
 
       - name: Set up uv
         if: steps.changes.outputs.build == 'true'
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4  # v10.1.0
         with:
           enable-cache: true
 
