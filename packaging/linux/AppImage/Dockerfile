@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev liblcms2-dev libpixman-1-dev libcairo2-dev libpango1.0-dev \
     libpng-dev libxcb-ewmh-dev libxcb-icccm4-dev libxcb-composite0-dev \
     libxcb-render0-dev libxcb-res0-dev xwayland wayland-utils wlr-randr \
-    pulseaudio-utils xkb-data x11-xkb-utils bubblewrap patch shellcheck xvfb \
+    pulseaudio-utils x11-xserver-utils xkb-data x11-xkb-utils bubblewrap patch shellcheck xvfb \
     && rm -rf /var/lib/apt/lists/*
 RUN apt-get update && apt-get install -y --no-install-recommends bison && rm -rf /var/lib/apt/lists/*
 COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node

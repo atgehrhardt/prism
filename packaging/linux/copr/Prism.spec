@@ -159,6 +159,7 @@ Requires: which >= 2.21
 Requires: bubblewrap
 Requires: labwc
 Requires: wlr-randr
+Requires: xrandr
 
 %if 0%{?fedora}
 # Fedora runtime requirements
