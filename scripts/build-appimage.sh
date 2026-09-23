@@ -44,7 +44,7 @@ DESTDIR="$APPDIR" cmake --install "$BUILD"
 bash "$ROOT/packaging/linux/AppImage/stage-compositor.sh" "$APPDIR"
 PRISM_INSTALL_PREFIX="$APPDIR/usr" bash "$ROOT/contrib/virtual-session/build-kwin-mode.sh"
 ln -s prism-labwc "$APPDIR/usr/bin/labwc"
-for program in wayland-info wlr-randr pactl; do
+for program in wayland-info wlr-randr xrandr pactl; do
   install -Dm755 "$(command -v "$program")" "$APPDIR/usr/bin/$program"
 done
 # This Xwayland build resolves xkbcomp relative to the AppDir set by its wrapper.

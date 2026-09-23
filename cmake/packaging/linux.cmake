@@ -158,6 +158,7 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
             miniupnpc, \
             openssl | libssl3, \
             wlr-randr, \
+            x11-xserver-utils, \
             xwayland")
 set(CPACK_RPM_PACKAGE_REQUIRES "\
             ${CPACK_RPM_PLATFORM_PACKAGE_REQUIRES} \
@@ -179,6 +180,7 @@ set(CPACK_RPM_PACKAGE_REQUIRES "\
             pulseaudio-libs >= 10.0, \
             which >= 2.21, \
             wlr-randr, \
+            xrandr, \
             xorg-x11-server-Xwayland")
 
 if(NOT BOOST_USE_STATIC)
