@@ -61,6 +61,7 @@ depends=(
   'vulkan-icd-loader'
   'which'
   'wlr-randr'
+  'xorg-xrandr'
   'xorg-xwayland'
 )
 
