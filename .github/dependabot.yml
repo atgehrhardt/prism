@@ -3,7 +3,7 @@ version: 2
 updates:
   - package-ecosystem: "gitsubmodule"
     directory: "/"
-    rebase-strategy: disabled
+    rebase-strategy: auto
     schedule:
       interval: "cron"
       cronjob: "30 2 * * *"

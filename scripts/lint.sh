@@ -128,6 +128,7 @@ if [ ${#CPP_FILES[@]} -gt 0 ]; then
 fi
 
 # --- GitHub Actions -----------------------------------------------------------
+run dependabot-auto-merge "$VENV/bin/python" tests/integration/test_dependabot_auto_merge.py
 if command -v actionlint >/dev/null 2>&1; then
   run actionlint actionlint -color
 fi
