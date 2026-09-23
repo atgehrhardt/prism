@@ -1,0 +1,46 @@
+---
+name: Dependabot auto-merge
+permissions: {}
+
+on:
+  pull_request_target:
+    branches: [master]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: dependabot-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    if: >-
+      github.repository == 'atgehrhardt/prism' &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # Only query GitHub metadata; never check out or execute PR contents with this token.
+      # GitHub's master ruleset gates merging on required checks and an up-to-date branch.
+      - name: Enable auto-merge for open Dependabot PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pulls=$(gh api --paginate "repos/$GH_REPO/pulls?state=open&base=master&per_page=100" |
+            jq -r --arg repo "$GH_REPO" '.[] | select(
+              .user.login == "dependabot[bot]" and .user.type == "Bot" and
+              .state == "open" and .draft == false and .base.ref == "master" and
+              .base.repo.full_name == $repo and .head.repo.full_name == $repo
+            ) | [.number, .head.sha] | @tsv')
+          while IFS=$'\t' read -r number sha; do
+            if [[ -n "$number" ]]; then
+              gh pr merge "$number" --repo "$GH_REPO" --auto --squash --match-head-commit "$sha"
+            fi
+          done <<< "$pulls"
