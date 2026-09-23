@@ -423,3 +423,6 @@ for script in \
   prism-virtual-common.sh; do
   bash -n "$SOURCE_DIR/contrib/virtual-session/$script"
 done
+
+# Exercise deferred desktop restoration as part of the gtest helper suite.
+python3 "$SOURCE_DIR/tests/integration/test_steam_restore.py"

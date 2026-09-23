@@ -546,6 +546,7 @@ if [ "$2" = is-active ] && [ "$FAILURE" = inactive ]; then exit 1; fi"""
             "xkbcomp",
             "wayland-info",
             "wlr-randr",
+            "xrandr",
             "pactl",
         ):
             path = binary_dir / program
