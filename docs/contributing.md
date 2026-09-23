@@ -111,6 +111,37 @@ Additionally, [xgettext](https://www.gnu.org/software/gettext) must be installed
   uv run --locked --no-sync lb-localize --root-dir . --compile
   ```
 
+### Dependency updates
+
+The `Dependabot auto-merge` workflow enables squash auto-merge for all non-draft
+Dependabot pull requests from branches in `atgehrhardt/prism` targeting `master`,
+including major updates and submodule updates. GitHub merges them only after the
+`Common Lint` and `Build and test` required checks pass, the branch is up to date,
+and all other rules in the `Protect master` ruleset are satisfied.
+
+Repository administrators must enable **Settings > General > Pull Requests >
+Allow auto-merge** and retain those required checks and the up-to-date branch rule.
+The workflow uses the built-in `GITHUB_TOKEN`; no personal access token or automatic
+approval is needed. It queries GitHub metadata without checking out or executing
+pull request code in the privileged `pull_request_target` workflow.
+
+Dependabot automatically rebases updates as `master` advances, including submodules,
+so CI reruns before the next merge. Conflicts, failed tests, or unresolved review
+threads still need attention. Dependabot stops automatically rebasing PRs after
+30 days or when a contributor adds commits; see
+[managing Dependabot PRs](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/manage-your-dependency-security/manage-dependabot-prs).
+
+After this workflow lands on `master`, use **Actions > Dependabot auto-merge > Run
+workflow** once to enroll existing open updates. New and updated Dependabot PRs
+also trigger a scan of all eligible open updates. Each merge request is tied to
+the current head commit; if the branch changes during enrollment, rerun the
+workflow. Auto-merge follows GitHub's
+[required-check behavior](https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions).
+
+`scripts/lint.sh` runs regression tests for PR selection, pagination, and merge
+commands using a fake GitHub CLI. With the lint environment installed, run them
+directly with `.lint-venv/bin/python tests/integration/test_dependabot_auto_merge.py`.
+
 ### Testing
 
 #### Clang Format

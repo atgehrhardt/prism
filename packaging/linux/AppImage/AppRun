@@ -17,7 +17,7 @@ case "${1:-}" in
   --check)
     [ "$#" = 1 ] || exit 64
     for executable in prism prism-input-bridge prism-hdr-calibration prism-labwc \
-      prism-kwin-mode Xwayland prism-Xwayland xkbcomp wayland-info wlr-randr pactl; do
+      prism-kwin-mode Xwayland prism-Xwayland xkbcomp wayland-info wlr-randr xrandr pactl; do
       [ -x "$HERE/usr/bin/$executable" ] || { echo "Missing payload: $executable" >&2; exit 1; }
     done
     for helper in appimage-manage.py install-appimage.sh \

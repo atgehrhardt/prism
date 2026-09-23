@@ -313,7 +313,15 @@ active session reader accepts only version four.
 
 After a Steam headless stream, `prism-steam-restore.service` waits five seconds before
 returning Steam to the desktop. Starting another headless Steam stream during that grace
-period cancels the restore and avoids a shutdown/relaunch cycle.
+period cancels the restore and avoids a shutdown/relaunch cycle. If the desktop has no
+active output (for example, while the monitor is off), restoration waits until an output
+returns. This prevents Steam from starting without a display and remaining stuck in the
+background. The check uses `xrandr` against the desktop X server, including Xwayland on
+a Wayland desktop. A new headless session cancels this wait as well.
+
+Inspect restoration with `journalctl --user -u prism-steam-restore.service`. A
+"Waiting for a desktop output" message means Steam will start once the desktop output
+becomes available.
 
 Synchronized games start Steam with `-silent` and the exact `steam://rungameid/<appid>`
 URL on its initial command line. This keeps Steam's window and Gamepad UI hidden while
