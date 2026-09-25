@@ -170,9 +170,11 @@ TEST(PyroWaveProtocol, ExactRateControlAndWarpRates) {
   EXPECT_EQ(prism_pyrowave::frame_budget(200000, 12000, 1392, 20), 208333);
   EXPECT_EQ(prism_pyrowave::frame_budget(200000, 24000, 1392, 20), 104166);
   EXPECT_EQ(prism_pyrowave::frame_budget(200000, 5994, 1392, 20), 417083);
-  EXPECT_EQ(prism_pyrowave::frame_budget(1000000, 6000, 1392, 20), 0);
   // Budgets up to the FEC capacity are usable; only length words are reserved for the envelope.
   EXPECT_EQ(prism_pyrowave::frame_budget(1000000, 12000, 1392, 20), 1041666);
+  // Larger requests are clamped to the transport ceiling rather than rejected.
+  EXPECT_EQ(prism_pyrowave::frame_budget(1000000, 6000, 1392, 20), prism_pyrowave::transport_frame_budget(1392, 20));
+  EXPECT_EQ(prism_pyrowave::frame_budget(1000000, 6000, 1024, 20), 854692);
   EXPECT_EQ(prism_pyrowave::transport_frame_budget(1024, 20), 854692);
 }
 
@@ -217,7 +219,7 @@ TEST(PyroWaveProtocol, RejectInvalidBudgets) {
     EXPECT_EQ(prism_pyrowave::frame_budget(200000, 6000, 1392, fec), 0);
   }
   EXPECT_EQ(prism_pyrowave::frame_budget(1, 6000, 1392, 20), 0);
-  EXPECT_EQ(prism_pyrowave::frame_budget(INT32_MAX, 1, 1392, 20), 0);
+  EXPECT_EQ(prism_pyrowave::frame_budget(INT32_MAX, 1, 1392, 20), prism_pyrowave::transport_frame_budget(1392, 20));
   for (int fec : {0, 20, 50, 100}) {
     for (int bitrate = 1000; bitrate <= 1000000; bitrate += 1000) {
       auto budget = prism_pyrowave::frame_budget(bitrate, 6000, 1392, fec);

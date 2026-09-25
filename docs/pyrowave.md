@@ -43,24 +43,26 @@ compression quality.
 
 PyroWave uses much higher bitrates than inter-frame codecs. Every frame is coded
 independently with simple entropy coding, so a bitrate that looks sharp with
-H.264, HEVC, or AV1 visibly blurs fine texture. As a starting point, target about
-1.5 bits per streamed pixel per frame: roughly 350–400 Mbps for 1080p120 and
-600+ Mbps for 1440p120, measured as video bitrate. FEC parity and audio are paid
-from Iris's bitrate setting, so video receives roughly 80% of it. Streaming at
-the client display's native resolution avoids spending bits on pixels that are
-discarded when Iris scales the image down. Iris allows bitrate entry up to
-1,000 Mbps; this is an input range, not a promise that every
-resolution/FPS/packet-size combination is transportable. Prism computes the
-initial encoder budget from the effective stream FPS (including Warp multipliers)
-after existing audio/FEC bandwidth adjustments. Subsequent frames earn byte
-credits from elapsed capture time, so a 120 FPS capture does not lose half its
-quality budget when Warp requests 240 FPS. Credits are capped at one transport-safe
-frame; pauses cannot accumulate an oversized frame or a prolonged burst. Requests
-whose initial budget exceeds four FEC blocks are rejected. The limit reserves one
-length word per upstream packet; upstream packs blocks greedily, so every packet
-except the last carries more than 48 KiB. Actual
-encoded frames are checked again before transmission; FEC is never silently
-disabled for PyroWave.
+H.264, HEVC, or AV1 visibly blurs fine texture. Iris therefore ignores its bitrate
+setting while PyroWave is selected, locks that setting, and shows a warning when
+PyroWave is chosen. It requests 1.5 bits per pixel per frame for 4:2:0 and 2.25
+for 4:4:4, plus 25% for the FEC parity, audio, and packet overhead that Prism
+deducts, capped at 1,000 Mbps: about 230 Mbps for 1080p60, 470 Mbps for 1080p120,
+and 830 Mbps for 1440p120. The target uses the selected frame rate, not a Warp
+multiplier. This needs wired Ethernet or strong Wi-Fi 6 or newer on the local
+network. Streaming at the client display's native resolution avoids spending bits
+on pixels that are discarded when Iris scales the image down.
+
+Prism computes the initial encoder budget from the effective stream FPS (including
+Warp multipliers) after existing audio/FEC bandwidth adjustments. Subsequent frames
+earn byte credits from elapsed capture time, so a 120 FPS capture does not lose half
+its quality budget when Warp requests 240 FPS. Credits are capped at one
+transport-safe frame; pauses cannot accumulate an oversized frame or a prolonged
+burst. A frame may use at most four FEC blocks. Larger budgets are clamped to that
+ceiling, which Prism logs as a warning, rather than rejected. The ceiling reserves
+one length word per upstream packet; upstream packs blocks greedily, so every packet
+except the last carries more than 48 KiB. Actual encoded frames are checked again
+before transmission; FEC is never silently disabled for PyroWave.
 
 ## Protocol version 1
 

@@ -1293,13 +1293,17 @@ namespace rtsp_stream {
           video.pyrowave_frame_limit < video.pyrowave_frame_budget ||
           !prism_pyrowave::valid_mode(video.width, video.height, video.dynamicRange, video.chromaSamplingType) ||
           !prism_pyrowave::encoder_capabilities()) {
-        BOOST_LOG(error) << "PyroWave: incompatible version, unavailable GPU, or bitrate outside FEC limits";
+        BOOST_LOG(error) << "PyroWave: incompatible version, unavailable GPU, invalid transport settings, or bitrate too low";
         respond(sock, session, &option, 400, "Unsupported PyroWave configuration", req->sequenceNumber, {});
         return;
       }
       BOOST_LOG(info) << "PyroWave: " << video.width << 'x' << video.height << ", " << video.bitrate
                       << " Kbps video; adaptive frame budget " << video.pyrowave_frame_budget
                       << " to " << video.pyrowave_frame_limit << " bytes";
+      if (video.pyrowave_frame_budget == video.pyrowave_frame_limit) {
+        BOOST_LOG(warning) << "PyroWave: requested bitrate exceeds four FEC blocks per frame; frames are capped at "
+                           << video.pyrowave_frame_limit << " bytes";
+      }
     }
 
     if (config.monitor.videoFormat == 1 && video::active_hevc_mode == 1) {

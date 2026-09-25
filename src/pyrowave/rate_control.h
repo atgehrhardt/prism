@@ -11,22 +11,6 @@
 
 namespace prism_pyrowave {
   /**
-   * @brief Bound an adaptive frame budget by the negotiated transport and envelope capacity.
-   * @param packet_size GameStream packet size including its video header.
-   * @param fec_percent Negotiated parity percentage.
-   * @return Conservative four-byte-aligned bitstream capacity, or zero for invalid settings.
-   */
-  inline size_t transport_frame_budget(int packet_size, int fec_percent) {
-    if (packet_size < 256 || packet_size > 65500 || fec_percent < 0 || fec_percent > 100) {
-      return 0;
-    }
-    const uint64_t shards = 4 * (25500 / (100 + fec_percent));
-    const uint64_t capacity = std::min<uint64_t>(shards * uint64_t(packet_size - 16) - 8, maximum_frame_size);
-    // Envelope overhead grows with the bitstream, so the overhead of the whole capacity bounds it.
-    return size_t(capacity - (envelope_bound(capacity) - capacity)) & ~size_t(3);
-  }
-
-  /**
    * @brief Byte-credit controller that preserves bandwidth when capture runs below requested FPS.
    */
   class rate_control {

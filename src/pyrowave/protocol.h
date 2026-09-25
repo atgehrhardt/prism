@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -201,26 +202,39 @@ namespace prism_pyrowave {
   }
 
   /**
-   * @brief Compute an exact encoder budget that fits four existing FEC blocks.
+   * @brief Bound an adaptive frame budget by the negotiated transport and envelope capacity.
+   * @param packet_size GameStream packet size including its 16-byte video header.
+   * @param fec_percent Negotiated parity percentage.
+   * @return Conservative four-byte-aligned bitstream capacity, or zero for invalid settings.
+   */
+  inline size_t transport_frame_budget(int packet_size, int fec_percent) {
+    if (packet_size < 256 || packet_size > 65500 || fec_percent < 0 || fec_percent > 100) {
+      return 0;
+    }
+    const uint64_t shards = 4 * (255 * 100 / (100 + fec_percent));
+    // The eight bytes reserved here are the video frame header prepended by the transport.
+    const uint64_t capacity = std::min<uint64_t>(shards * uint64_t(packet_size - 16) - 8, maximum_frame_size);
+    // Envelope overhead grows with the bitstream, so the overhead of the whole capacity bounds it.
+    return size_t(capacity - (envelope_bound(capacity) - capacity)) & ~size_t(3);
+  }
+
+  /**
+   * @brief Compute the initial encoder budget, limited to what four existing FEC blocks carry.
    * @param bitrate_kbps Codec bitrate after transport overhead adjustments.
    * @param fps_x100 Actual stream frame rate multiplied by 100.
    * @param packet_size Negotiated GameStream packet size, including its 16-byte video header.
    * @param fec_percent Requested Reed-Solomon parity percentage.
-   * @return Maximum upstream bitstream bytes per frame, or zero for unsupported settings.
+   * @return Upstream bitstream bytes per frame, clamped to the transport ceiling, or zero for unsupported settings.
    */
   inline size_t frame_budget(int bitrate_kbps, int fps_x100, int packet_size, int fec_percent) {
-    if (bitrate_kbps <= 0 || fps_x100 <= 0 || packet_size < 256 || packet_size > 65500 ||
-        fec_percent < 0 || fec_percent > 100) {
+    if (bitrate_kbps <= 0 || fps_x100 <= 0) {
       return 0;
     }
     const uint64_t budget = uint64_t(bitrate_kbps) * 12500 / uint64_t(fps_x100);
-    const uint64_t envelope = envelope_bound(budget);
-    const uint64_t shards = 4 * (255 * 100 / (100 + fec_percent));
-    // The eight bytes reserved here are the video frame header prepended by the transport.
-    const uint64_t capacity = shards * uint64_t(packet_size - 16) - 8;
-    if (budget < 4096 || envelope > capacity || envelope > maximum_frame_size) {
+    const size_t limit = transport_frame_budget(packet_size, fec_percent);
+    if (budget < 4096 || !limit) {
       return 0;
     }
-    return size_t(budget);
+    return size_t(std::min<uint64_t>(budget, limit));
   }
 }  // namespace prism_pyrowave
