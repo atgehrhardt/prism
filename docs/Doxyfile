@@ -49,6 +49,7 @@ INPUT = ../README.md \
         awesome_sunshine.md \
         guides.md \
         performance_tuning.md \
+        pyrowave.md \
         api.md \
         troubleshooting.md \
         building.md \

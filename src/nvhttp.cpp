@@ -30,6 +30,8 @@
 #include "nvhttp.h"
 #include "platform/common.h"
 #include "process.h"
+#include "pyrowave/encoder.h"
+#include "pyrowave/protocol.h"
 #include "rtsp.h"
 #include "system_tray.h"
 #include "utility.h"
@@ -915,7 +917,9 @@ namespace nvhttp {
     }
 
     const uint32_t codec_mode_flags = get_codec_mode_flags();
-    tree.put("root.ServerCodecModeSupport", codec_mode_flags);
+    auto pyrowave_modes = prism_pyrowave::encoder_capabilities();
+    tree.put("root.PrismPyroWaveVersion", pyrowave_modes ? prism_pyrowave::version : 0);
+    tree.put("root.ServerCodecModeSupport", codec_mode_flags | pyrowave_modes);
 
     if (!config::nvhttp.external_ip.empty()) {
       tree.put("root.ExternalIP", config::nvhttp.external_ip);

@@ -697,6 +697,22 @@ namespace platf {
     }
 
     /**
+     * @brief Report support for direct PyroWave DMA-BUF capture.
+     * @return True for capture paths implementing the PyroWave image contract.
+     */
+    virtual bool supports_pyrowave() const {
+      return false;
+    }
+
+    /**
+     * @brief Locate the output within an exported capture framebuffer.
+     * @return Pixel offsets for the top-left of the captured display.
+     */
+    virtual std::pair<int, int> pyrowave_capture_offset() const {
+      return {0, 0};
+    }
+
+    /**
      * @brief Report whether the active display mode is HDR.
      *
      * @return True when the active display mode is HDR.

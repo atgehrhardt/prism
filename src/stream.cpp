@@ -1565,6 +1565,12 @@ namespace stream {
       auto max_data_per_fec_block = max_data_shards_per_fec_block * blocksize;
       auto fec_blocks_needed = (payload.size() + (max_data_per_fec_block - 1)) / max_data_per_fec_block;
 
+      if (session->config.monitor.videoFormat == 3 && fec_blocks_needed > MAX_FEC_BLOCKS) {
+        BOOST_LOG(error) << "PyroWave frame exceeds the negotiated FEC capacity";
+        session->shutdown_event->raise(true);
+        continue;
+      }
+
       // If the number of FEC blocks needed exceeds the protocol limit, turn off FEC for this frame.
       // For normal FEC percentages, this should only happen for enormous frames (over 800 packets at 20%).
       if (fec_blocks_needed > MAX_FEC_BLOCKS) {

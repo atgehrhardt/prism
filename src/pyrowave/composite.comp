@@ -1,0 +1,49 @@
+#version 450
+// Aspect-fit capture and composite a separate KMS cursor before wavelet encoding.
+layout(local_size_x=8, local_size_y=8) in;
+layout(binding=0) uniform sampler2D source_image;
+layout(binding=1, rgba16) writeonly uniform image2D output_image;
+layout(binding=2, std430) readonly buffer Cursor { uint pixels[]; } cursor;
+layout(push_constant) uniform Parameters {
+    ivec2 source_offset;
+    ivec2 source_size;
+    ivec2 output_size;
+    ivec2 cursor_position;
+    ivec2 cursor_size;
+    ivec2 cursor_source_size;
+    int hdr;
+} p;
+vec3 pq_decode(vec3 x) {
+    vec3 y = pow(max(x, 0.0), vec3(1.0 / 78.84375));
+    return 10000.0 * pow(max(y - 0.8359375, 0.0) / max(18.8515625 - 18.6875 * y, 1e-6), vec3(1.0 / 0.1593017578125));
+}
+vec3 pq_encode(vec3 x) {
+    vec3 y = pow(max(x, 0.0) / 10000.0, vec3(0.1593017578125));
+    return pow((0.8359375 + 18.8515625 * y) / (1.0 + 18.6875 * y), vec3(78.84375));
+}
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, p.output_size))) return;
+    float scale = min(float(p.output_size.x) / p.source_size.x, float(p.output_size.y) / p.source_size.y);
+    vec2 point = (vec2(pixel) + 0.5 - (vec2(p.output_size) - vec2(p.source_size) * scale) * 0.5) / scale;
+    if (any(lessThan(point, vec2(0))) || any(greaterThanEqual(point, vec2(p.source_size)))) {
+        imageStore(output_image, pixel, vec4(0, 0, 0, 1));
+        return;
+    }
+    point += vec2(p.source_offset);
+    vec3 rgb = texture(source_image, point / vec2(textureSize(source_image, 0))).rgb;
+    vec2 cp = point - vec2(p.cursor_position);
+    if (all(greaterThan(p.cursor_size, ivec2(0))) && all(greaterThanEqual(cp, vec2(0))) && all(lessThan(cp, vec2(p.cursor_size)))) {
+        ivec2 position = ivec2(cp * vec2(p.cursor_source_size) / vec2(p.cursor_size));
+        uint packed = cursor.pixels[position.y * p.cursor_source_size.x + position.x];
+        vec3 c = vec3((packed >> 16) & 255, (packed >> 8) & 255, packed & 255) / 255.0;
+        float alpha = float(packed >> 24) / 255.0;
+        if (p.hdr != 0) {
+            c = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), greaterThan(c, vec3(0.04045)));
+            // Linear BT.709 -> BT.2020; SDR white at 80 nits.
+            c = mat3(0.627404, 0.069097, 0.016391, 0.329283, 0.919540, 0.088013, 0.043313, 0.011362, 0.895595) * c * 80.0;
+            rgb = pq_encode(mix(pq_decode(rgb), c, alpha));
+        } else rgb = mix(rgb, c, alpha);
+    }
+    imageStore(output_image, pixel, vec4(rgb, 1));
+}
