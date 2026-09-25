@@ -1236,6 +1236,14 @@ namespace pipewire {
     }
 
     /**
+     * @brief Report whether PipeWire negotiated GPU-backed capture.
+     * @return True when frames are DMA-BUF images suitable for PyroWave.
+     */
+    bool supports_pyrowave() const override {
+      return shared_state->using_dmabuf.load();
+    }
+
+    /**
      * @brief Report whether the active display mode is HDR.
      *
      * @return True when the active display mode is HDR.

@@ -29,6 +29,9 @@ extern "C" {
 #include "logging.h"
 #include "nvenc/nvenc_base.h"
 #include "platform/common.h"
+#include "pyrowave/encoder.h"
+#include "pyrowave/protocol.h"
+#include "pyrowave/rate_control.h"
 #include "sync.h"
 #include "video.h"
 
@@ -2498,6 +2501,87 @@ namespace video {
   }
 
   /**
+   * @brief Capture and encode independent PyroWave frames on the session thread.
+   * @param mail Session events and shutdown signal.
+   * @param config Validated codec configuration.
+   * @param channel_data Transport session attached to encoded packets.
+   */
+  void capture_pyrowave(safe::mail_t mail, const config_t &config, void *channel_data) {
+    auto shutdown = mail->event<bool>(mail::shutdown);
+    auto finish = util::fail_guard([&]() {
+      shutdown->raise(true);
+    });
+    auto packets = mail::man->queue<packet_t>(mail::video_packets);
+    int64_t frame_number = 1;
+    try {
+      while (!shutdown->peek()) {
+        std::vector<std::string> names;
+        int selected = -1;
+        refresh_displays(platf::mem_type_e::vulkan, names, selected);
+        if (selected < 0 || size_t(selected) >= names.size()) {
+          throw std::runtime_error("PyroWave could not find a capture display");
+        }
+        auto display = platf::display(platf::mem_type_e::vulkan, names[selected], config);
+        if (!display || !display->supports_pyrowave()) {
+          throw std::runtime_error("PyroWave requires GPU DMA-BUF capture (PipeWire, KMS, or Wayland screencopy)");
+        }
+        prism_pyrowave::encoder encoder(config);
+        prism_pyrowave::rate_control rate(config.bitrate, config.pyrowave_frame_budget, config.pyrowave_frame_limit);
+        std::optional<std::chrono::steady_clock::time_point> previous_encode;
+        mail->event<input::touch_port_t>(mail::touch_port)->raise(make_port(display.get(), config));
+        bool hdr_sent = false;
+        std::shared_ptr<platf::img_t> previous_image;
+        auto push = [&](std::shared_ptr<platf::img_t> image, bool captured) {
+          if (shutdown->peek()) {
+            return false;
+          }
+          if (captured) {
+            previous_image = std::move(image);
+          }
+          image = previous_image;
+          if (!image) {
+            return true;
+          }
+          if (!hdr_sent) {
+            auto hdr = std::make_unique<hdr_info_raw_t>(config.dynamicRange != 0);
+            if (hdr->enabled && !display->get_hdr_metadata(hdr->metadata)) {
+              throw std::runtime_error("PyroWave HDR capture metadata is unavailable");
+            }
+            mail->event<hdr_info_t>(mail::hdr)->raise(std::move(hdr));
+            hdr_sent = true;
+          }
+          const auto now = std::chrono::steady_clock::now();
+          const auto elapsed = previous_encode ? now - *previous_encode : std::chrono::steady_clock::duration::zero();
+          previous_encode = now;
+          const auto budget = rate.next(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed));
+          if (!budget) {
+            return true;
+          }
+          auto bytes = encoder.encode(*image, *display, budget);
+          auto packet = std::make_unique<packet_raw_generic>(std::move(bytes), frame_number++, true);
+          packet->channel_data = channel_data;
+          packet->frame_timestamp = image->frame_timestamp;
+          packets->raise(std::move(packet));
+          return true;
+        };
+        auto pull = [&](std::shared_ptr<platf::img_t> &image) {
+          if (shutdown->peek()) {
+            return false;
+          }
+          image = display->alloc_img();
+          return bool(image);
+        };
+        auto status = display->capture(push, pull, &display_cursor);
+        if (status != platf::capture_e::reinit) {
+          break;
+        }
+      }
+    } catch (const std::exception &failure) {
+      BOOST_LOG(error) << "PyroWave session stopped: " << failure.what();
+    }
+  }
+
+  /**
    * @brief Capture and encode video for a streaming session.
    *
    * @param mail Session mail bus.
@@ -2509,6 +2593,10 @@ namespace video {
     config_t config,
     void *channel_data
   ) {
+    if (config.videoFormat == prism_pyrowave::video_format) {
+      capture_pyrowave(std::move(mail), config, channel_data);
+      return;
+    }
     auto idr_events = mail->event<bool>(mail::idr);
 
     idr_events->raise(true);

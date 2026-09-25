@@ -48,6 +48,8 @@ file(GLOB NVENC_SOURCES CONFIGURE_DEPENDS "src/nvenc/*.cpp" "src/nvenc/*.h")
 list(APPEND PLATFORM_TARGET_FILES ${NVENC_SOURCES})
 
 set(PRISM_TARGET_FILES
+        "${CMAKE_SOURCE_DIR}/src/pyrowave/encoder.cpp"
+        "${CMAKE_SOURCE_DIR}/src/pyrowave/compositor.cpp"
         "${CMAKE_SOURCE_DIR}/third-party/moonlight-common-c/src/Input.h"
         "${CMAKE_SOURCE_DIR}/third-party/moonlight-common-c/src/Rtsp.h"
         "${CMAKE_SOURCE_DIR}/third-party/moonlight-common-c/src/RtspParser.c"

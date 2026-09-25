@@ -1733,6 +1733,22 @@ namespace platf {
     class display_vram_t: public display_t {
     public:
       /**
+       * @brief Report support for direct DMA-BUF encoding.
+       * @return True for the Vulkan capture path.
+       */
+      bool supports_pyrowave() const override {
+        return mem_type == mem_type_e::vulkan;
+      }
+
+      /**
+       * @brief Locate this output within the KMS framebuffer.
+       * @return Framebuffer crop origin.
+       */
+      std::pair<int, int> pyrowave_capture_offset() const override {
+        return {img_offset_x, img_offset_y};
+      }
+
+      /**
        * @brief Initialize a KMS display backend that exports frames as GPU resources.
        *
        * @param mem_type Mem type.

@@ -48,3 +48,5 @@ include("${CMAKE_MODULE_PATH}/dependencies/FindOpus.cmake")
 # platform specific dependencies (Linux-only fork)
 include("${CMAKE_MODULE_PATH}/dependencies/unix.cmake")
 include("${CMAKE_MODULE_PATH}/dependencies/linux.cmake")
+
+include(dependencies/pyrowave)

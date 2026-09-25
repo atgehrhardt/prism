@@ -27,6 +27,9 @@ extern "C" {
 #include "input.h"
 #include "logging.h"
 #include "network.h"
+#include "pyrowave/encoder.h"
+#include "pyrowave/protocol.h"
+#include "pyrowave/rate_control.h"
 #include "rtsp.h"
 #include "stream.h"
 #include "sync.h"
@@ -957,6 +960,10 @@ namespace rtsp_stream {
       ss << "a=rtpmap:98 AV1/90000"sv << std::endl;
     }
 
+    if (prism_pyrowave::encoder_capabilities()) {
+      ss << "a=x-prism-pyrowave.version:1" << std::endl;
+    }
+
     if (!session.surround_params.empty()) {
       // If we have our own surround parameters, advertise them twice first
       ss << "a=fmtp:97 surround-params="sv << session.surround_params << std::endl;
@@ -1271,6 +1278,28 @@ namespace rtsp_stream {
 
       BOOST_LOG(debug) << "Final adjusted video encoding bitrate is "sv << configuredBitrateKbps << " Kbps"sv;
       config.monitor.bitrate = (int) configuredBitrateKbps;
+    }
+
+    if (config.monitor.videoFormat < 0 || config.monitor.videoFormat > prism_pyrowave::video_format) {
+      respond(sock, session, &option, 400, "Unsupported video codec", req->sequenceNumber, {});
+      return;
+    }
+    if (config.monitor.videoFormat == prism_pyrowave::video_format) {
+      auto version = args.find("x-prism-pyrowave.version"sv);
+      auto &video = config.monitor;
+      video.pyrowave_frame_budget = prism_pyrowave::frame_budget(video.bitrate, prism_pyrowave::effective_fps(video.framerate, video.framerateX100), config.packetsize, config::stream.fec_percentage);
+      video.pyrowave_frame_limit = prism_pyrowave::transport_frame_budget(config.packetsize, config::stream.fec_percentage);
+      if (version == args.end() || version->second != "1" || !video.pyrowave_frame_budget ||
+          video.pyrowave_frame_limit < video.pyrowave_frame_budget ||
+          !prism_pyrowave::valid_mode(video.width, video.height, video.dynamicRange, video.chromaSamplingType) ||
+          !prism_pyrowave::encoder_capabilities()) {
+        BOOST_LOG(error) << "PyroWave: incompatible version, unavailable GPU, or bitrate outside FEC limits";
+        respond(sock, session, &option, 400, "Unsupported PyroWave configuration", req->sequenceNumber, {});
+        return;
+      }
+      BOOST_LOG(info) << "PyroWave: " << video.width << 'x' << video.height << ", " << video.bitrate
+                      << " Kbps video; adaptive frame budget " << video.pyrowave_frame_budget
+                      << " to " << video.pyrowave_frame_limit << " bytes";
     }
 
     if (config.monitor.videoFormat == 1 && video::active_hevc_mode == 1) {

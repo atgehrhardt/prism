@@ -507,6 +507,15 @@ namespace wl {
    */
   class wlr_vram_t: public wlr_t {
   public:
+    /**
+     * @brief Expose screencopy DMA-BUF frames directly to the PyroWave Vulkan encoder.
+     *
+     * @return True when this display was created for Vulkan capture.
+     */
+    bool supports_pyrowave() const override {
+      return mem_type == platf::mem_type_e::vulkan;
+    }
+
     platf::capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
       auto next_frame = std::chrono::steady_clock::now();
 
@@ -667,12 +676,12 @@ namespace platf {
     int expected_width,
     int expected_height
   ) {
-    if (hwdevice_type != platf::mem_type_e::system && hwdevice_type != platf::mem_type_e::vaapi && hwdevice_type != platf::mem_type_e::cuda) {
+    if (hwdevice_type != platf::mem_type_e::system && hwdevice_type != platf::mem_type_e::vaapi && hwdevice_type != platf::mem_type_e::cuda && hwdevice_type != platf::mem_type_e::vulkan) {
       BOOST_LOG(error) << "[wlgrab] Could not initialize display with the given hw device type."sv;
       return nullptr;
     }
 
-    if (hwdevice_type == platf::mem_type_e::vaapi || hwdevice_type == platf::mem_type_e::cuda) {
+    if (hwdevice_type == platf::mem_type_e::vaapi || hwdevice_type == platf::mem_type_e::cuda || hwdevice_type == platf::mem_type_e::vulkan) {
       auto wlr = std::make_shared<wl::wlr_vram_t>();
       if (wlr->init(
             hwdevice_type,
