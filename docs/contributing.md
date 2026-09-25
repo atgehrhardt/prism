@@ -122,25 +122,30 @@ and all other rules in the `Protect master` ruleset are satisfied.
 Repository administrators must enable **Settings > General > Pull Requests >
 Allow auto-merge** and retain those required checks and the up-to-date branch rule.
 The workflow uses the built-in `GITHUB_TOKEN`; no personal access token or automatic
-approval is needed. It queries GitHub metadata without checking out or executing
-pull request code in the privileged `pull_request_target` workflow.
+approval is needed. The privileged automation checks out only trusted `master`
+code, never a pull request branch. CI runs separately with its own permissions.
 
-Dependabot automatically rebases updates as `master` advances, including submodules,
-so CI reruns before the next merge. Conflicts, failed tests, or unresolved review
-threads still need attention. Dependabot stops automatically rebasing PRs after
-30 days or when a contributor adds commits; see
-[managing Dependabot PRs](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/manage-your-dependency-security/manage-dependabot-prs).
+Enabling auto-merge alone does not update an outdated branch. The automation merges
+`master` into eligible branches that GitHub marks `behind`, waits for the new head,
+and starts missing `Common Lint` and `Linux` workflows for that commit. Updates and
+merge requests include the expected head SHA so a concurrent change cannot be
+overwritten. It explicitly dispatches CI because updates made with `GITHUB_TOKEN`
+do not start unattended pull request checks; see
+[triggering workflows](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+Existing queued, running, or completed CI is not restarted. Conflicts, failed tests,
+cancelled checks, and unresolved review threads still need attention.
 
-After this workflow lands on `master`, use **Actions > Dependabot auto-merge > Run
-workflow** once to enroll existing open updates. New and updated Dependabot PRs
-also trigger a scan of all eligible open updates. Each merge request is tied to
-the current head commit; if the branch changes during enrollment, rerun the
-workflow. Auto-merge follows GitHub's
+Scans run when `master` changes, when required CI workflows finish, on Dependabot
+events, and every 15 minutes as a fallback (scheduled runs may be delayed by GitHub).
+This also recovers partial updates or CI dispatch failures. To request a scan
+immediately, use **Actions > Dependabot auto-merge > Run workflow**. Existing open
+updates are included. Auto-merge follows GitHub's
 [required-check behavior](https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions).
 
-`scripts/lint.sh` runs regression tests for PR selection, pagination, and merge
-commands using a fake GitHub CLI. With the lint environment installed, run them
-directly with `.lint-venv/bin/python tests/integration/test_dependabot_auto_merge.py`.
+`scripts/lint.sh` runs regression tests for PR selection, pagination, branch updates,
+merge requests, and CI recovery using mocked GitHub responses. With the lint
+environment installed, run them directly with
+`.lint-venv/bin/python tests/integration/test_dependabot_auto_merge.py`.
 
 ### Testing
 

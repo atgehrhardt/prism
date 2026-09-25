@@ -7,6 +7,13 @@ on:
     branches: [master]
     types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
+  push:
+    branches: [master]
+  workflow_run:
+    workflows: [Linux, Common Lint]
+    types: [completed]
+  schedule:
+    - cron: "7,22,37,52 * * * *"
 
 concurrency:
   group: dependabot-auto-merge
@@ -16,31 +23,24 @@ jobs:
   auto-merge:
     if: >-
       github.repository == 'atgehrhardt/prism' &&
-      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name != 'pull_request_target' ||
       github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     steps:
-      # Only query GitHub metadata; never check out or execute PR contents with this token.
-      # GitHub's master ruleset gates merging on required checks and an up-to-date branch.
-      - name: Enable auto-merge for open Dependabot PRs
+      # Only execute trusted master code with write permissions, never PR contents.
+      - name: Checkout automation from master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Refresh and enroll open Dependabot PRs
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          pulls=$(gh api --paginate "repos/$GH_REPO/pulls?state=open&base=master&per_page=100" |
-            jq -r --arg repo "$GH_REPO" '.[] | select(
-              .user.login == "dependabot[bot]" and .user.type == "Bot" and
-              .state == "open" and .draft == false and .base.ref == "master" and
-              .base.repo.full_name == $repo and .head.repo.full_name == $repo
-            ) | [.number, .head.sha] | @tsv')
-          while IFS=$'\t' read -r number sha; do
-            if [[ -n "$number" ]]; then
-              gh pr merge "$number" --repo "$GH_REPO" --auto --squash --match-head-commit "$sha"
-            fi
-          done <<< "$pulls"
+        run: python3 scripts/dependabot-auto-merge.py
