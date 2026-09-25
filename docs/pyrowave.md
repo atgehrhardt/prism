@@ -41,16 +41,24 @@ initialization logs the negotiated video size, window size, buffer size, viewpor
 and surface transform under `IrisPyroWave` to diagnose scaling independently of
 compression quality.
 
-PyroWave uses much higher bitrates than inter-frame codecs. Iris allows bitrate
-entry up to 1,000 Mbps; this is an input range, not a promise that every
+PyroWave uses much higher bitrates than inter-frame codecs. Every frame is coded
+independently with simple entropy coding, so a bitrate that looks sharp with
+H.264, HEVC, or AV1 visibly blurs fine texture. As a starting point, target about
+1.5 bits per streamed pixel per frame: roughly 350–400 Mbps for 1080p120 and
+600+ Mbps for 1440p120, measured as video bitrate. FEC parity and audio are paid
+from Iris's bitrate setting, so video receives roughly 80% of it. Streaming at
+the client display's native resolution avoids spending bits on pixels that are
+discarded when Iris scales the image down. Iris allows bitrate entry up to
+1,000 Mbps; this is an input range, not a promise that every
 resolution/FPS/packet-size combination is transportable. Prism computes the
 initial encoder budget from the effective stream FPS (including Warp multipliers)
 after existing audio/FEC bandwidth adjustments. Subsequent frames earn byte
 credits from elapsed capture time, so a 120 FPS capture does not lose half its
 quality budget when Warp requests 240 FPS. Credits are capped at one transport-safe
 frame; pauses cannot accumulate an oversized frame or a prolonged burst. Requests
-whose initial budget exceeds four FEC blocks are rejected. The limit accounts
-conservatively for envelope overhead. Actual
+whose initial budget exceeds four FEC blocks are rejected. The limit reserves one
+length word per upstream packet; upstream packs blocks greedily, so every packet
+except the last carries more than 48 KiB. Actual
 encoded frames are checked again before transmission; FEC is never silently
 disabled for PyroWave.
 

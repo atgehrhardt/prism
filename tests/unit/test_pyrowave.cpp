@@ -86,9 +86,11 @@ TEST(PyroWaveRateControl, TransportCapacity) {
       const auto budget = prism_pyrowave::transport_frame_budget(packet, fec);
       EXPECT_GE(budget, 4096);
       EXPECT_EQ(budget % 4, 0);
-      const auto envelope = budget + (budget / 8 + 1) * 4 + prism_pyrowave::header_size;
-      EXPECT_LE(envelope + 8, size_t(4 * (25500 / (100 + fec)) * (packet - 16)));
-      EXPECT_LE(envelope, prism_pyrowave::maximum_frame_size);
+      const auto envelope = prism_pyrowave::envelope_bound(budget);
+      const auto capacity = std::min<uint64_t>(uint64_t(4 * (25500 / (100 + fec))) * (packet - 16) - 8, prism_pyrowave::maximum_frame_size);
+      EXPECT_LE(envelope, capacity);
+      // Only alignment and the envelope's own length words may be left unused.
+      EXPECT_GT(envelope + 4 + 4 * (capacity / 49157 + 1), capacity);
     }
   }
 }
@@ -169,6 +171,35 @@ TEST(PyroWaveProtocol, ExactRateControlAndWarpRates) {
   EXPECT_EQ(prism_pyrowave::frame_budget(200000, 24000, 1392, 20), 104166);
   EXPECT_EQ(prism_pyrowave::frame_budget(200000, 5994, 1392, 20), 417083);
   EXPECT_EQ(prism_pyrowave::frame_budget(1000000, 6000, 1392, 20), 0);
+  // Budgets up to the FEC capacity are usable; only length words are reserved for the envelope.
+  EXPECT_EQ(prism_pyrowave::frame_budget(1000000, 12000, 1392, 20), 1041666);
+  EXPECT_EQ(prism_pyrowave::transport_frame_budget(1024, 20), 854692);
+}
+
+/**
+ * @brief Upstream's greedy packetization never produces more envelope overhead than the bound.
+ */
+TEST(PyroWaveProtocol, EnvelopeBoundCoversGreedyPacketization) {
+  EXPECT_EQ(prism_pyrowave::envelope_bound(0), prism_pyrowave::header_size + 4);
+  std::mt19937 random(7);
+  for (int trial = 0; trial < 2000; ++trial) {
+    // Mirror upstream: an 8-byte sequence header, then blocks that open a new packet only on overflow.
+    const size_t block_limit = trial % 2 ? prism_pyrowave::maximum_block_size : 8 + 4 * (random() % 64);
+    size_t bitstream = 8;
+    size_t in_packet = 8;
+    size_t packets = 1;
+    const size_t blocks = random() % 400;
+    for (size_t i = 0; i < blocks; ++i) {
+      const size_t block = 8 + 4 * (random() % ((block_limit - 8) / 4 + 1));
+      if (in_packet + block > prism_pyrowave::packet_boundary) {
+        ++packets;
+        in_packet = 0;
+      }
+      in_packet += block;
+      bitstream += block;
+    }
+    EXPECT_LE(prism_pyrowave::header_size + bitstream + 4 * packets, prism_pyrowave::envelope_bound(bitstream));
+  }
 }
 
 /**
@@ -191,7 +222,7 @@ TEST(PyroWaveProtocol, RejectInvalidBudgets) {
     for (int bitrate = 1000; bitrate <= 1000000; bitrate += 1000) {
       auto budget = prism_pyrowave::frame_budget(bitrate, 6000, 1392, fec);
       if (budget) {
-        EXPECT_LE(budget + (budget / 8 + 1) * 4 + 12 + 8, size_t(4 * (25500 / (100 + fec)) * (1392 - 16)));
+        EXPECT_LE(prism_pyrowave::envelope_bound(budget) + 8, size_t(4 * (25500 / (100 + fec)) * (1392 - 16)));
       }
     }
   }

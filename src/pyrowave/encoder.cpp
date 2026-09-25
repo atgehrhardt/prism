@@ -302,7 +302,12 @@ namespace prism_pyrowave {
       }
       views.push_back({bytes.data() + packet.offset, packet.size});
     }
-    return pack(views, uint8_t(impl->config.dynamicRange | impl->config.chromaSamplingType << 1));
+    auto envelope = pack(views, uint8_t(impl->config.dynamicRange | impl->config.chromaSamplingType << 1));
+    // Transport limits assume upstream's greedy packetization; reject a violation before FEC does.
+    if (envelope.size() > envelope_bound(frame_budget)) {
+      throw std::runtime_error("PyroWave envelope exceeds its negotiated bound");
+    }
+    return envelope;
   }
 
   uint32_t encoder_capabilities() {
@@ -330,7 +335,7 @@ namespace prism_pyrowave {
 
   encoder::~encoder() = default;
 
-  std::vector<uint8_t> encoder::encode(platf::img_t &, platf::display_t &) {
+  std::vector<uint8_t> encoder::encode(platf::img_t &, platf::display_t &, size_t) {
     throw std::runtime_error("PyroWave support was disabled at build time");
   }
 

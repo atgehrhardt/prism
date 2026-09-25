@@ -22,8 +22,8 @@ namespace prism_pyrowave {
     }
     const uint64_t shards = 4 * (25500 / (100 + fec_percent));
     const uint64_t capacity = std::min<uint64_t>(shards * uint64_t(packet_size - 16) - 8, maximum_frame_size);
-    // Same worst-case envelope overhead as frame_budget(): one length word per eight bytes.
-    return size_t((capacity - header_size - 4) * 2 / 3) & ~size_t(3);
+    // Envelope overhead grows with the bitstream, so the overhead of the whole capacity bounds it.
+    return size_t(capacity - (envelope_bound(capacity) - capacity)) & ~size_t(3);
   }
 
   /**

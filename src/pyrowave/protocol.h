@@ -22,6 +22,7 @@ namespace prism_pyrowave {
   constexpr size_t maximum_frame_size = 4 * 1024 * 1024;  ///< Absolute allocation bound for untrusted frame envelopes.
   constexpr size_t packet_boundary = 65536;  ///< Maximum upstream packet size within an envelope.
   constexpr size_t header_size = 12;  ///< Magic, version, mode flags, reserved bytes, and packet count.
+  constexpr size_t maximum_block_size = 0xfff * 4;  ///< Largest upstream block; its length is a 12-bit word count.
 
   /**
    * @brief A borrowed upstream packet inside a validated frame envelope.
@@ -186,6 +187,20 @@ namespace prism_pyrowave {
   }
 
   /**
+   * @brief Bound the envelope carrying an upstream bitstream of a given size.
+   *
+   * Upstream packetization starts a new packet only when the next block would cross the packet
+   * boundary, so every packet except the last holds more than `packet_boundary - maximum_block_size`
+   * bytes. Each packet adds one length word to the envelope.
+   *
+   * @param bitstream Upstream bitstream bytes, including its sequence header.
+   * @return Largest possible envelope size in bytes.
+   */
+  constexpr uint64_t envelope_bound(uint64_t bitstream) {
+    return header_size + bitstream + 4 * (bitstream / (packet_boundary - maximum_block_size + 1) + 1);
+  }
+
+  /**
    * @brief Compute an exact encoder budget that fits four existing FEC blocks.
    * @param bitrate_kbps Codec bitrate after transport overhead adjustments.
    * @param fps_x100 Actual stream frame rate multiplied by 100.
@@ -199,12 +214,11 @@ namespace prism_pyrowave {
       return 0;
     }
     const uint64_t budget = uint64_t(bitrate_kbps) * 12500 / uint64_t(fps_x100);
-    // Reserve one length word per minimum-sized upstream packet, plus the envelope and video header.
-    // This bound does not depend on upstream's rate-control treatment of packetization overhead.
-    const uint64_t envelope_bound = budget + (budget / 8 + 1) * 4 + header_size;
+    const uint64_t envelope = envelope_bound(budget);
     const uint64_t shards = 4 * (255 * 100 / (100 + fec_percent));
+    // The eight bytes reserved here are the video frame header prepended by the transport.
     const uint64_t capacity = shards * uint64_t(packet_size - 16) - 8;
-    if (budget < 4096 || envelope_bound > capacity || envelope_bound > maximum_frame_size) {
+    if (budget < 4096 || envelope > capacity || envelope > maximum_frame_size) {
       return 0;
     }
     return size_t(budget);
