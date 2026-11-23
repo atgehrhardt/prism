@@ -9,11 +9,11 @@
   },
   "type": "module",
   "dependencies": {
-    "@lucide/vue": "1.72.0",
+    "@lucide/vue": "1.77.0",
     "bootstrap": "5.3.9",
-    "marked": "18.2.0",
+    "marked": "18.2.1",
     "vue": "3.5.45",
-    "vue-i18n": "11.4.19",
+    "vue-i18n": "11.4.23",
     "vue3-simple-icons": "16.10.0"
   },
   "devDependencies": {
